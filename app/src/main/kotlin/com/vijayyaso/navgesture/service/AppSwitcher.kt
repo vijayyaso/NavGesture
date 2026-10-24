@@ -17,6 +17,7 @@
 
 package com.vijayyaso.navgesture.service
 
+import android.app.ActivityManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -78,10 +79,32 @@ class AppSwitcher(internal val context: Context) {
             if (event.eventType != UsageEvents.Event.ACTIVITY_RESUMED) continue
             resumed.add(event.packageName ?: continue)
         }
-        return RecentApps.order(resumed, context.packageName, homePackages()) { packageName ->
+        // Apps the user can still return to: recent ones whose process is alive. Clearing the
+        // system recents kills those processes, so the row empties with it.
+        val alive = runningPackages()
+        val recent = if (alive.isEmpty()) resumed else resumed.filter { it in alive }
+        Log.i(TAG, "SWITCHER_POOL usage=${resumed.size} running=${alive.size} kept=${recent.size}")
+        return RecentApps.order(
+            recent.filterNot { it in HOUSEKEEPING },
+            context.packageName,
+            homePackages(),
+        ) { packageName ->
             context.packageManager.getLaunchIntentForPackage(packageName) != null
-        }
+        }.take(MAX_APPS)
     }
+
+    /**
+     * Packages with a live process. Android hides other apps' processes from ordinary
+     * callers on newer releases; an unusable answer (only ourselves) is treated as unknown.
+     */
+    @Suppress("DEPRECATION")
+    private fun runningPackages(): Set<String> = runCatching {
+        val manager = context.getSystemService(ActivityManager::class.java) ?: return emptySet()
+        val packages = manager.runningAppProcesses.orEmpty()
+            .flatMap { it.pkgList?.toList().orEmpty() }
+            .toSet()
+        if (packages.size <= 1) emptySet() else packages
+    }.getOrDefault(emptySet())
 
     internal fun homePackages(): Set<String> =
         context.packageManager.queryIntentActivities(
@@ -91,7 +114,21 @@ class AppSwitcher(internal val context: Context) {
 
     companion object {
         private const val TAG = "NavGesture"
-        private const val TRAIL_WINDOW_MS = 6L * 60L * 60L * 1000L
+        private const val TRAIL_WINDOW_MS = 30L * 60L * 1000L
+
+        /** A row, not a list: the panel shows six, so anything past eight is unreachable. */
+        private const val MAX_APPS = 8
+
+        /**
+         * MIUI starts these itself, for scans and installs, so they would sit in the row
+         * permanently without the user ever opening them.
+         */
+        private val HOUSEKEEPING = setOf(
+            "com.miui.securitycenter",
+            "com.miui.securityadd",
+            "com.miui.securitycore",
+            "com.lbe.security.miui",
+        )
 
         @Volatile
         var lastFailure: String? = null

@@ -19,9 +19,14 @@ package com.vijayyaso.navgesture.ui
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -41,6 +46,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -52,7 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Picks the right-edge app list, in the order the panel will show it. */
+/** Picks the list a leftward drag from the bottom shows, in the order the panel shows it. */
 @Composable
 internal fun FavouriteAppsScreen() {
     val context = LocalContext.current
@@ -71,6 +78,9 @@ internal fun FavouriteAppsScreen() {
     val labels = remember(apps) {
         apps.orEmpty().associate { it.packageName to it.label }
     }
+    val appIcons = remember(apps) {
+        apps.orEmpty().associate { it.packageName to it.icon }
+    }
     val save: (List<String>) -> Unit = { updated ->
         // Shown at once, then saved; waiting for DataStore would make every tick feel slow.
         favourites = updated
@@ -83,6 +93,7 @@ internal fun FavouriteAppsScreen() {
     }
     chosen.forEachIndexed { index, packageName ->
         ListItem(
+            leadingContent = { AppIconImage(appIcons[packageName]) },
             headlineContent = { Text(labels[packageName] ?: packageName) },
             trailingContent = {
                 Row {
@@ -116,6 +127,7 @@ internal fun FavouriteAppsScreen() {
     all.forEach { app ->
         val checked = app.packageName in chosen
         ListItem(
+            leadingContent = { AppIconImage(app.icon) },
             headlineContent = { Text(app.label) },
             trailingContent = {
                 Checkbox(
@@ -132,12 +144,32 @@ internal fun FavouriteAppsScreen() {
     }
 }
 
-private data class LaunchableApp(val packageName: String, val label: String)
+private data class LaunchableApp(
+    val packageName: String,
+    val label: String,
+    val icon: ImageBitmap?,
+)
+
+/** A 40 dp icon slot, blank when the package manager gave nothing usable. */
+@Composable
+private fun AppIconImage(icon: ImageBitmap?) {
+    if (icon == null) return
+    Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(40.dp))
+}
+
+/** Draws an app icon into a square bitmap; adaptive icons draw fine this way. */
+private fun Drawable.toIconBitmap(sizePx: Int): ImageBitmap {
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    setBounds(0, 0, sizePx, sizePx)
+    draw(Canvas(bitmap))
+    return bitmap.asImageBitmap()
+}
 
 /** Every app with a launcher entry, minus the home screens and NavGesture itself. */
 private fun launchableApps(context: Context): List<LaunchableApp> {
     val manager = context.packageManager
     val home = AppSwitcher(context).homePackages()
+    val iconSize = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
     return manager.queryIntentActivities(
         Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
         0,
@@ -146,7 +178,10 @@ private fun launchableApps(context: Context): List<LaunchableApp> {
         .filterNot { it.packageName == context.packageName || it.packageName in home }
         .map { info ->
             val label = manager.getApplicationLabel(info.applicationInfo).toString()
-            LaunchableApp(info.packageName, label)
+            val icon = runCatching {
+                manager.getApplicationIcon(info.applicationInfo).toIconBitmap(iconSize)
+            }.getOrNull()
+            LaunchableApp(info.packageName, label, icon)
         }
         .sortedBy { it.label.lowercase() }
         // Some apps ship several launcher activities; show each package once.

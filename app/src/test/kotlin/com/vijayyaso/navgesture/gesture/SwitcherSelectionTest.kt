@@ -23,33 +23,50 @@ import org.junit.Test
 
 class SwitcherSelectionTest {
     @Test
-    fun `no slide is cancel`() {
-        assertNull(SwitcherSelection.selected(10f, 5, 1))
-        assertNull(SwitcherSelection.selected(-10f, 5, 1))
+    fun `no slide stays on the start index`() {
+        assertEquals(1, SwitcherSelection.looped(0f, 5, 1))
+        assertEquals(0, SwitcherSelection.looped(10f, 5, 0))
     }
 
     @Test
-    fun `first step selects firstIndex`() {
-        assertEquals(1, SwitcherSelection.selected(24f, 5, 1))
-        assertEquals(1, SwitcherSelection.selected(79f, 5, 1))
-        assertEquals(2, SwitcherSelection.selected(80f, 5, 1))
-        assertEquals(0, SwitcherSelection.selected(24f, 5, 0))
+    fun `each step moves one app`() {
+        assertEquals(2, SwitcherSelection.looped(56f, 5, 1))
+        assertEquals(3, SwitcherSelection.looped(112f, 5, 1))
     }
 
     @Test
-    fun `clamped to the last app`() {
-        assertEquals(2, SwitcherSelection.selected(1000f, 3, 1))
+    fun `sliding back moves one app per step`() {
+        assertEquals(4, SwitcherSelection.looped(-56f, 5, 1))
+    }
+
+    @Test
+    fun `past the last app comes the first`() {
+        // 4 selectable apps (1..4) with the dimmed current app at 0.
+        assertEquals(1, SwitcherSelection.looped(56f * 4, 5, 1))
+        assertEquals(2, SwitcherSelection.looped(56f * 5, 5, 1))
+    }
+
+    @Test
+    fun `before the first app comes the last`() {
+        assertEquals(4, SwitcherSelection.looped(-56f, 5, 1))
+        assertEquals(3, SwitcherSelection.looped(-112f, 5, 1))
+    }
+
+    @Test
+    fun `favourites loop over the whole list`() {
+        assertEquals(0, SwitcherSelection.looped(56f * 3, 3, 0))
+        assertEquals(2, SwitcherSelection.looped(-56f, 3, 0))
     }
 
     @Test
     fun `an empty list selects nothing`() {
-        assertNull(SwitcherSelection.selected(200f, 0, 0))
+        assertNull(SwitcherSelection.looped(200f, 0, 0))
     }
 
     @Test
     fun `a one-app recents list cannot select itself`() {
-        assertNull(SwitcherSelection.selected(200f, 1, 1))
-        assertNull(SwitcherSelection.selected(200f, 3, 4))
+        assertNull(SwitcherSelection.looped(200f, 1, 1))
+        assertNull(SwitcherSelection.looped(200f, 3, 4))
     }
 
     @Test

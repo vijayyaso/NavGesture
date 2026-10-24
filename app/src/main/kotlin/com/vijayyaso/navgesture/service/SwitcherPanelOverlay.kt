@@ -37,7 +37,7 @@ import kotlin.math.ceil
 /** Metadata resolved off the touch thread, ready for drawing. */
 internal data class PanelApp(val packageName: String, val label: String, val icon: Drawable)
 
-/** A non-touchable app row; the side strip keeps ownership of the held touch. */
+/** A non-touchable app row; the bottom strip keeps ownership of the held touch. */
 internal class SwitcherPanelOverlay(
     context: Context,
     private val windowManager: WindowManager,

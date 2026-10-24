@@ -40,7 +40,10 @@ internal fun CircleToSearchScreen(model: AppModel) {
     SectionHeader(stringResource(R.string.section_timing))
     ToggleRow(
         label = stringResource(R.string.label_circle_to_search_system_timing),
-        supporting = stringResource(R.string.value_ms, ViewConfiguration.getLongPressTimeout()),
+        supporting = stringResource(
+            R.string.value_seconds,
+            ViewConfiguration.getLongPressTimeout() / 1000f,
+        ),
         checked = configuration.circleToSearchFollowsSystemTiming,
     ) { updated -> model.update { it.copy(circleToSearchFollowsSystemTiming = updated) } }
     if (!configuration.circleToSearchFollowsSystemTiming) {
@@ -48,7 +51,7 @@ internal fun CircleToSearchScreen(model: AppModel) {
             label = stringResource(R.string.label_circle_to_search_hold),
             value = configuration.circleToSearchHoldMs.toFloat(),
             range = 250f..1500f,
-            formatter = { stringResource(R.string.value_ms, it) },
+            formatter = { stringResource(R.string.value_seconds, it / 1000f) },
         ) { updated -> model.update { it.copy(circleToSearchHoldMs = updated.toLong()) } }
     }
     SectionHeader(stringResource(R.string.section_needs))

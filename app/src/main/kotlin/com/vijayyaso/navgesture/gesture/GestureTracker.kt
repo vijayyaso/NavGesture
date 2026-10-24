@@ -33,8 +33,9 @@ import kotlin.math.pow
  * than timing a hold. A follow point chases a damped "pivot" of the finger a quarter of the
  * way every frame; the swipe has paused when it catches up. A pause counts only past the
  * Recents line, so a slow Home swipe that hesitates near the bottom stays Home. The pause
- * only primes Recents, with a tick: the release decides, and a fast upward flick is still
- * Home.
+ * primes Recents, with a tick: the release decides, and a fast upward flick is still Home.
+ * A sideways drag during the rise opens the app list instead, since the phone's own
+ * Recents gesture is a still finger and this one never is.
  *
  * Released low and not moving up, a bottom swipe reverts to the app it started on, as POCO's
  * does in its safe area.
@@ -129,11 +130,13 @@ class GestureTracker(
 
     private val longPressSlopPx: Float get() = configuration.platform.touchSlopDp * density
 
-    // A side hold is a deliberate gesture, so a resting finger may drift more than the
-    // system's 8 dp touch slop before Back starts. Keep the bottom handle strict.
+    // Only the bottom handle takes a long press, and it stays strict like Launcher3's.
     private val holdSlopPx: Float
-        get() = if (edge == ScreenEdge.BOTTOM) longPressSlopPx else
-            maxOf(longPressSlopPx, density * SWITCHER_HOLD_SLOP_DP)
+        get() = longPressSlopPx
+
+    // A deliberate sideways drag, well past the drift of an ordinary Home swipe.
+    private val switcherDragPx: Float
+        get() = density * SWITCHER_DRAG_DP
 
     private val handleHalfWidthPx: Float
         get() = density / 2f * maxOf(
@@ -151,15 +154,10 @@ class GestureTracker(
         tailX = pivotX(sample)
         tailY = pivotY(sample)
         tailAtMs = sample.timestampMs
-        longPressPending = if (edge == ScreenEdge.BOTTOM) {
+        longPressPending = edge == ScreenEdge.BOTTOM &&
             longPressAction != null && overHandle(sample)
-        } else {
-            configuration.edgeAppListEnabled
-        }
         return if (longPressPending) {
-            TrackerAction.ScheduleLongPress(
-                if (edge == ScreenEdge.BOTTOM) configuration.effectiveCircleToSearchHoldMs else EDGE_HOLD_MS,
-            )
+            TrackerAction.ScheduleLongPress(configuration.effectiveCircleToSearchHoldMs)
         } else {
             TrackerAction.None
         }
@@ -192,6 +190,25 @@ class GestureTracker(
     }
 
     private fun whileArmed(origin: TouchSample, state: Arm, sample: TouchSample): TrackerAction {
+        // A sideways drag during the rise is the app-list gesture. A still finger is not,
+        // so the phone's own Recents keeps the pause. The sideways travel must also beat
+        // the rise: a slow, wavy swipe up wobbles a long way sideways, and that must still
+        // reach Recents instead of opening the list.
+        if (state == Arm.Rising && edge == ScreenEdge.BOTTOM &&
+            configuration.edgeAppListEnabled
+        ) {
+            val sideways = abs(sample.xPx - origin.xPx)
+            val rise = abs(origin.yPx - sample.yPx)
+            if (sideways >= switcherDragPx && sideways > rise) {
+                arm = Arm.Switcher
+                // Right opens recent apps, left opens favourites: the direction is the choice.
+                return TrackerAction.OpenSwitcher(
+                    ScreenEdge.BOTTOM,
+                    sample,
+                    recents = sample.xPx >= origin.xPx,
+                )
+            }
+        }
         if (holdAction == null) return followSide(origin, state, sample)
         // A primed or fired gesture owns the release.
         if (state != Arm.Rising) return TrackerAction.None
@@ -235,12 +252,6 @@ class GestureTracker(
     /** Fires only for a touch still down, unarmed and within the slop since DOWN. */
     fun onLongPressElapsed(): TrackerAction {
         if (!longPressPending || arm != null) return TrackerAction.None
-        if (edge != ScreenEdge.BOTTOM) {
-            val origin = tracked ?: return TrackerAction.None
-            longPressPending = false
-            arm = Arm.Switcher
-            return TrackerAction.OpenSwitcher(edge, origin)
-        }
         val action = longPressAction ?: return TrackerAction.None
         longPressPending = false
         // Marked fired, so the release is consumed rather than read as Home or replayed.
@@ -402,11 +413,8 @@ class GestureTracker(
     }
 
     companion object {
-        /** A still side touch opens the app selector after this delay. */
-        const val EDGE_HOLD_MS = 300L
-
-        /** A resting finger may wander this far before the side hold becomes a Back swipe. */
-        const val SWITCHER_HOLD_SLOP_DP = 24f
+        /** Sideways travel that turns a bottom swipe into the app list. Short on purpose. */
+        const val SWITCHER_DRAG_DP = 40f
 
         /** POCO samples its tail once per 60Hz frame. */
         const val FRAME_MS = 16L

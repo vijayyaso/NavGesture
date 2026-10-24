@@ -44,9 +44,13 @@ class GestureSettingsRepository(private val context: Context) {
 
     suspend fun read(): GestureConfiguration = configuration.first()
 
+    /**
+     * Reads and writes inside one transaction. Reading first and editing after would let two
+     * quick changes both start from the old values, so the second write puts the first one back.
+     */
     suspend fun update(transform: (GestureConfiguration) -> GestureConfiguration) {
-        val updated = transform(read())
         context.gestureDataStore.edit { preferences ->
+            val updated = transform(toConfiguration(preferences))
             preferences[EDGE_WIDTH_DP] = updated.edgeWidthDp
             preferences[SIDE_MIN_DISTANCE_DP] = updated.sideMinimumSwipeDistanceDp
             preferences[BOTTOM_MIN_DISTANCE_DP] = updated.bottomMinimumSwipeDistanceDp

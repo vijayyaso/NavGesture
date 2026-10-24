@@ -34,8 +34,8 @@ android {
         // edge overlays need to be positioned correctly.
         minSdk = 30
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.0.0"
+        versionCode = 9
+        versionName = "1.1.0"
     }
 
     // android.keystore and .env are both gitignored. Missing either degrades to an
@@ -72,6 +72,10 @@ android {
         }
         debug {
             enableUnitTestCoverage = true
+            // Test builds reuse the release key when it is available, so any APK this
+            // project builds can update the installed app. Without it, Gradle generates a
+            // throwaway debug key in $HOME, which changes with every container build.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

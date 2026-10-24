@@ -17,18 +17,24 @@
 
 package com.vijayyaso.navgesture.gesture
 
-import kotlin.math.floor
+import kotlin.math.roundToInt
 
-/** Pure selection and scrolling maths shared by both switcher edges. */
+/** Pure selection and scrolling maths for the bottom app switcher. */
 object SwitcherSelection {
+    /** Sideways travel per icon. */
     const val STEP_DP = 56f
-    const val CANCEL_DP = 24f
 
-    /** Returns no selection in the cancel zone or when no selectable app remains. */
-    fun selected(inwardDp: Float, count: Int, firstIndex: Int): Int? {
-        if (inwardDp < CANCEL_DP || count <= 0 || firstIndex !in 0 until count) return null
-        val steps = floor((inwardDp - CANCEL_DP) / STEP_DP)
-        return (firstIndex.toDouble() + steps).coerceAtMost((count - 1).toDouble()).toInt()
+    /**
+     * Maps sideways finger travel to an index, one icon per [STEP_DP]. The list loops: past
+     * the last icon comes the first, and before the first comes the last, so a short drag
+     * always finds every app. [startIndex] keeps the dimmed current app out of reach.
+     */
+    fun looped(offsetDp: Float, count: Int, startIndex: Int): Int? {
+        if (count <= 0 || startIndex !in 0 until count) return null
+        val span = count - startIndex
+        if (span <= 0) return null
+        val steps = (offsetDp / STEP_DP).roundToInt()
+        return startIndex + Math.floorMod(steps, span)
     }
 
     /** Reveals one more icon as selection moves past the initial window's end. */

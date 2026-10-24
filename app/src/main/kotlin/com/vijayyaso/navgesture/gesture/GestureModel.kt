@@ -73,7 +73,7 @@ data class GestureConfiguration(
     val homeFlickDpPerMs: Float = 0.5f,
     /** Multiple of the on-axis travel; 1.0 is a 45-degree cone. */
     val offAxisToleranceRatio: Float = 1.0f,
-    /** Hold either side edge to show the app list. */
+    /** Swipe up from the bottom and drag sideways to show the app list. */
     val edgeAppListEnabled: Boolean = true,
     val leftEdgeBackEnabled: Boolean = true,
     val rightEdgeBackEnabled: Boolean = true,
@@ -131,14 +131,23 @@ sealed interface TrackerAction {
 
     data class RearmHold(val delayMs: Long) : TrackerAction
 
-    /** A bottom swipe paused past the Recents line; the release now means Recents. */
+    /**
+     * A bottom swipe paused past the Recents line; the release means Recents.
+     */
     data object RecentsPrimed : TrackerAction
 
     /** Starts the long-press timer, whose expiry is reported through `onLongPressElapsed`. */
     data class ScheduleLongPress(val delayMs: Long) : TrackerAction
 
-    /** A still side touch hands the remaining stream to the app selector. */
-    data class OpenSwitcher(val edge: ScreenEdge, val origin: TouchSample) : TrackerAction
+    /**
+     * A sideways drag during the bottom rise hands the rest of the stream to the selector.
+     * Dragging right opens recent apps; dragging left opens favourites.
+     */
+    data class OpenSwitcher(
+        val edge: ScreenEdge,
+        val origin: TouchSample,
+        val recents: Boolean,
+    ) : TrackerAction
 
     data class Fire(val action: GestureAction, val edge: ScreenEdge) : TrackerAction
 

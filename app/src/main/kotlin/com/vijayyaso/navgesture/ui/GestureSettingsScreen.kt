@@ -17,13 +17,24 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
@@ -33,16 +44,58 @@ import kotlin.math.roundToInt
 @Composable
 internal fun GestureSettingsScreen(model: AppModel) {
     val configuration = model.configuration
+    var adjustOpen by rememberSaveable { mutableStateOf(false) }
     SectionHeader(stringResource(R.string.gestures_title))
     CheatSheet(configuration)
 
     SectionHeader(stringResource(R.string.section_edges))
-    ThresholdSlider(
-        label = stringResource(R.string.label_edge_width),
-        value = configuration.edgeWidthDp,
-        range = 8f..64f,
-        formatter = { stringResource(R.string.value_dp, it) },
-    ) { updated -> model.update { it.copy(edgeWidthDp = updated) } }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.label_edge_width),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.value_dp, configuration.edgeWidthDp.roundToInt()),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+    Text(
+        text = stringResource(R.string.label_edge_width_body),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+    )
+    OutlinedButton(
+        onClick = { adjustOpen = true },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .testTag(TestTags.EDGE_AREA_ADJUST),
+    ) {
+        Text(stringResource(R.string.edge_area_adjust))
+    }
+    Text(
+        text = stringResource(R.string.edge_area_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    )
+    if (adjustOpen) {
+        TouchAreaAdjuster(
+            configuration = configuration,
+            range = EDGE_WIDTH_RANGE,
+            onCommit = { updated -> model.update { it.copy(edgeWidthDp = updated) } },
+            onDismiss = { adjustOpen = false },
+        )
+    }
     ToggleRow(
         label = stringResource(R.string.label_left_edge_back),
         checked = configuration.leftEdgeBackEnabled,
@@ -64,24 +117,28 @@ internal fun GestureSettingsScreen(model: AppModel) {
         value = configuration.sideMinimumSwipeDistanceDp,
         range = 8f..80f,
         formatter = { stringResource(R.string.value_dp, it) },
+        supporting = stringResource(R.string.label_side_distance_body),
     ) { updated -> model.update { it.copy(sideMinimumSwipeDistanceDp = updated) } }
     ThresholdSlider(
         label = stringResource(R.string.label_bottom_distance),
         value = configuration.bottomMinimumSwipeDistanceDp,
         range = 4f..60f,
         formatter = { stringResource(R.string.value_dp, it) },
+        supporting = stringResource(R.string.label_bottom_distance_body),
     ) { updated -> model.update { it.copy(bottomMinimumSwipeDistanceDp = updated) } }
     ThresholdSlider(
         label = stringResource(R.string.label_recents_line),
         value = configuration.recentsLinePercent,
         range = 5f..30f,
         formatter = { stringResource(R.string.value_percent, it) },
+        supporting = stringResource(R.string.label_recents_line_body),
     ) { updated -> model.update { it.copy(recentsLinePercent = updated) } }
     ThresholdSlider(
         label = stringResource(R.string.label_maximum_duration),
         value = configuration.maximumArmDurationMs.toFloat(),
         range = 300f..3000f,
-        formatter = { stringResource(R.string.value_ms, it) },
+        formatter = { stringResource(R.string.value_seconds, it / 1000f) },
+        supporting = stringResource(R.string.label_maximum_duration_body),
     ) { updated -> model.update { it.copy(maximumArmDurationMs = updated.toLong()) } }
 
     SectionHeader(stringResource(R.string.section_gesture_bar))
@@ -141,3 +198,6 @@ internal fun gestureSettingsSummary(configuration: GestureConfiguration): String
     configuration.sideMinimumSwipeDistanceDp.roundToInt(),
     configuration.bottomMinimumSwipeDistanceDp.roundToInt(),
 )
+
+/** The same 8 to 64 dp the touch strips have always offered. */
+private val EDGE_WIDTH_RANGE = 8f..64f

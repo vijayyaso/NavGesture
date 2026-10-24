@@ -7,8 +7,8 @@
 NavGesture is an edge-gesture app. It does three things:
 
 - **Recents waits for a real pause.** Modelled on the stock POCO launcher (6.01.05), a pause only counts past POCO's own line (about a tenth of the screen up), and it is detected the way POCO detects it: a smoothed follow point catching up with the finger, not a timer. The pause only *arms* Recents, with a tick. Letting go decides, and a quick flick up is still Home.
-- **A black drop rises from the edge** under your finger: a round head joined to the edge by a gooey metaball neck (adapted from Ramotion's MIT-licensed fluid slider), moved by Fluid Navigation Gestures' springs. The neck thins as the head pulls away, leans as you slide, and the drop wobbles once as it forms. From the bottom it carries a Home icon and swaps to Recents with a tick when you pause; from the sides it carries the Back arrow. The action fires as you let go. It never touches the app underneath.
-- **Hold a side edge still** and a macOS-style row of app icons appears: recents on the left, your favourites on the right. Home screens never appear. Slide to choose and lift to open.
+- **A black drop rises from the edge** under your finger: a round head joined to the edge by a gooey metaball neck (adapted from Ramotion's MIT-licensed fluid slider), moved by Fluid Navigation Gestures' springs. The neck thins as the head pulls away, leans as you slide, and the drop wobbles once as it forms. From the bottom it carries a Home icon; from the sides it carries the Back arrow. The action fires as you let go. It never touches the app underneath.
+- **Swipe up from the bottom and drag sideways** and a macOS-style row of app icons appears just above the edge: recent apps when you drag right, your favourites when you drag left. Home screens never appear. Each short drag moves one icon and the row loops at both ends, so the first app is always a short drag away. Lift to open, or swipe down to close. A plain upward swipe with no sideways drag is still Home, and a still pause is still Recents.
 
 It installs as its own app (`com.vijayyaso.navgesture`).
 
@@ -23,7 +23,9 @@ HyperOS ties its gesture navigation to the stock launcher. Switch to Nova, Niaga
 | Swipe in from the left or right edge | Back |
 | Swipe up from the bottom edge | Home |
 | Swipe up from the bottom, pause, then let go | Recent apps |
-| Hold a side edge still, then slide inward | App list: recents on the left, favourites on the right |
+| Swipe up from the bottom, then drag right | App list: recent apps, one per short drag, loops at both ends |
+| Swipe up from the bottom, then drag left | App list: your favourites, one per short drag, loops at both ends |
+| Swipe down while the app list is open | Closes the list; nothing opens |
 | Touch and hold the middle of the bottom edge | Circle to Search, once it is on |
 
 In landscape the first bottom swipe only shows a pill, and a second one within 2 seconds goes Home, as HyperOS does in games. Every distance and delay is adjustable in the app's Gesture settings.

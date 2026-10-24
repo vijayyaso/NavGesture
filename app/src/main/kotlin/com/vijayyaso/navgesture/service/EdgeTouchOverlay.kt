@@ -99,7 +99,13 @@ internal class EdgeTouchOverlay(
         if (configuration.edgeAppListEnabled) {
             val panel = SwitcherPanelOverlay(context, windowManager, geometry).also { it.install() }
             switcherPanel = panel
-            switcherController = EdgeSwitcherController(panel, switcher, favourites, geometry.density) { feedback ->
+            switcherController = EdgeSwitcherController(
+                panel = panel,
+                switcher = switcher,
+                favourites = favourites,
+                density = geometry.density,
+                screenHeightPx = geometry.heightPx.toFloat(),
+            ) { feedback ->
                 if (configuration.hapticFeedbackEnabled) {
                     strips.values.firstOrNull()?.performHapticFeedback(feedback)
                 }
@@ -107,8 +113,8 @@ internal class EdgeTouchOverlay(
         }
 
         val edges = buildList {
-            if (configuration.leftEdgeBackEnabled || configuration.edgeAppListEnabled) add(ScreenEdge.LEFT)
-            if (configuration.rightEdgeBackEnabled || configuration.edgeAppListEnabled) add(ScreenEdge.RIGHT)
+            if (configuration.leftEdgeBackEnabled) add(ScreenEdge.LEFT)
+            if (configuration.rightEdgeBackEnabled) add(ScreenEdge.RIGHT)
             add(ScreenEdge.BOTTOM)
         }
 
@@ -160,7 +166,7 @@ internal class EdgeTouchOverlay(
             ),
             hapticsEnabled = configuration.hapticFeedbackEnabled,
             bubble = bubbles[edge],
-            controller = if (edge == ScreenEdge.BOTTOM) null else switcherController,
+            controller = switcherController,
             onStreamStart = { onStreamStart(edge) },
             admit = { action -> admit(action, edge) },
             onFire = { action -> onFire(action, edge) },
@@ -350,7 +356,6 @@ internal class EdgeTouchOverlay(
                     samples.clear()
                     abandoned = false
                     switching = false
-                    controller?.prepare(edge)
                     haptics.reset()
                     samples += sample
                     Log.d(TAG, "$edge DOWN at ${sample.xPx.toInt()},${sample.yPx.toInt()}")
@@ -451,6 +456,8 @@ internal class EdgeTouchOverlay(
                     // A swipe is under way, so this touch can no longer be a long press.
                     removeCallbacks(longPressRunnable)
                     Log.d(TAG, "$edge armed (pause poll=${action.scheduleHoldMs})")
+                    // The rise is live: from here a sideways drag opens the app list, so say so.
+                    if (edge == ScreenEdge.BOTTOM) confirmTick()
                     action.scheduleHoldMs?.let { postDelayed(holdRunnable, it) }
                 }
                 is TrackerAction.RearmHold -> {
@@ -485,6 +492,9 @@ internal class EdgeTouchOverlay(
         // The bubble moves first. A replay must never land under a visible window.
         private fun track(action: TrackerAction, sample: TouchSample, replayable: Boolean): Boolean {
             bubble?.follow(action, sample.xPx, sample.yPx)
+            // Only a real swipe can pause into the app list, so a tap on the bottom strip
+            // never pays for a package lookup. Arming happens once per gesture per edge.
+            if (action is TrackerAction.Armed) controller?.prepare(edge)
             return handle(action, replayable)
         }
 

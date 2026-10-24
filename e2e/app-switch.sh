@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# A still finger on a side edge opens the app list. A bottom sideways swipe does nothing.
+# Swiping up from the bottom and dragging sideways opens the app list: recents when the swipe
+# started on the left half, favourites when it started on the right half. A still pause is the
+# phone's own Recents, and a side hold opens nothing.
 #
 # Only the recognizer and panel opening are asserted here: this emulator reports no usage
 # events, so the launch itself is proven by hand on hardware.
@@ -34,7 +36,18 @@ require_adb
 geometry
 warm_input
 
-# hold_edge <x> <y> - press, wait past the hold delay, then lift without moving.
+# swipe_up_drag <x> <dx> - swipe up from the bottom, drag sideways past 56 dp, then lift.
+swipe_up_drag() {
+  local x="$1" dx="$2" top=$((HEIGHT - 600))
+  "${ADB_BIN}" shell input motionevent DOWN "${x}" "${BOTTOM_Y}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE "${x}" "${top}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE $((x + dx)) "${top}" >/dev/null
+  sleep 0.4
+  "${ADB_BIN}" shell input motionevent UP $((x + dx)) "${top}" >/dev/null
+  sleep 2
+}
+
+# hold_edge <x> <y> - press, wait, then lift without moving.
 hold_edge() {
   "${ADB_BIN}" shell input motionevent DOWN "$1" "$2" >/dev/null
   sleep 0.7
@@ -42,53 +55,45 @@ hold_edge() {
   sleep 2
 }
 
-# A drift past the system's 8 dp touch slop must still count as a resting finger.
-density="$("${ADB_BIN}" shell wm density 2>/dev/null | tr -d '\r' |
-  awk -F': *' 'NF > 1 {print $2}' | tail -1)"
-[ -n "${density}" ] || density=420
-drift=$((density * 12 / 160))
-[ "${drift}" -gt 1 ] || drift=12
+echo >&2
+echo "== a bottom swipe dragged right from the left half opens recent apps ==" >&2
+open_test_app
+reset_log
+# 220 px is 84 dp at the emulator's 420 dpi, safely past the 40 dp trigger.
+swipe_up_drag $((WIDTH / 4)) 220
+assert_log "the left-half drag opens recents" "SWITCHER_OPEN bottom recents"
+assert_no_log "the drag is not read as Home" "GESTURE_FIRED BOTTOM Home"
+assert_no_log "the drag is not read as Recents" "GESTURE_FIRED BOTTOM Recents"
+assert_no_log "the drag is not replayed to the app" "REPLAY_DISPATCHED"
 
 echo >&2
-echo "== a still finger on the left edge opens recent apps ==" >&2
+echo "== a bottom swipe dragged left from the right half opens favourites ==" >&2
+open_test_app
+reset_log
+swipe_up_drag $((WIDTH * 3 / 4)) -220
+assert_log "the right-half drag opens favourites" "SWITCHER_OPEN bottom favourites"
+assert_no_log "the right-half drag is not read as Home" "GESTURE_FIRED BOTTOM Home"
+
+echo >&2
+echo "== a still pause is the phone's own Recents, not the app list ==" >&2
+open_test_app
+reset_log
+swipe_and_hold $((WIDTH / 2)) "${BOTTOM_Y}" $((WIDTH / 2)) $((HEIGHT - 600)) 0.6
+sleep 2
+assert_log "the still pause fires Recents" "GESTURE_FIRED BOTTOM Recents"
+assert_no_log "the still pause opens no app list" "SWITCHER_OPEN"
+
+echo >&2
+echo "== a side hold no longer opens the app list ==" >&2
 open_test_app
 reset_log
 hold_edge 2 "${MID_Y}"
-assert_log "the left hold opens the app list" "SWITCHER_OPEN LEFT"
+assert_no_log "the left hold opens nothing" "SWITCHER_OPEN"
 assert_no_log "the hold is not read as Back" "GESTURE_FIRED LEFT Back"
-assert_no_log "the hold is not replayed to the app" "REPLAY_DISPATCHED"
+assert_log "the hold is replayed to the app" "REPLAY_DISPATCHED"
 
 echo >&2
-echo "== a still finger on the right edge opens favourites ==" >&2
-open_test_app
-reset_log
-hold_edge "${RIGHT_X}" "${MID_Y}"
-assert_log "the right hold opens the app list" "SWITCHER_OPEN RIGHT"
-assert_no_log "the right hold is not read as Back" "GESTURE_FIRED RIGHT Back"
-
-echo >&2
-echo "== a small resting drift still opens the app list ==" >&2
-open_test_app
-reset_log
-"${ADB_BIN}" shell input motionevent DOWN 2 "${MID_Y}" >/dev/null
-"${ADB_BIN}" shell input motionevent MOVE $((2 + drift)) "${MID_Y}" >/dev/null
-sleep 0.7
-"${ADB_BIN}" shell input motionevent UP $((2 + drift)) "${MID_Y}" >/dev/null
-sleep 2
-assert_log "a 12 dp drift still opens the app list" "SWITCHER_OPEN LEFT"
-assert_no_log "the drift is not read as Back" "GESTURE_FIRED LEFT Back"
-
-echo >&2
-echo "== a sideways swipe along the bottom no longer switches apps ==" >&2
-open_test_app
-reset_log
-swipe 300 "${BOTTOM_Y}" 800 "${BOTTOM_Y}" 120
-sleep 2
-assert_no_log "the sideways bottom swipe fires no bottom gesture" "GESTURE_FIRED BOTTOM"
-assert_log "the sideways bottom swipe is replayed to the app" "REPLAY_DISPATCHED"
-
-echo >&2
-echo "== a quick side swipe is still Back, not the app list ==" >&2
+echo "== a quick side swipe is still Back ==" >&2
 open_test_app
 reset_log
 swipe 2 "${MID_Y}" 300 "${MID_Y}" 120
@@ -96,4 +101,4 @@ sleep 2
 assert_log "the quick swipe fires Back" "GESTURE_FIRED LEFT Back"
 assert_no_log "the quick swipe does not open the app list" "SWITCHER_OPEN"
 
-report "EDGE APP LIST"
+report "APP LIST"

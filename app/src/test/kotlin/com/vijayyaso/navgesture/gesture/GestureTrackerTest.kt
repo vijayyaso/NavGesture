@@ -518,4 +518,37 @@ class GestureTrackerTest {
         t.onMove(sample(540f, 2390f, 200L))
         assertEquals(TrackerAction.Reverted, t.onUp(sample(540f, 2390f, 210L)))
     }
+
+    @Test
+    fun `a sideways drag with the app list on opens the switcher`() {
+        val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
+        t.onDown(sample(540f, 2395f, 0L))
+        t.onMove(sample(540f, 2295f, 50L))
+        val drag = sample(740f, 2295f, 100L)
+        assertEquals(
+            TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, drag, recents = true),
+            t.onMove(drag),
+        )
+        assertEquals(TrackerAction.None, t.onUp(sample(740f, 2295f, 150L)))
+    }
+
+    @Test
+    fun `a pause with the app list on still primes Recents`() {
+        val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
+        t.onDown(sample(540f, 2395f, 0L))
+        t.onMove(sample(540f, 2295f, 50L))
+        t.onMove(sample(540f, 2095f, 100L))
+        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(
+            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            t.onUp(sample(540f, 2095f, 500L)),
+        )
+    }
+
+    @Test
+    fun `the app list no longer listens on a side edge`() {
+        val t = tracker(ScreenEdge.LEFT, configuration = GestureConfiguration())
+        assertEquals(TrackerAction.None, t.onDown(sample(5f, 1200f, 0L)))
+        assertEquals(TrackerAction.None, t.onLongPressElapsed())
+    }
 }

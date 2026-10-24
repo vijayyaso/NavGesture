@@ -255,6 +255,7 @@ internal fun ThresholdSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     formatter: @Composable (Int) -> String,
+    supporting: String? = null,
     onCommit: (Float) -> Unit,
 ) {
     var dragging by remember { mutableStateOf(false) }
@@ -275,6 +276,14 @@ internal fun ThresholdSlider(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium,
+            )
+        }
+        if (supporting != null) {
+            Text(
+                text = supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
             )
         }
         Slider(
