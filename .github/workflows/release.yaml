@@ -1,0 +1,176 @@
+# Copyright (C) 2026  Henrique Almeida <me@h3nc4.com>
+#
+# This file is part of HyperGesture.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+name: NavGesture Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  check-tag-branch:
+    name: Check Tag Location
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Verify tag is on main branch
+        run: git merge-base --is-ancestor ${{ github.sha }} origin/main
+
+  prepare:
+    name: Prepare environment
+    runs-on: ubuntu-latest
+    needs: check-tag-branch
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dev-image: ${{ steps.dev_image.outputs.ref }}
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >>"${GITHUB_OUTPUT}"
+      - id: dev_image
+        run: echo "ref=$(./scripts/devcontainer-image.sh)" >>"${GITHUB_OUTPUT}"
+
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: prepare
+    outputs:
+      apk-size: ${{ steps.verify.outputs.apk-size }}
+      cert-sha256: ${{ steps.verify.outputs.cert-sha256 }}
+    steps:
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Run docker/setup-buildx-action
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: Run docker/login-action
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Restore keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 --decode >android.keystore
+      - name: Verify signing material is present
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          test -s android.keystore || {
+            echo '::error::ANDROID_KEYSTORE_B64 is empty or not valid base64' && exit 1
+          }
+          test -n "${KEYSTORE_PASSWORD}" || {
+            echo '::error::KEYSTORE_PASSWORD is unset' && exit 1
+          }
+      - name: Build signed APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./scripts/build-apk.sh "${{ needs.prepare.outputs.version }}"
+      - name: Verify the APK is signed
+        id: verify
+        run: |
+          certs="$(docker run --rm --entrypoint bash \
+            -v "${PWD}:/apk:ro" \
+            "${{ needs.prepare.outputs.dev-image }}" \
+            -c 'set -e
+              apksigner="$(find "${ANDROID_HOME}/build-tools" -name apksigner | sort | tail -n1)"
+              "${apksigner}" verify --print-certs /apk/navgesture.apk')"
+          printf '%s\n' "${certs}"
+          sha="$(printf '%s\n' "${certs}" | grep -m1 -oE 'certificate SHA-256 digest: [0-9a-f]{64}' | cut -d' ' -f4)"
+          test -n "${sha}" || { echo '::error::apksigner printed no SHA-256 certificate digest' && exit 1; }
+          echo "cert-sha256=${sha}" >>"${GITHUB_OUTPUT}"
+          echo "apk-size=$(stat -c %s navgesture.apk)" >>"${GITHUB_OUTPUT}"
+      - name: Run actions/upload-artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: apk
+          path: navgesture.apk
+          retention-days: 1
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-apk
+    permissions:
+      contents: write
+    steps:
+      - name: Run actions/download-artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: apk
+      - name: Run softprops/action-gh-release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          generate_release_notes: true
+          files: navgesture.apk
+
+  bump-version-code:
+    name: Bump versionCode for the next release
+    runs-on: ubuntu-latest
+    needs: [prepare, release]
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BRANCH: bump-versioncode-after-v${{ needs.prepare.outputs.version }}
+      TITLE: bump versioncode after v${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Mint an app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: "4811373"
+          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Run actions/checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          persist-credentials: false
+      # Android refuses to install an APK whose versionCode went backwards, so the
+      # released code is burned and main moves on to the next one.
+      - name: Run scripts/bump-version.sh
+        run: ./scripts/bump-version.sh
+      - name: Create the bump branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/heads/${BRANCH}" -f "sha=$(git rev-parse HEAD)"
+      - name: Run planetscale/ghcommit-action
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+        with:
+          commit_message: ${{ env.TITLE }}
+          repo: ${{ github.repository }}
+          branch: ${{ env.BRANCH }}
+          file_pattern: "app/build.gradle.kts"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Open the bump pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          body="Raises versionCode past the one v${VERSION} was built with, so Android installs the next release over it."
+          number="$(gh api "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f "title=${TITLE}" -f "head=${BRANCH}" -f base=main -f "body=${body}" --jq .number)"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/${number}/labels" -f "labels[]=automerge"
