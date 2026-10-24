@@ -1,5 +1,7 @@
 # NavGesture
 
+<img src="docs/branding/navgesture-logo.png" alt="NavGesture fluid n logo" width="160" height="160">
+
 > Edge gestures for Xiaomi HyperOS, so you can keep the launcher you actually like.
 
 NavGesture is an edge-gesture app. It does three things:
