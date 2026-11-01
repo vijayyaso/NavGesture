@@ -52,6 +52,13 @@ if [ ! -f "${apk}" ]; then
   exit 1
 fi
 
+# Whether the service was on before the install decides the wait after it.
+was_enabled=''
+if "${ADB_BIN}" shell settings get secure enabled_accessibility_services 2>/dev/null | grep -q "${PKG}"; then
+  was_enabled='1'
+fi
+"${ADB_BIN}" logcat -c >/dev/null 2>&1 || true
+
 echo "== installing ${apk} ==" >&2
 # A release and a debug build carry different keys, and Android refuses one over the other.
 if ! "${ADB_BIN}" install -r -g "${apk}" >/dev/null 2>"${LOG_DIR}/install.err"; then
@@ -97,32 +104,25 @@ else
   enable_edge_app_list
 fi
 
-service_bound() {
-  "${ADB_BIN}" shell dumpsys accessibility 2>/dev/null | tr -d '\r' |
-    grep -q "Enabled services:.*${PKG}"
-}
-
-# A restricted setting since Android 13, and the service caches a rejection until the
-# enabled list changes. Hence the retry, clearing the list so no write is a no-op.
-enable_service() {
-  attempt=1
-  while [ "${attempt}" -le 4 ]; do
-    "${ADB_BIN}" shell appops set "${PKG}" ACCESS_RESTRICTED_SETTINGS allow >/dev/null 2>&1 || true
-    "${ADB_BIN}" shell settings delete secure enabled_accessibility_services >/dev/null 2>&1 || true
-    sleep 1
-    "${ADB_BIN}" shell settings put secure accessibility_enabled 1 >/dev/null
-    "${ADB_BIN}" shell settings put secure enabled_accessibility_services "${SERVICE}" >/dev/null
-    sleep 6
-    # shellcheck disable=SC2310 # a false predicate is the retry signal, not an error
-    if service_bound; then
-      echo "   bound on attempt ${attempt}" >&2
-      return 0
+# An install over a bound service kills it, and Android restarts it in a fresh process that
+# runs unoptimised code for its first seconds. Switching the service off and on while that
+# process is still starting leaves its windows on the dead connection ("token null"), so wait
+# for the restart to finish first. Measured on a cold API 36 emulator, 2026-11-01.
+if [ -n "${was_enabled}" ]; then
+  settle=1
+  while [ "${settle}" -le 40 ]; do
+    if "${ADB_BIN}" logcat -d -s NavGesture 2>/dev/null | grep -q 'strip BOTTOM installed'; then
+      echo "   the restarted service is up" >&2
+      break
     fi
-    echo "   not bound yet (attempt ${attempt} of 4)" >&2
-    attempt=$((attempt + 1))
+    sleep 1
+    settle=$((settle + 1))
   done
-  return 1
-}
+fi
+
+# A bank-pause run that stopped early leaves Settings picked as a bank app, and the other suites
+# open Settings. The bank-pause suite sets it again itself.
+"${ADB_BIN}" shell settings delete global navgesture_bank_apps >/dev/null 2>&1 || true
 
 echo "== enabling the accessibility service ==" >&2
 # Every case in every suite is meaningless if the service never bound.

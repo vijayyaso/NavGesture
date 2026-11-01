@@ -28,17 +28,18 @@ import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.bankpause.BankPause
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.ui.MainActivity
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.lang.ref.WeakReference
 
 // The way back when HyperOS stops the service with the bar hidden, as Control Center still opens.
 // The system binds the tile even after a force stop, so opening the panel runs ServiceKeeper. What a
@@ -85,6 +86,12 @@ class GestureTileService : TileService() {
     }
 
     private fun act(disclosureAccepted: Boolean) {
+        // During a bank pause the tap is Resume now, not a plain turn-on that the pause's own
+        // watcher would not know about.
+        if (BankPause.resumeNow(this)) {
+            refresh()
+            return
+        }
         val tap = tileTap(
             serviceEnabled = currentFace().target == TileTarget.APP,
             disclosureAccepted = disclosureAccepted,

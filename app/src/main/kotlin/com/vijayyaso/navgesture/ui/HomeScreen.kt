@@ -18,10 +18,15 @@
 package com.vijayyaso.navgesture.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.settings.PackageListStore
 
 @Composable
 internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
@@ -48,6 +53,15 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
         switchTag = TestTags.SWITCH_CIRCLE_TO_SEARCH,
         onOpen = { onOpen(Screen.CIRCLE_TO_SEARCH) },
     ) { on -> model.update { it.copy(circleToSearchEnabled = on) } }
+    if (!BuildConfig.IS_PLAY) {
+        val bankApps by remember(context) { PackageListStore.bankApps(context).packages }
+            .collectAsState(initial = emptyList())
+        NavigationRow(
+            title = stringResource(R.string.section_bank_apps),
+            supporting = bankAppsSummary(model, bankApps.size),
+            tag = TestTags.ROW_BANK_APPS,
+        ) { onOpen(Screen.BANK_APPS) }
+    }
     Store.HomeRow { onOpen(Screen.UPDATES) }
 
     SectionHeader(stringResource(R.string.section_more))

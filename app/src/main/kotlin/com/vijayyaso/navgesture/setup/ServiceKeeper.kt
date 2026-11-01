@@ -23,6 +23,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.content.edit
 import com.vijayyaso.navgesture.BuildConfig
+import com.vijayyaso.navgesture.bankpause.BankPause
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.diagnostics.withServiceListed
@@ -67,6 +68,14 @@ object ServiceKeeper {
     fun check(context: Context, from: String) {
         if (BuildConfig.IS_PLAY) return
         if (NavGestureAccessibilityService.isRunning()) return
+        val pause = BankPause.paused(context)
+        if (pause != null) {
+            // A live bank pause owns the switch: turning it on now would show the bank app
+            // the service it was paused for.
+            if (BankPause.watcherRunning) return
+            BankPause.clearPause(context)
+            ServiceLog.add(context, "$from: a bank pause outlived its watcher, ending it")
+        }
         // Listed but not yet running: the system binds it by itself.
         if (DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)) return
         if (!prefs(context).getBoolean(KEY_WANTED, false)) return

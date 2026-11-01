@@ -19,6 +19,8 @@
 -->
 <!--
   No event types, so the framework delivers no events and notificationTimeout would throttle nothing.
+  Bank pause (github build) adds window-state events at runtime through setServiceInfo, and only
+  from the apps the user picked.
   canPerformGestures is for the dispatchGesture touch replay, and nothing reads window content.
   settingsActivity puts a settings link on NavGesture's own Accessibility page.
 -->

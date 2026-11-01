@@ -28,7 +28,22 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Bank pause: the watcher that keeps gestures paused while a picked bank app is open and
+         switches them back on afterwards runs as a foreground service with a notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application>
+        <service
+            android:name=".bankpause.BankPauseWatcher"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps gesture navigation paused while a bank app the user picked is open, and switches it back on when the user leaves that app." />
+        </service>
+
         <receiver
             android:name=".update.InstallResultReceiver"
             android:exported="false" />

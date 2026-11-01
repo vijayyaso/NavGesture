@@ -4,11 +4,12 @@
 
 > Edge gestures for Xiaomi HyperOS, so you can keep the launcher you actually like.
 
-NavGesture is an edge-gesture app. It does three things:
+NavGesture is an edge-gesture app. It does four things:
 
 - **Recents waits for a real pause.** Modelled on the stock POCO launcher (6.01.05), a pause only counts past POCO's own line (about a tenth of the screen up), and it is detected the way POCO detects it: a smoothed follow point catching up with the finger, not a timer. The pause only *arms* Recents, with a tick. Letting go decides, and a quick flick up is still Home.
 - **A black drop rises from the edge** under your finger: a round head joined to the edge by a gooey metaball neck (adapted from Ramotion's MIT-licensed fluid slider), moved by Fluid Navigation Gestures' springs. The neck thins as the head pulls away, leans as you slide, and the drop wobbles once as it forms. From the bottom it carries a Home icon; from the sides it carries the Back arrow. The action fires as you let go. It never touches the app underneath.
 - **Swipe up from the bottom and drag sideways** and a macOS-style row of app icons appears just above the edge: recent apps when you drag right, your favourites when you drag left. Home screens never appear. Each short drag moves one icon and the row loops at both ends, so the first app is always a short drag away. Lift to open, or swipe down to close. A plain upward swipe with no sideways drag is still Home, and a still pause is still Recents.
+- **Bank apps keep working.** Many bank and payment apps refuse to open while an Accessibility app is on. Pick them on the Bank apps screen: when one opens, NavGesture gives your phone its own bar back and steps aside, and a few seconds after you leave, gestures come back by themselves. Needs the same one-time computer permission as "hide the gesture bar", and usage access.
 
 It installs as its own app (`com.vijayyaso.navgesture`).
 
@@ -42,7 +43,7 @@ If Play Protect blocks the install, allow restricted settings as in step 2. If t
 
 ## Privacy
 
-Gestures need an accessibility service. This one watches thin strips along the screen edges and turns a swipe into Back, Home, Recents or an app list. Its configuration withholds window content and accessibility events, so it never reads the screen or what you type. The app goes online only for an update check that stays off until you turn it on, and then asks GitHub for the latest release. It has no ads, analytics or account. The full [privacy policy](docs/privacy-policy.md) covers both builds.
+Gestures need an accessibility service. This one watches thin strips along the screen edges and turns a swipe into Back, Home, Recents or an app list. Its configuration withholds window content, and it takes no accessibility events unless you pick bank apps for bank pause, which tells it only when one of them opens. It never reads the screen or what you type. The app goes online only for an update check that stays off until you turn it on, and then asks GitHub for the latest release. It has no ads, analytics or account. The full [privacy policy](docs/privacy-policy.md) covers both builds.
 
 ## What it can't do
 

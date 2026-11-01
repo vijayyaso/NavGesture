@@ -1,6 +1,6 @@
 # NavGesture privacy policy
 
-*Last updated: 2026-10-31*
+*Last updated: 2026-11-01*
 
 NavGesture is a free, open-source gesture app by Vijayyaso. This policy covers
 both builds: the one on Google Play and the one on GitHub Releases.
@@ -26,9 +26,19 @@ those strips**. It uses them to decide whether a touch is a gesture:
 A touch that is not a gesture is passed on to the app underneath, exactly
 where you touched.
 
-The service is configured so that it **cannot read window content or
-accessibility events**. It never sees what is on your screen, what you type,
-or your passwords.
+The service is configured so that it **cannot read window content**, and by
+default it receives **no accessibility events**. It never sees what is on your
+screen, what you type, or your passwords.
+
+### Bank pause (GitHub build only, optional)
+
+Many bank apps refuse to open while an accessibility app is on. If you pick
+bank apps on the **Bank apps** screen, the service is told **only when one of
+those apps opens a window** (the app's name, nothing on its screen). It then
+switches itself off, and while that pause lasts the app reads **which app is
+in front** (app names only, through Usage access) to know when you have left,
+then switches itself back on. None of this is stored beyond the pause or
+leaves your phone. The Google Play build has no bank pause.
 
 ### Usage access (optional)
 

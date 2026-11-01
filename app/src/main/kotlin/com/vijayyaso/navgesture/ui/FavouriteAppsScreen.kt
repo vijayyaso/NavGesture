@@ -18,19 +18,10 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.Drawable
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -40,38 +31,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.FavouriteList
-import com.vijayyaso.navgesture.service.AppSwitcher
-import com.vijayyaso.navgesture.settings.FavouriteAppsStore
-import kotlinx.coroutines.Dispatchers
+import com.vijayyaso.navgesture.settings.PackageListStore
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Picks the list a leftward drag from the bottom shows, in the order the panel shows it. */
 @Composable
 internal fun FavouriteAppsScreen() {
     val context = LocalContext.current
-    val store = remember(context) { FavouriteAppsStore(context.applicationContext) }
+    val store = remember(context) { PackageListStore.favourites(context) }
     val scope = rememberCoroutineScope()
     var favourites by remember { mutableStateOf<List<String>?>(null) }
-    val apps by produceState<List<LaunchableApp>?>(initialValue = null) {
-        value = withContext(Dispatchers.IO) { launchableApps(context) }
-    }
+    val apps by rememberLaunchableApps()
 
     LaunchedEffect(store) {
-        store.favourites.collect { favourites = it }
+        store.packages.collect { favourites = it }
     }
 
     val chosen = favourites.orEmpty()
@@ -119,72 +100,5 @@ internal fun FavouriteAppsScreen() {
     }
 
     SectionHeader(stringResource(R.string.section_all_apps))
-    val all = apps
-    if (all == null) {
-        FootNote(stringResource(R.string.switcher_loading))
-        return
-    }
-    all.forEach { app ->
-        val checked = app.packageName in chosen
-        ListItem(
-            leadingContent = { AppIconImage(app.icon) },
-            headlineContent = { Text(app.label) },
-            trailingContent = {
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = null,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable {
-                save(FavouriteList.toggle(chosen, app.packageName))
-            },
-        )
-    }
-}
-
-private data class LaunchableApp(
-    val packageName: String,
-    val label: String,
-    val icon: ImageBitmap?,
-)
-
-/** A 40 dp icon slot, blank when the package manager gave nothing usable. */
-@Composable
-private fun AppIconImage(icon: ImageBitmap?) {
-    if (icon == null) return
-    Image(bitmap = icon, contentDescription = null, modifier = Modifier.size(40.dp))
-}
-
-/** Draws an app icon into a square bitmap; adaptive icons draw fine this way. */
-private fun Drawable.toIconBitmap(sizePx: Int): ImageBitmap {
-    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-    setBounds(0, 0, sizePx, sizePx)
-    draw(Canvas(bitmap))
-    return bitmap.asImageBitmap()
-}
-
-/** Every app with a launcher entry, minus the home screens and NavGesture itself. */
-private fun launchableApps(context: Context): List<LaunchableApp> {
-    val manager = context.packageManager
-    val home = AppSwitcher(context).homePackages()
-    val iconSize = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-    return manager.queryIntentActivities(
-        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
-        0,
-    ).asSequence()
-        .mapNotNull { it.activityInfo }
-        .filterNot { it.packageName == context.packageName || it.packageName in home }
-        .map { info ->
-            val label = manager.getApplicationLabel(info.applicationInfo).toString()
-            val icon = runCatching {
-                manager.getApplicationIcon(info.applicationInfo).toIconBitmap(iconSize)
-            }.getOrNull()
-            LaunchableApp(info.packageName, label, icon)
-        }
-        .sortedBy { it.label.lowercase() }
-        // Some apps ship several launcher activities; show each package once.
-        .distinctBy { it.packageName }
-        .toList()
+    AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
 }

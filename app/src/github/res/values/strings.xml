@@ -62,4 +62,16 @@
     <string name="update_signature_conflict">Android refused the update, because it is signed with a different key from this copy (%1$s).</string>
     <string name="update_declined">The update was cancelled in the system prompt, and this copy stays as it was.</string>
     <string name="update_installed">Update installed.</string>
+
+    <!-- The disclosure, github wording: only this build has bank pause. -->
+    <string name="disclosure_reads_body">Only where and when you touch inside thin strips along the left, right and bottom edges of the screen. If you pick bank apps, it also learns when one of them opens, and which app is in front while a bank pause lasts (app names only).</string>
+
+    <!-- Bank pause notifications, from the github-only watcher. -->
+    <string name="bank_pause_channel">Bank pause</string>
+    <string name="bank_pause_a_bank_app">a bank app</string>
+    <string name="bank_pause_title">Gestures paused for %1$s</string>
+    <string name="bank_pause_text">Your phone\'s own navigation works meanwhile. Gestures come back a few seconds after you leave the app.</string>
+    <string name="bank_pause_resume_now">Resume now</string>
+    <string name="bank_pause_failed_title">Gestures could not come back</string>
+    <string name="bank_pause_failed_text">NavGesture could not switch itself back on. Tap to open it and turn gestures on again.</string>
 </resources>

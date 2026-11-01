@@ -114,6 +114,24 @@
     <string name="label_edge_app_list">Bottom app switcher</string>
     <string name="edge_app_list_body">Swipe up from the bottom, then drag right for recent apps or left for favourites. Each short drag moves one app, and the list loops after the last one. Lift to open, or swipe down to close.</string>
     <string name="section_favourite_apps">Favourite apps</string>
+    <string name="section_bank_apps">Bank apps</string>
+    <string name="section_bank_apps_picked">Pause for these apps</string>
+    <string name="bank_apps_intro">Many bank and payment apps refuse to open while an Accessibility app such as NavGesture is on. Pick them here. When one opens, NavGesture gives your phone its own navigation bar back and switches itself off. A few seconds after you leave the app, gestures come back by themselves.</string>
+    <string name="bank_apps_first_open">Some banks check the moment they start. If one still complains, open it again: the pause is already on by then.</string>
+    <string name="bank_apps_empty">None yet. Tick your bank apps below.</string>
+    <string name="label_adb_grant">Permission from a computer</string>
+    <string name="label_granted">Granted</string>
+    <string name="bank_apps_needs_grant">Needed so gestures can switch themselves back on. From a computer, run once: %1$s</string>
+    <string name="bank_apps_needs_usage">Needed to see when you leave a bank app. Nothing leaves your phone.</string>
+    <string name="label_notifications">Notifications</string>
+    <string name="bank_apps_notifications_on">On: a notice with Resume now shows while gestures are paused.</string>
+    <string name="bank_apps_notifications_off">Off: the pause still works, with no notice. The NavGesture tile in Control Center resumes gestures.</string>
+    <string name="action_allow">Allow</string>
+    <string name="bank_apps_summary_needs_grant">Needs the permission from a computer</string>
+    <plurals name="bank_apps_summary">
+        <item quantity="one">Pauses gestures for %1$d app</item>
+        <item quantity="other">Pauses gestures for %1$d apps</item>
+    </plurals>
     <string name="section_favourites">Favourites</string>
     <string name="section_all_apps">All apps</string>
     <string name="favourites_empty">No favourite apps yet. Tick apps below to add them.</string>

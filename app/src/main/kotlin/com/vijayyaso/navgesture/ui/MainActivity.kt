@@ -113,6 +113,7 @@ internal enum class Screen(@param:StringRes val title: Int) {
     SETUP(R.string.section_setup),
     APP_SWITCHING(R.string.section_app_switch),
     FAVOURITE_APPS(R.string.section_favourite_apps),
+    BANK_APPS(R.string.section_bank_apps),
     CIRCLE_TO_SEARCH(R.string.section_circle_to_search),
     UPDATES(R.string.section_updates),
     GESTURE_SETTINGS(R.string.section_gestures),
@@ -193,6 +194,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                         stack = stack + Screen.FAVOURITE_APPS
                     }
                     Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
+                    Screen.BANK_APPS -> BankAppsScreen(model)
                     Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)
                     Screen.UPDATES -> Store.UpdatesScreen()
                     Screen.GESTURE_SETTINGS -> GestureSettingsScreen(model)

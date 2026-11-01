@@ -35,6 +35,9 @@ import android.view.Display
 import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import com.vijayyaso.navgesture.BuildConfig
+import com.vijayyaso.navgesture.bankpause.BankPause
+import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.FailureLog
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.gesture.GestureAction
@@ -44,20 +47,21 @@ import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.settings.GestureSettingsRepository
-import com.vijayyaso.navgesture.settings.FavouriteAppsStore
+import com.vijayyaso.navgesture.settings.PackageListStore
 import com.vijayyaso.navgesture.setup.GestureTileService
 import com.vijayyaso.navgesture.setup.ServiceKeeper
+import kotlin.math.hypot
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import kotlin.math.hypot
 
 /**
  * Hosts the edge strips in-process rather than in a foreground service:
@@ -73,7 +77,11 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     private val coroutineFailures = CoroutineExceptionHandler { _, throwable ->
         FailureLog.record(this, "settings collector", throwable)
     }
-    private val scope =
+    private var scope = newScope()
+
+    // A fresh one per connect: after a bank pause the system can connect this same instance
+    // again, and a cancelled scope would silently start nothing.
+    private fun newScope() =
         CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate + coroutineFailures)
     private val handler = Handler(Looper.getMainLooper())
 
@@ -85,6 +93,9 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     private var configuration: GestureConfiguration = GestureConfiguration()
     private var lastGeometry: ScreenGeometry? = null
     private var favourites: List<String> = emptyList()
+    private var bankApps: Set<String> = emptySet()
+    private var pausing = false
+    private var skipLogged = false
 
     /**
      * Rotation reaches the display *after* the configuration change lands, so
@@ -109,6 +120,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         runningState.value = true
         ServiceLog.add(this, "service started")
         ServiceKeeper.markWanted(this, wanted = true)
+        pausing = false
+        endBankPause()
         try {
             setUp()
         } catch (t: Throwable) {
@@ -118,6 +131,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     }
 
     private fun setUp() {
+        if (!scope.isActive) scope = newScope()
         settings = GestureSettingsRepository(applicationContext)
         performer = GestureActionPerformer(this)
         windowManager = getSystemService(WindowManager::class.java)
@@ -135,7 +149,13 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
 
         gestureBar = GestureBarHider(this, handler)
         scope.launch {
-            FavouriteAppsStore(applicationContext).favourites.collect { favourites = it }
+            PackageListStore.favourites(applicationContext).packages.collect { favourites = it }
+        }
+        scope.launch {
+            PackageListStore.bankApps(applicationContext).packages.collect {
+                bankApps = it.toSet()
+                listenToBankApps()
+            }
         }
         scope.launch {
             settings.configuration.distinctUntilChanged().collect { updated ->
@@ -152,8 +172,17 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
      * tells it apart from the user's own choice.
      */
     override fun onUnbind(intent: Intent?): Boolean {
-        ServiceLog.add(this, "service switched off")
-        ServiceKeeper.markWanted(this, wanted = false)
+        if (BankPause.consumeGoingAway(this)) {
+            // The bank pause switched us off; "wanted" stays, so a lost watcher still heals.
+            ServiceLog.add(this, "service paused for a bank app")
+        } else {
+            ServiceLog.add(this, "service switched off")
+            ServiceKeeper.markWanted(this, wanted = false)
+            if (BankPause.paused(this) != null) {
+                BankPause.clearPause(this)
+                BankPause.stopWatcher(this)
+            }
+        }
         gestureBar?.restoreForShutdown()
         teardown()
         GestureTileService.requestRefresh(this)
@@ -170,8 +199,95 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         reinstallIfGeometryChanged()
     }
 
-    /** No events are requested in `accessibility_service_config.xml`. */
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    /**
+     * The XML config requests no events. Only with bank apps picked does [listenToBankApps]
+     * ask for window changes, and only from those apps, to start a bank pause.
+     */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val packageName = event.packageName?.toString() ?: return
+        if (packageName in bankApps) pauseFor(packageName)
+    }
+
+    /** Changes the current service info, so canPerformGestures and the rest stay as declared. */
+    private fun listenToBankApps() {
+        val info = serviceInfo ?: return
+        val listen = !BuildConfig.IS_PLAY && bankApps.isNotEmpty()
+        info.eventTypes = if (listen) AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED else 0
+        info.packageNames = if (listen) bankApps.toTypedArray() else null
+        runCatching { serviceInfo = info }
+            .onFailure { FailureLog.record(this, "bank pause event filter", it) }
+    }
+
+    /**
+     * Steps aside for a bank app: watcher first (while the strips still allow a background
+     * start), the phone's own bar second and read back, the service last. Any step that fails
+     * undoes the pause, so the user never ends up with neither gestures nor the bar.
+     */
+    private fun pauseFor(packageName: String) {
+        if (pausing) return
+        if (!BankPause.canPause(this)) {
+            if (!skipLogged) {
+                skipLogged = true
+                ServiceLog.add(this, "bank pause skipped for $packageName: needs the adb grant and usage access")
+            }
+            return
+        }
+        if (BankPause.holdBlocks(this)) return
+        pausing = true
+        BankPause.savePause(this, packageName, bankApps, System.currentTimeMillis())
+        if (!BankPause.startWatcher(this)) {
+            undoPause("Android refused to start the watcher")
+            return
+        }
+        gestureBar?.restoreForShutdown()
+        if (configuration.hideGestureBar && GestureBarHider.isHidden(this)) {
+            undoPause("the phone's own bar did not come back")
+            return
+        }
+        ServiceLog.add(this, "bank pause: $packageName opened, switching off")
+        Log.i(TAG, "BANK_PAUSE $packageName")
+        disableSelf()
+        confirmPause(attempt = 1)
+    }
+
+    /**
+     * What a bank reads is the enabled list, so the list decides whether the pause took. The
+     * emulator (API 36) drops the entry at once but may never call onUnbind, so once the entry
+     * is gone the service takes down its own windows and state rather than wait for it.
+     */
+    private fun confirmPause(attempt: Int) {
+        if (instance == null) return
+        if (!DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this)) {
+            ServiceLog.add(this, "service paused for a bank app")
+            teardown()
+            GestureTileService.requestRefresh(this)
+            return
+        }
+        if (attempt >= DISABLE_CHECKS) {
+            undoPause("the system kept the service on")
+            return
+        }
+        handler.postDelayed({ confirmPause(attempt + 1) }, DISABLE_CHECK_MS)
+    }
+
+    private fun undoPause(reason: String) {
+        ServiceLog.add(this, "bank pause undone: $reason")
+        Log.w(TAG, "BANK_PAUSE_UNDONE $reason")
+        BankPause.clearPause(this)
+        BankPause.consumeGoingAway(this)
+        BankPause.stopWatcher(this)
+        gestureBar?.apply(configuration.hideGestureBar)
+        pausing = false
+    }
+
+    /** A saved pause ends when the service is back, however it came back. */
+    private fun endBankPause() {
+        if (BankPause.paused(this) == null) return
+        BankPause.clearPause(this)
+        BankPause.stopWatcher(this)
+        ServiceLog.add(this, "bank pause over, gestures back")
+    }
 
     override fun onInterrupt() = Unit
 
@@ -338,6 +454,10 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         private const val WINDOW_SETTLE_MS = 65L
 
         private const val FINISH_GRACE_MS = 1_000L
+
+        /** disableSelf() gets [DISABLE_CHECKS] looks this far apart before it counts as refused. */
+        private const val DISABLE_CHECK_MS = 500L
+        private const val DISABLE_CHECKS = 7
 
         @Volatile
         private var instance: NavGestureAccessibilityService? = null
