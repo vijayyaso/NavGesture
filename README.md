@@ -16,6 +16,8 @@ HyperOS ties its gesture navigation to the stock launcher. Switch to Nova, Niaga
 
 **[Download the latest release](https://github.com/vijayyaso/NavGesture/releases/latest)** · no root, no ADB, no computer needed
 
+Two builds come from this code. The GitHub release can check GitHub for updates (off until you turn it on). The Google Play build, once published, has no internet permission and updates through Play.
+
 ## Gestures
 
 | Gesture | Does |
@@ -40,7 +42,7 @@ If Play Protect blocks the install, allow restricted settings as in step 2. If t
 
 ## Privacy
 
-Gestures need an accessibility service. This one watches thin strips along the screen edges and turns a swipe into Back, Home, Recents or an app list. Its configuration withholds window content and accessibility events, so it never reads the screen or what you type. The app goes online only for an update check that stays off until you turn it on, and then asks GitHub for the latest release. It has no ads, analytics or account.
+Gestures need an accessibility service. This one watches thin strips along the screen edges and turns a swipe into Back, Home, Recents or an app list. Its configuration withholds window content and accessibility events, so it never reads the screen or what you type. The app goes online only for an update check that stays off until you turn it on, and then asks GitHub for the latest release. It has no ads, analytics or account. The full [privacy policy](docs/privacy-policy.md) covers both builds.
 
 ## What it can't do
 

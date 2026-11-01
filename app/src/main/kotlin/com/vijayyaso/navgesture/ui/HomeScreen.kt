@@ -18,17 +18,17 @@
 package com.vijayyaso.navgesture.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
-import com.vijayyaso.navgesture.update.UpdateViewModel
 
 @Composable
-internal fun HomeScreen(model: AppModel, updates: UpdateViewModel, onOpen: (Screen) -> Unit) {
-    val updateState by updates.state.collectAsState()
-    StatusBlock(model.status, model.configuration)
+internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
+    val context = LocalContext.current
+    StatusBlock(model.status, model.configuration, model.restrictedSettingsApply) {
+        model.requestAccessibility(context)
+    }
     SetupGroup(model) { onOpen(Screen.SETUP) }
 
     SectionHeader(stringResource(R.string.section_features))
@@ -48,15 +48,7 @@ internal fun HomeScreen(model: AppModel, updates: UpdateViewModel, onOpen: (Scre
         switchTag = TestTags.SWITCH_CIRCLE_TO_SEARCH,
         onOpen = { onOpen(Screen.CIRCLE_TO_SEARCH) },
     ) { on -> model.update { it.copy(circleToSearchEnabled = on) } }
-    SplitSwitchRow(
-        title = stringResource(R.string.section_updates),
-        supporting = updatesSummary(updateState),
-        checked = updateState.enabled,
-        rowTag = TestTags.ROW_UPDATES,
-        switchTag = TestTags.SWITCH_UPDATE_CHECK,
-        onOpen = { onOpen(Screen.UPDATES) },
-        onChange = updates::setEnabled,
-    )
+    Store.HomeRow { onOpen(Screen.UPDATES) }
 
     SectionHeader(stringResource(R.string.section_more))
     NavigationRow(

@@ -29,16 +29,21 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
+import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 // The way back when HyperOS stops the service with the bar hidden, as Control Center still opens.
-// Only the user may turn an accessibility service on. A tap on a stopped tile opens Settings.
+// The system binds the tile even after a force stop, so opening the panel runs ServiceKeeper. What a
+// tap does is tileTap() in TileModel.kt: the disclosure until the user agrees, then the one-tap
+// turn-on in the GitHub build with the adb grant, else Android's Accessibility settings.
 class GestureTileService : TileService() {
 
     override fun onTileAdded() {
@@ -53,6 +58,7 @@ class GestureTileService : TileService() {
         // Only a tile in the panel listens, which also covers one added before this was recorded.
         recordAdded(true)
         refresh()
+        writes.launch { ServiceKeeper.check(applicationContext, "Control Center") }
     }
 
     private fun recordAdded(added: Boolean) {
@@ -63,12 +69,42 @@ class GestureTileService : TileService() {
         if (listening?.get() === this) listening = null
     }
 
+    // Behind the lock screen, like the Settings switch it stands in for.
     override fun onClick() {
-        val target = when (currentFace().target) {
-            TileTarget.APP -> Intent(this, MainActivity::class.java)
-            TileTarget.ACCESSIBILITY_SETTINGS -> accessibilityIntent(this)
+        if (isLocked) unlockAndRun(::handleClick) else handleClick()
+    }
+
+    // Consent lives in DataStore, so it is read off the main thread and acted on back on it.
+    private fun handleClick() {
+        writes.launch {
+            val accepted = runCatching {
+                applicationContext.setupState.record.first().disclosureAccepted
+            }.getOrDefault(false)
+            withContext(Dispatchers.Main) { act(accepted) }
         }
-        if (isLocked) unlockAndRun { open(target) } else open(target)
+    }
+
+    private fun act(disclosureAccepted: Boolean) {
+        val tap = tileTap(
+            serviceEnabled = currentFace().target == TileTarget.APP,
+            disclosureAccepted = disclosureAccepted,
+            canTurnOn = ServiceKeeper.canTurnOn(this) &&
+                !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this),
+        )
+        when (tap) {
+            TileTap.OPEN_APP -> open(Intent(this, MainActivity::class.java))
+            TileTap.SHOW_DISCLOSURE -> open(
+                Intent(this, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_SHOW_DISCLOSURE, true),
+            )
+            TileTap.TURN_ON -> if (ServiceKeeper.turnOn(this)) {
+                ServiceLog.add(this, "tile tap: turned on")
+                refresh()
+            } else {
+                open(accessibilityIntent(this))
+            }
+            TileTap.OPEN_SETTINGS -> open(accessibilityIntent(this))
+        }
     }
 
     private fun currentFace() =

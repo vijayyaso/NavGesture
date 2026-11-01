@@ -93,4 +93,23 @@ class TileModelTest {
             TileAddOutcome.Failed(SecurityException()),
         )
     }
+
+    @Test
+    fun `a running service always opens the app`() {
+        for (accepted in listOf(true, false)) for (canTurnOn in listOf(true, false)) {
+            assertEquals(TileTap.OPEN_APP, tileTap(serviceEnabled = true, disclosureAccepted = accepted, canTurnOn = canTurnOn))
+        }
+    }
+
+    @Test
+    fun `without consent the tile shows the disclosure, even when it could turn the service on`() {
+        assertEquals(TileTap.SHOW_DISCLOSURE, tileTap(serviceEnabled = false, disclosureAccepted = false, canTurnOn = true))
+        assertEquals(TileTap.SHOW_DISCLOSURE, tileTap(serviceEnabled = false, disclosureAccepted = false, canTurnOn = false))
+    }
+
+    @Test
+    fun `with consent it turns the service on when allowed, else opens settings`() {
+        assertEquals(TileTap.TURN_ON, tileTap(serviceEnabled = false, disclosureAccepted = true, canTurnOn = true))
+        assertEquals(TileTap.OPEN_SETTINGS, tileTap(serviceEnabled = false, disclosureAccepted = true, canTurnOn = false))
+    }
 }

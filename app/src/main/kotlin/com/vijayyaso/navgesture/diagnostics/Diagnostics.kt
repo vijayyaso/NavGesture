@@ -53,6 +53,8 @@ data class Diagnostics(
     val lastCircleToSearchFailure: String?,
     /** Shown in-app because release builds cannot be read with `adb run-as`. */
     val lastRecordedFailure: String?,
+    /** When the service started and stopped, newest first; see [ServiceLog]. */
+    val serviceHistory: String?,
     val appVersionName: String?,
 ) {
     val serviceStatus: ServiceStatus
@@ -85,6 +87,7 @@ object DiagnosticsCollector {
             lastAppSwitchFailure = AppSwitcher.lastFailure,
             lastCircleToSearchFailure = GestureActionPerformer.lastCircleToSearchFailure,
             lastRecordedFailure = FailureLog.read(context),
+            serviceHistory = ServiceLog.read(context),
             appVersionName = appVersionName(context),
         )
     }

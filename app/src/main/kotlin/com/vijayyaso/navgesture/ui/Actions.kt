@@ -29,6 +29,7 @@ import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import androidx.core.net.toUri
+import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.setup.GestureTileService
 import com.vijayyaso.navgesture.setup.TileAddOutcome
@@ -56,6 +57,18 @@ private fun Context.findActivity(): Activity? {
 
 internal fun openAccessibility(context: Context) =
     context.startFirst(GestureTileService.accessibilityIntent(context))
+
+/**
+ * The one way the app sends the user to the Accessibility switch. Until the disclosure has been
+ * agreed to, it shows that instead: Google Play requires it before the user turns the service on.
+ */
+internal fun openAccessibilityOrDisclosure(
+    context: Context,
+    disclosureAccepted: Boolean,
+    showDisclosure: () -> Unit,
+) {
+    if (disclosureAccepted) openAccessibility(context) else showDisclosure()
+}
 
 /** Autostart decides whether HyperOS restores the service after a reboot. */
 internal fun openAutostart(context: Context) = context.startFirst(
@@ -117,6 +130,14 @@ internal fun hasUsageAccess(context: Context): Boolean {
     }.getOrNull()
     return mode == AppOpsManager.MODE_ALLOWED
 }
+
+/**
+ * Android 13's restricted settings greys out the Accessibility switch only for apps installed
+ * outside an app store. The Play build is installed from Play, so it never shows that step or
+ * hint; the same build flag as every other Play difference decides it.
+ */
+internal fun restrictedSettingsApply(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !BuildConfig.IS_PLAY
 
 /** A yes is trusted. HyperOS keeps its own Power setting, so a no proves nothing there. */
 internal fun batteryUnrestricted(context: Context): Boolean =

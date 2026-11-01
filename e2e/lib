@@ -104,14 +104,16 @@ report() {
 #
 # logcat says what the service decided, dumpsys what the system did.
 
-# Clears logcat, so each case asserts only on what it caused.
+# Starts a case: each case asserts only on what it caused. The Android 11 image can keep the
+# previous case's lines after a clear, so the lines still there are counted and skipped.
 reset_log() {
   "${ADB_BIN}" logcat -c >/dev/null 2>&1 || true
+  LOG_SKIP="$("${ADB_BIN}" logcat -d -s NavGesture 2>/dev/null | wc -l | tr -d ' ')"
 }
 
 # Prints this case's NavGesture log lines.
 gesture_log() {
-  "${ADB_BIN}" logcat -d -s NavGesture 2>/dev/null | tr -d '\r'
+  "${ADB_BIN}" logcat -d -s NavGesture 2>/dev/null | tr -d '\r' | tail -n +"$((${LOG_SKIP:-0} + 1))"
 }
 
 # assert_log <description> <grep-pattern>
@@ -146,9 +148,10 @@ assert_no_log() {
   fi
 }
 
+# Android 12+ names the field topResumedActivity; Android 11 says mResumedActivity.
 resumed_activity() {
   "${ADB_BIN}" shell dumpsys activity activities 2>/dev/null |
-    tr -d '\r' | grep -oE 'topResumedActivity.*' | head -1 || true
+    tr -d '\r' | grep -oE '(topResumedActivity|mResumedActivity).*' | head -1 || true
 }
 
 ################################################################################

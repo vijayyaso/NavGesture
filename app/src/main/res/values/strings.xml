@@ -22,7 +22,7 @@
     <string name="app_name">NavGesture</string>
 
     <!-- Shown by the system in the accessibility settings list. -->
-    <string name="accessibility_service_description">Recognises swipes from the screen edges and performs Back, Home and Recents. The service is for navigation alone, and it doesn\'t read screen content or keystrokes or send anything off your device. The app itself contacts GitHub only if you turn on its update check.</string>
+    <string name="accessibility_service_description">Recognises swipes from the screen edges and performs Back, Home and Recents. The service is for navigation alone, and it doesn\'t read screen content or keystrokes or send anything off your device.</string>
     <string name="accessibility_service_summary">Edge gesture navigation</string>
 
     <!-- Status, the first thing on home. The tile reuses the two short ones. -->
@@ -189,47 +189,8 @@
     <string name="action_reset_defaults">Reset to defaults</string>
     <string name="snackbar_reset">Gesture settings reset</string>
 
-    <!-- Update check. Off by default, and the only code that touches the network. -->
-    <string name="update_switch">Check for updates</string>
-    <string name="update_switch_body">Asks GitHub for the latest release once a day as you open the app.</string>
+    <!-- The Updates screen title; its strings live in the github build's resources. -->
     <string name="section_updates">Updates</string>
-    <string name="update_summary_up_to_date">Up to date</string>
-    <string name="update_summary_available">Update available (%1$s)</string>
-    <string name="update_summary_checking">Checking…</string>
-    <string name="update_summary_no_network">No connection</string>
-    <string name="update_summary_rate_limited">GitHub is limiting requests</string>
-    <string name="update_summary_http_error">GitHub answered HTTP %1$d</string>
-    <string name="update_summary_bad_response">Unreadable answer from GitHub</string>
-    <string name="update_summary_no_apk">%1$s has no APK yet</string>
-    <string name="update_summary_nothing_published">No release yet</string>
-    <string name="update_summary_unreadable_version">Could not compare versions</string>
-    <string name="update_status">Latest release</string>
-    <string name="update_not_checked">Not checked yet</string>
-    <string name="update_check_now">Check now</string>
-    <string name="update_download_install">Download and install</string>
-    <string name="update_allow_installs">Allow installs</string>
-    <string name="update_last_checked">Last checked %1$s</string>
-    <string name="update_checking">Asking GitHub for the newest release…</string>
-    <string name="update_up_to_date">Up to date. You have %1$s and the newest release is %2$s.</string>
-    <string name="update_available">%1$s is available. You have %2$s.</string>
-    <string name="update_no_apk">Release %1$s has no APK attached, so there is nothing to install yet.</string>
-    <string name="update_nothing_published">GitHub doesn\'t list a published release yet.</string>
-    <string name="update_unreadable_version">Could not compare versions, because %1$s is not a version number.</string>
-    <string name="update_no_network">Could not reach GitHub (%1$s). Check the connection and try again.</string>
-    <string name="update_rate_limited">GitHub is limiting requests from this network. Try again later.</string>
-    <string name="update_rate_limited_until">GitHub is limiting requests from this network. Try again after %1$s.</string>
-    <string name="update_http_error">GitHub answered with HTTP %1$d. Try again later.</string>
-    <string name="update_bad_response">GitHub sent an answer this app could not read (%1$s).</string>
-    <string name="update_downloading">Downloading %1$s…</string>
-    <string name="update_permission_needed">Android needs your permission before NavGesture can install an update. Allow it, come back here, and the download starts.</string>
-    <string name="update_confirming">Confirm the update in the system prompt.</string>
-    <string name="update_checksum_mismatch">The download did not match the checksum GitHub published, so it was deleted and nothing was installed.</string>
-    <string name="update_blocked_host">The download was redirected to %1$s, which is not a GitHub host, so it was stopped.</string>
-    <string name="update_download_failed">The download failed (%1$s). Try again.</string>
-    <string name="update_install_failed">The update did not install (%1$s).</string>
-    <string name="update_signature_conflict">Android refused the update, because it is signed with a different key from this copy (%1$s).</string>
-    <string name="update_declined">The update was cancelled in the system prompt, and this copy stays as it was.</string>
-    <string name="update_installed">Update installed.</string>
 
 
     <!-- Troubleshooting. Local only, never transmitted. -->
@@ -255,6 +216,21 @@
     <string name="label_last_app_switch_failure">Last app switch problem</string>
     <string name="diag_last_circle_to_search_failure">Last Circle to Search problem</string>
     <string name="diag_recorded_failure">Recorded failure</string>
+    <string name="diag_service_history">Service history</string>
+
+    <!-- Accessibility disclosure, required by Google Play. Mirrored in docs/play-store/disclosure.md. -->
+    <string name="disclosure_title">About the Accessibility service</string>
+    <string name="disclosure_intro">NavGesture needs Android\'s Accessibility service to turn edge swipes into Back, Home and Recents. Before you turn it on, here is exactly what it does.</string>
+    <string name="disclosure_reads_title">What it reads</string>
+    <string name="disclosure_reads_body">Only where and when you touch inside thin strips along the left, right and bottom edges of the screen.</string>
+    <string name="disclosure_does_title">What it does with it</string>
+    <string name="disclosure_does_body">It decides whether the touch is a gesture, then performs Back, Home, Recents (Android\'s recent-apps screen), opens NavGesture\'s own app row, or starts Circle to Search. A touch that is not a gesture is passed on to the app underneath, at the same spot.</string>
+    <string name="disclosure_never_title">What it never does</string>
+    <string name="disclosure_never_body">It cannot see what is on your screen or what you type. It does not store your touches, and it does not send them anywhere.</string>
+    <string name="disclosure_agree">Agree</string>
+    <string name="disclosure_not_now">Not now</string>
+    <string name="disclosure_footnote">Agree opens Android\'s Accessibility settings, where you switch NavGesture on. You can switch it off there at any time.</string>
+    <string name="usage_access_explainer">With Usage access, NavGesture reads which apps you opened recently, only to list them in the app row. The list stays on this phone.</string>
     <string name="diag_none">None</string>
     <string name="diag_unknown">Unknown</string>
     <string name="value_yes">Yes</string>

@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# Builds the release APK in a container, dropping navgesture.apk in the repo root.
+# Builds the release APK in a container, dropping navgesture.apk and navgesture-play.aab in the
+# repo root.
 set -e
 
 cd "$(dirname "$0")/../"

@@ -32,7 +32,7 @@ import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.update.UpdateViewModel
 
 @Composable
-internal fun UpdatesScreen(updates: UpdateViewModel) {
+internal fun UpdatesScreenContent(updates: UpdateViewModel) {
     val context = LocalContext.current
     val state by updates.state.collectAsState()
     Column(modifier = Modifier.testTag(TestTags.SCREEN_UPDATES)) {

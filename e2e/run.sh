@@ -38,11 +38,15 @@ set -e
 
 keep=''
 apk_arg=''
-usage="usage: $0 [-a avd] [-p apk] [-k] [suite ...]"
+gestural=''
+usage="usage: $0 [-a avd] [-p apk] [-k] [-g] [suite ...]"
 
-while getopts 'a:p:kh' opt; do
+# -g runs in Android's own gesture navigation instead of three-button mode, for information only:
+# the phone takes slow side swipes and may take bottom ones there, so failures are expected.
+while getopts 'a:p:kgh' opt; do
   case "${opt}" in
     a) AVD="${OPTARG}" ;;
+    g) gestural='1' ;;
     p) apk_arg="${OPTARG}" ;;
     k) keep='1' ;;
     h)
@@ -57,7 +61,8 @@ while getopts 'a:p:kh' opt; do
 done
 shift $((OPTIND - 1))
 
-all_suites='navigation app-switch back-revert status-refresh circle-to-search landscape-confirm'
+# disclosure clears the app's data, so it stays last.
+all_suites='navigation app-switch back-revert status-refresh circle-to-search landscape-confirm disclosure'
 suites="${all_suites}"
 if [ "$#" -gt 0 ]; then
   suites="$*"
@@ -82,7 +87,8 @@ cleanup() {
   fi
 }
 
-e2e/emulator.sh
+# shellcheck disable=SC2086 # an unset flag must vanish, not become an empty argument
+e2e/emulator.sh ${gestural:+-g}
 trap cleanup INT TERM EXIT
 
 # shellcheck disable=SC2086 # an empty apk argument must vanish, not become an empty string

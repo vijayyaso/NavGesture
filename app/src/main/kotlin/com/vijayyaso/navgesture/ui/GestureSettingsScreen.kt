@@ -37,8 +37,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.navigation.GestureBarHider
+import com.vijayyaso.navgesture.navigation.NavigationModeReader
 import kotlin.math.roundToInt
 
 @Composable
@@ -141,18 +143,13 @@ internal fun GestureSettingsScreen(model: AppModel) {
         supporting = stringResource(R.string.label_maximum_duration_body),
     ) { updated -> model.update { it.copy(maximumArmDurationMs = updated.toLong()) } }
 
-    SectionHeader(stringResource(R.string.section_gesture_bar))
     // Read on every recomposition, so a grant made while the app is open shows on return.
     val canHide = GestureBarHider.canWrite(LocalContext.current)
-    ToggleRow(
-        label = stringResource(R.string.label_hide_gesture_bar),
-        checked = configuration.hideGestureBar && canHide,
-        supporting = if (canHide) {
-            stringResource(R.string.hide_gesture_bar_body)
-        } else {
-            stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND)
-        },
-    ) { updated -> if (canHide) model.update { it.copy(hideGestureBar = updated) } }
+    // The bar settings exist only on HyperOS. The Play build never shows an adb instruction, so
+    // there the switch appears only once the grant is already in place.
+    if (NavigationModeReader.isHyperOsDevice() && (canHide || !BuildConfig.IS_PLAY)) {
+        GestureBarSection(configuration, canHide, model)
+    }
 
     SectionHeader(stringResource(R.string.section_feedback))
     ToggleRow(
@@ -201,3 +198,17 @@ internal fun gestureSettingsSummary(configuration: GestureConfiguration): String
 
 /** The same 8 to 64 dp the touch strips have always offered. */
 private val EDGE_WIDTH_RANGE = 8f..64f
+
+@Composable
+private fun GestureBarSection(configuration: GestureConfiguration, canHide: Boolean, model: AppModel) {
+    SectionHeader(stringResource(R.string.section_gesture_bar))
+    ToggleRow(
+        label = stringResource(R.string.label_hide_gesture_bar),
+        checked = configuration.hideGestureBar && canHide,
+        supporting = if (canHide) {
+            stringResource(R.string.hide_gesture_bar_body)
+        } else {
+            stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND)
+        },
+    ) { updated -> if (canHide) model.update { it.copy(hideGestureBar = updated) } }
+}

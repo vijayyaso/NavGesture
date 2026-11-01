@@ -23,11 +23,15 @@ app/
     navigation/   NavigationIntegration + HyperOS/generic implementations
     settings/     DataStore-backed configuration
     diagnostics/  Local-only device/state snapshot
-    boot/         BOOT_COMPLETED observer
-    setup/        Control Center tile and the setup checklist (unit tested)
-    update/       Opt-in update check, the only network code
+    setup/        Control Center tile, the setup checklist and ServiceKeeper (unit tested)
     ui/           MainActivity with its back stack, one file per screen, theme
-  src/test/kotlin/            Recognizer tests (plain JVM, no device)
+  src/github/kotlin/com/vijayyaso/navgesture/   GitHub build only
+    boot/         BOOT_COMPLETED observer
+    update/       Opt-in update check, the only network code
+    ui/           Store.kt (updater hooks), the Updates row and screen
+  src/play/kotlin/com/vijayyaso/navgesture/ui/  Store.kt with empty hooks
+  src/test/kotlin/            Recognizer and setup tests (plain JVM, no device)
+  src/testGithub/kotlin/      Update check tests
 docker/           Dev container and APK build images
 scripts/          Entrypoint, hooks, sonar, version, emulator and E2E helpers
 docs/             This file and the platform investigations
@@ -46,12 +50,30 @@ There is nothing to decide, by design. Semver would promise a kind of compatibil
 
 Note `bash -c`, not `-lc`, when running commands in the container: a login shell sources `/etc/profile`, which replaces `PATH` and drops the SDK directories.
 
+## Two builds
+
+One codebase, two Gradle flavors (dimension `store`). The design is in
+[designs/play-store-release.md](designs/play-store-release.md).
+
+| | `github` | `play` |
+| :- | :------- | :----- |
+| Ships as | `navgesture.apk` on GitHub Releases | `app-play-release.aab` uploaded to Google Play |
+| Update check | yes (`src/github`: `update/`, `ui/UpdateRows.kt`, `ui/UpdatesScreen.kt`) | no code, no `INTERNET`, no `REQUEST_INSTALL_PACKAGES` |
+| Turns itself back on after a force stop, one-tap tile | yes, with the adb grant | no (`BuildConfig.IS_PLAY`) |
+| "Allow restricted settings" step | Android 13+ | never |
+| Boot receiver | yes | no |
+
+`ui/Store.kt` exists in both `src/github` and `src/play` with the same functions; `main` calls
+it for the Updates row, screen and resume check. Everything else, including the Accessibility
+disclosure Google Play requires, is shared. The Play Console texts are in
+[play-store/](play-store/) and the privacy policy in [privacy-policy.md](privacy-policy.md).
+
 ## Commands
 
 Gradle is the only task runner.
 
 ```sh
-gradle assembleDebug   # build
+gradle assembleGithubDebug assemblePlayDebug   # build both
 gradle test            # unit tests (GestureTracker decision logic)
 gradle lint            # Android lint
 gradle jacocoTestReport
@@ -78,7 +100,7 @@ Two layers, because they catch different things.
 - injects real swipes with `adb shell input`
 - rotates the display to landscape for the pill, and back to portrait afterwards
 
-It then asserts on two independent signals: logcat (did *our* service decide correctly) and `dumpsys` (did the system state actually change). It needs `/dev/kvm` and the debug APK from `gradle assembleDebug`:
+It then asserts on two independent signals: logcat (did *our* service decide correctly) and `dumpsys` (did the system state actually change). It needs `/dev/kvm` and the debug APK from `gradle assembleGithubDebug`:
 
 ```sh
 docker run --rm --device /dev/kvm -u "$(id -u):$(id -g)" -e HOME=/tmp \
@@ -87,11 +109,11 @@ docker run --rm --device /dev/kvm -u "$(id -u):$(id -g)" -e HOME=/tmp \
   -c './e2e/run.sh'
 ```
 
-Suite names after the flags run only those suites, such as `./e2e/run.sh navigation back-revert`, and with none it runs all six. CI builds the debug APK once and splits the suites across three jobs, each booting its own emulator, and the `Gesture end-to-end` check passes only when all three do. `-k` leaves the emulator running for interactive poking. `-p navgesture.apk` runs the suite against a release build. Run it before every release, because R8 obfuscation and shrinking can break things no JVM test sees. It has already caught one such bug: log and diagnostics strings built from `::class.simpleName` came out as `a`/`b`/`c` once minified, so `GestureAction` has an explicit `id`. R8 also strips every `Log.d` and `Log.v` call from a release build, so a line the suite greps for logs at info or above.
+Suite names after the flags run only those suites, such as `./e2e/run.sh navigation back-revert`, and with none it runs all seven. `disclosure` checks the Google Play consent screen; it switches the service off and clears the app's data first, so it always runs last. `-g` runs in Android's own gesture navigation instead of three-button mode, for information only: there the phone takes slow side swipes and may take bottom ones, so failures are expected and are not a release gate (`./e2e/run.sh -g back-revert`; see the design's section E). CI builds the debug APK once and splits the suites across three jobs, each booting its own emulator, and the `Gesture end-to-end` check passes only when all three do. `-k` leaves the emulator running for interactive poking. `-p navgesture.apk` runs the suite against a release build. Run it before every release, because R8 obfuscation and shrinking can break things no JVM test sees. It has already caught one such bug: log and diagnostics strings built from `::class.simpleName` came out as `a`/`b`/`c` once minified, so `GestureAction` has an explicit `id`. R8 also strips every `Log.d` and `Log.v` call from a release build, so a line the suite greps for logs at info or above.
 
 A release build ignores the debug overrides that `e2e/device.sh` writes, so for a release APK the script turns the side app list on through the app's own toggle, the way a user would, and the app-switch suite runs in full. That keeps an R8 break in the toggle, its DataStore write or the recognizer visible as a failing case, where a skip would hide all three. The cost is a dependency on the screen. The app turns its Compose test tags into resource ids. The script finds the switch by its `switch_edge_app_list` tag in a `uiautomator` dump and taps it. A layout that drops the tag fails the run before any gesture is tried. Every suite selects rows by tag through `find_id`, `tap_id`, `text_of_id` and `set_toggle_id` in `e2e/lib`, with the tags in `ui/TestTags.kt`. Moving a row or rewording its label leaves the suites working. The Recents hold also keeps its 100 ms default, since its override is debug-only as well. Installing over a build signed with another key uninstalls it first, so the release and debug runs can share one emulator, and on a phone that wipes the installed copy and its settings. The app opens on whichever screen was last showing, so `open_home` taps the back arrow until home, and `open_screen <row tag>` goes from home to a nested screen.
 
-The update check has JVM tests of its own. A saved Releases API response in `app/src/test/resources`, captured from the real endpoint, feeds the parser, and fakes of the network, store and installer interfaces drive the controller through each outcome.
+The update check has JVM tests of its own, in the `github` flavor (`app/src/testGithub`). A saved Releases API response in `app/src/testGithub/resources`, captured from the real endpoint, feeds the parser, and fakes of the network, store and installer interfaces drive the controller through each outcome.
 
 Every bug found on a real device so far was in the Android integration, not the recognizer:
 
@@ -112,7 +134,9 @@ Signing material lives outside git:
 ./scripts/build-apk.sh 1.0.0   # produces ./navgesture.apk
 ```
 
-The build receives the password as a Docker build arg. The final image stage is `FROM scratch` with only the APK in it, and no publishable layer holds the key or the password. With either piece missing, the release build degrades to unsigned rather than failing, so CI can still verify that `assembleRelease` compiles.
+The build receives the password as a Docker build arg. The final image stage is `FROM scratch` with only the APK and the Play bundle (`navgesture-play.aab`) in it, and no publishable layer holds the key or the password. With either piece missing, the release build degrades to unsigned rather than failing, so CI can still verify that `assembleGithubRelease` and `bundlePlayRelease` compile.
+
+The keystore is the same key under two names: `android.keystore` at the repository root (what CI restores from `ANDROID_KEYSTORE_B64`) and `~/.config/navgesture/navgesture-release.jks` on the maintainer's machine, alias `navgesture`, certificate SHA-256 `8527f9ba…5e4311`. Google Play App Signing uses this same key, so the Play and GitHub builds install over each other; `docs/play-store/release-checklist.md` has the upload steps.
 
 **Back up the keystore somewhere off this machine.** Android identifies an app by its signing certificate, so an update signed with a different key is refused by every device that already has NavGesture on it, and the only recovery is a new package name. `android.keystore` and `.env` are gitignored and must never be committed, which also means git is not a backup: keep the key and its password in a password manager, `base64` the keystore if the manager only takes text.
 

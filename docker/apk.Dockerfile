@@ -37,15 +37,17 @@ ENV KEYSTORE_ALIAS="${KEYSTORE_ALIAS}"
 ENV GRADLE_USER_HOME="/tmp/gradle"
 
 RUN ./scripts/version.sh "${VERSION}" \
-  && gradle --no-daemon assembleRelease
+  && gradle --no-daemon assembleGithubRelease bundlePlayRelease
 
 # The task output name depends on whether signing material was present.
 RUN mkdir -p /out \
-  && cp "$(find app/build/outputs/apk/release -name '*.apk' | head -n 1)" \
-  /out/navgesture.apk
+  && cp "$(find app/build/outputs/apk/github/release -name '*.apk' | head -n 1)" \
+  /out/navgesture.apk \
+  && cp app/build/outputs/bundle/playRelease/app-play-release.aab /out/navgesture-play.aab
 
 ################################################################################
-# Final stage to extract only the APK
+# Final stage to extract only the APK and the Play bundle
 FROM scratch AS final
 
 COPY --from=builder /out/navgesture.apk /navgesture.apk
+COPY --from=builder /out/navgesture-play.aab /navgesture-play.aab

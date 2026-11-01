@@ -30,12 +30,14 @@ set -e
 . "$(dirname -- "$0")/lib"
 
 stop=''
-usage="usage: $0 [-a avd] [-s]"
+gestural=''
+usage="usage: $0 [-a avd] [-s] [-g]"
 
-while getopts 'a:sh' opt; do
+while getopts 'a:sgh' opt; do
   case "${opt}" in
     a) AVD="${OPTARG}" ;;
     s) stop='1' ;;
+    g) gestural='1' ;;
     h)
       echo "${usage}"
       exit 0
@@ -79,6 +81,13 @@ fi
 
 # Gestural mode puts the gesture bar over our bottom strip and satisfies tests our service
 # did nothing for. The mode comes from an overlay, so the secure setting alone does nothing.
+# -g asks for gesture navigation instead (navigation_mode 2), for the informational run.
+want_overlay='threebutton'
+want_mode='0'
+if [ -n "${gestural}" ]; then
+  want_overlay='gestural'
+  want_mode='2'
+fi
 force_three_button() {
   for mode in gestural twobutton threebutton; do
     "${ADB_BIN}" shell cmd overlay disable \
@@ -86,7 +95,7 @@ force_three_button() {
   done
   sleep 1
   "${ADB_BIN}" shell cmd overlay enable \
-    com.android.internal.systemui.navbar.threebutton >/dev/null 2>&1 || true
+    "com.android.internal.systemui.navbar.${want_overlay}" >/dev/null 2>&1 || true
 }
 
 nav_mode=''
@@ -96,24 +105,24 @@ while [ "${attempt}" -le 6 ]; do
   waited=1
   while [ "${waited}" -le 10 ]; do
     nav_mode="$("${ADB_BIN}" shell settings get secure navigation_mode 2>/dev/null | tr -d '\r')"
-    if [ "${nav_mode}" = '0' ]; then
+    if [ "${nav_mode}" = "${want_mode}" ]; then
       break
     fi
     sleep 1
     waited=$((waited + 1))
   done
-  if [ "${nav_mode}" = '0' ]; then
+  if [ "${nav_mode}" = "${want_mode}" ]; then
     break
   fi
   echo "   navigation_mode=${nav_mode}, retrying the overlay switch (attempt ${attempt} of 6)" >&2
   attempt=$((attempt + 1))
 done
-if [ "${nav_mode}" != '0' ]; then
-  echo "Could not switch to three-button navigation (navigation_mode=${nav_mode})." >&2
+if [ "${nav_mode}" != "${want_mode}" ]; then
+  echo "Could not switch to ${want_overlay} navigation (navigation_mode=${nav_mode})." >&2
   echo "Bottom-edge cases cannot pass in gestural mode: the gesture bar outranks our" >&2
   echo "strip and claims the stream. Overlays available:" >&2
   "${ADB_BIN}" shell cmd overlay list 2>/dev/null | tr -d '\r' | grep -i navbar | sed 's/^/    /' >&2
   exit 1
 fi
-echo "   navigation_mode=0 (three-button)" >&2
+echo "   navigation_mode=${nav_mode} (${want_overlay})" >&2
 echo "emulator '${AVD}' ready. Stop it with: e2e/emulator.sh -s" >&2

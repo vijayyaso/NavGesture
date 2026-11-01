@@ -23,16 +23,32 @@ import android.content.Intent
 import android.util.Log
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 import com.vijayyaso.navgesture.navigation.NavigationMode
+import com.vijayyaso.navgesture.setup.ServiceKeeper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
- * Android rebinds the accessibility service on boot by itself, so this exists only for the
- * navigation subsystem — and since a normal APK cannot restore the state HyperOS resets
- * across a reboot, it only observes it and lets the UI report it.
+ * Android rebinds the accessibility service on boot by itself. This puts the service back
+ * when the system dropped its switch, see [ServiceKeeper]. It also
+ * observes the navigation mode HyperOS resets across a reboot, for the UI to report.
  */
 class BootCompletedReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+
+        // Puts back a switch the system dropped before the restart. A force-stopped app gets
+        // no boot broadcast, so the tile and the app opening cover that case.
+        val pending = goAsync()
+        work.launch {
+            try {
+                ServiceKeeper.check(context.applicationContext, "boot")
+            } finally {
+                pending.finish()
+            }
+        }
 
         val status = NavigationIntegrationFactory.create(context).status()
         if (status.available && status.currentMode != NavigationMode.GESTURAL) {
@@ -46,5 +62,6 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
     private companion object {
         const val TAG = "NavGesture"
+        val work = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }

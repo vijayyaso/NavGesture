@@ -28,7 +28,7 @@ set -e
 # shellcheck source=lib
 . "$(dirname -- "$0")/lib"
 
-apk="app/build/outputs/apk/debug/app-debug.apk"
+apk="app/build/outputs/apk/github/debug/app-github-debug.apk"
 usage="usage: $0 [-p apk]"
 
 while getopts 'p:h' opt; do
@@ -48,7 +48,7 @@ done
 require_adb
 
 if [ ! -f "${apk}" ]; then
-  echo "APK missing at ${apk}. Build it first: gradle assembleDebug" >&2
+  echo "APK missing at ${apk}. Build it first: gradle assembleGithubDebug" >&2
   exit 1
 fi
 

@@ -18,7 +18,6 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
@@ -74,12 +73,18 @@ internal class AppModel(
         private set
     private var batteryUnrestricted by mutableStateOf(batteryUnrestricted(context))
 
+    /** Set by a Turn on tap without consent; the screen stack shows the disclosure and clears it. */
+    var disclosureRequested by mutableStateOf(false)
+
     val status: ServiceStatus get() = diagnostics.serviceStatus
+
+    /** Fixed for the life of the install, so it is read once. */
+    val restrictedSettingsApply: Boolean = restrictedSettingsApply()
 
     val checklist: SetupChecklist
         get() = SetupChecklist.evaluate(
             SetupFacts(
-                restrictedSettingsApply = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                restrictedSettingsApply = restrictedSettingsApply,
                 restrictedSettingsConfirmed = record.restrictedSettingsConfirmed,
                 serviceEverEnabled = record.serviceEverEnabled,
                 service = status,
@@ -106,6 +111,16 @@ internal class AppModel(
     fun update(transform: (GestureConfiguration) -> GestureConfiguration) {
         scope.launch { settings.update(transform) }
     }
+
+    /**
+     * Every Turn on, Fix and Open button that leads to the Accessibility switch calls this. The
+     * screen stack pushes the disclosure and clears [disclosureRequested] in the same step, so a
+     * second Turn on after Not now shows it again.
+     */
+    fun requestAccessibility(context: Context) =
+        openAccessibilityOrDisclosure(context, record.disclosureAccepted) { disclosureRequested = true }
+
+    fun acceptDisclosure() = setFlag(SetupFlag.DISCLOSURE_ACCEPTED, true)
 
     fun setFlag(flag: SetupFlag, value: Boolean) {
         scope.launch { setupState.set(flag, value) }

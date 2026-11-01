@@ -17,7 +17,6 @@
 
 package com.vijayyaso.navgesture.ui
 
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +47,12 @@ import com.vijayyaso.navgesture.ui.theme.warning
 
 /** The answer to why the app was opened, with the one action the current state needs. */
 @Composable
-internal fun StatusBlock(status: ServiceStatus, configuration: GestureConfiguration) {
+internal fun StatusBlock(
+    status: ServiceStatus,
+    configuration: GestureConfiguration,
+    restrictedSettingsApply: Boolean,
+    onTurnOn: () -> Unit,
+) {
     val context = LocalContext.current
     val title = when (status) {
         ServiceStatus.OFF -> R.string.status_off
@@ -93,11 +97,11 @@ internal fun StatusBlock(status: ServiceStatus, configuration: GestureConfigurat
             )
             when (status) {
                 ServiceStatus.OFF -> {
-                    Button(onClick = { openAccessibility(context) }) {
+                    Button(onClick = onTurnOn, modifier = Modifier.testTag(TestTags.STATUS_TURN_ON)) {
                         Text(stringResource(R.string.action_turn_on))
                     }
                     // Restricted settings arrived in Android 13, for apps installed outside a store.
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (restrictedSettingsApply) {
                         Text(
                             text = stringResource(R.string.status_restricted_hint),
                             style = MaterialTheme.typography.bodySmall,
@@ -108,7 +112,7 @@ internal fun StatusBlock(status: ServiceStatus, configuration: GestureConfigurat
                         }
                     }
                 }
-                ServiceStatus.STOPPED -> Button(onClick = { openAccessibility(context) }) {
+                ServiceStatus.STOPPED -> Button(onClick = onTurnOn, modifier = Modifier.testTag(TestTags.STATUS_TURN_ON)) {
                     Text(stringResource(R.string.action_fix))
                 }
                 ServiceStatus.WORKING -> Unit

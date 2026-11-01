@@ -105,6 +105,12 @@ jobs:
           name: apk
           path: navgesture.apk
           retention-days: 1
+      - name: Run actions/upload-artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: play-aab
+          path: navgesture-play.aab
+          retention-days: 1
 
   release:
     name: Publish GitHub Release

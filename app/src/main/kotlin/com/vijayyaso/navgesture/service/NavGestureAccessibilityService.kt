@@ -36,6 +36,7 @@ import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import com.vijayyaso.navgesture.diagnostics.FailureLog
+import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.PlatformDefaults
@@ -45,6 +46,7 @@ import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.settings.GestureSettingsRepository
 import com.vijayyaso.navgesture.settings.FavouriteAppsStore
 import com.vijayyaso.navgesture.setup.GestureTileService
+import com.vijayyaso.navgesture.setup.ServiceKeeper
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -105,6 +107,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         super.onServiceConnected()
         instance = this
         runningState.value = true
+        ServiceLog.add(this, "service started")
+        ServiceKeeper.markWanted(this, wanted = true)
         try {
             setUp()
         } catch (t: Throwable) {
@@ -142,7 +146,15 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
     }
 
+    /**
+     * The system unbinds when the switch goes off. The swipes go with it, so a bar this app
+     * hid comes back first. A force stop skips this entirely, which is how [ServiceKeeper]
+     * tells it apart from the user's own choice.
+     */
     override fun onUnbind(intent: Intent?): Boolean {
+        ServiceLog.add(this, "service switched off")
+        ServiceKeeper.markWanted(this, wanted = false)
+        gestureBar?.restoreForShutdown()
         teardown()
         GestureTileService.requestRefresh(this)
         return super.onUnbind(intent)

@@ -31,6 +31,8 @@ data class SetupRecord(
     val restrictedSettingsConfirmed: Boolean = false,
     val batteryConfirmed: Boolean = false,
     val autostartConfirmed: Boolean = false,
+    /** The user tapped Agree on the Accessibility disclosure, which Google Play requires. */
+    val disclosureAccepted: Boolean = false,
 )
 
 enum class SetupFlag(internal val key: Preferences.Key<Boolean>) {
@@ -39,6 +41,7 @@ enum class SetupFlag(internal val key: Preferences.Key<Boolean>) {
     RESTRICTED_SETTINGS_CONFIRMED(booleanPreferencesKey("restricted_settings_confirmed")),
     BATTERY_CONFIRMED(booleanPreferencesKey("battery_confirmed")),
     AUTOSTART_CONFIRMED(booleanPreferencesKey("autostart_confirmed")),
+    DISCLOSURE_ACCEPTED(booleanPreferencesKey("disclosure_accepted")),
 }
 
 class SetupStateRepository(private val store: DataStore<Preferences>) {
@@ -51,6 +54,7 @@ class SetupStateRepository(private val store: DataStore<Preferences>) {
             restrictedSettingsConfirmed = flag(SetupFlag.RESTRICTED_SETTINGS_CONFIRMED),
             batteryConfirmed = flag(SetupFlag.BATTERY_CONFIRMED),
             autostartConfirmed = flag(SetupFlag.AUTOSTART_CONFIRMED),
+            disclosureAccepted = flag(SetupFlag.DISCLOSURE_ACCEPTED),
         )
     }
 

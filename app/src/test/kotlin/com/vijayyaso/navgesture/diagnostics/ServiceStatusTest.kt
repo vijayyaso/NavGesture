@@ -60,6 +60,17 @@ class ServiceStatusTest {
         assertFalse(isServiceListed("$PKG/$PKG.Other", PKG, cls))
     }
 
+    @Test
+    fun `turning on keeps every other service and adds ours once`() {
+        val ours = "$PKG/$PKG.service.NavGestureAccessibilityService"
+        val other = "other.app/other.app.Mouse"
+        assertEquals("$other:$ours", withServiceListed(other, ours))
+        assertEquals(ours, withServiceListed(null, ours))
+        assertEquals(ours, withServiceListed("", ours))
+        assertEquals("$other:$ours", withServiceListed("$other:$ours", ours))
+        assertEquals("$other:$ours", withServiceListed("$other::", ours))
+    }
+
     private companion object {
         const val PKG = "com.vijayyaso.navgesture"
     }

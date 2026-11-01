@@ -56,6 +56,8 @@ internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
             }
         },
     )
+    // Its own line, outside the tagged status text that the status-refresh suite compares exactly.
+    FootNote(stringResource(R.string.usage_access_explainer))
     SectionHeader(stringResource(R.string.section_gestures_it_adds))
     InfoRow(
         title = stringResource(R.string.gesture_switch_apps_name),

@@ -103,7 +103,7 @@ timeout 180 adb shell \
 trap cleanup INT TERM EXIT
 
 echo "Building and installing the debug APK" >&2
-gradle --no-daemon installDebug
+gradle --no-daemon installGithubDebug
 
 echo >&2
 echo "  Emulator '${avd}' is up. Open in your browser:" >&2

@@ -56,7 +56,7 @@ class GestureBarHider(private val context: Context, private val handler: Handler
 
     fun canWrite(): Boolean = canWrite(context)
 
-    fun isHidden(): Boolean = global(FORCE_FSG) == 1 && global(HIDE_LINE) == 1
+    fun isHidden(): Boolean = isHidden(context)
 
     /** Brings the bar in line with what the user chose, and keeps it there. */
     fun apply(hide: Boolean) {
@@ -66,18 +66,24 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         if (!canWrite()) return
         // Only undo what this app did, so a bar the user never asked to hide is left alone.
         if (hide && !isHidden()) write(hidden = true)
-        if (!hide && changed && global(FORCE_FSG) == 1) write(hidden = false)
+        if (!hide && changed) show(context)
     }
 
     fun release() = stopObserving()
 
-    private fun write(hidden: Boolean) {
-        runCatching {
-            val resolver = context.contentResolver
-            if (hidden) Settings.Global.putInt(resolver, HIDE_LINE, 1)
-            Settings.Global.putInt(resolver, FORCE_FSG, if (hidden) 1 else 0)
-        }.onFailure { Log.w(TAG, "Could not write the gesture-bar settings", it) }
+    /**
+     * The service is going away, so its swipes go with it. A hidden bar would then leave no
+     * navigation at all, so the phone's own bar comes back. The next connect hides it again.
+     * A bar this app never hid is left alone.
+     */
+    fun restoreForShutdown() {
+        val hiding = wanted
+        stopObserving()
+        wanted = false
+        if (hiding && canWrite()) show(context)
     }
+
+    private fun write(hidden: Boolean) = write(context, hidden)
 
     private fun startObserving() {
         if (observing) return
@@ -93,13 +99,29 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         observing = false
     }
 
-    private fun global(key: String): Int =
-        runCatching { Settings.Global.getInt(context.contentResolver, key, 0) }.getOrDefault(0)
-
     companion object {
         fun canWrite(context: Context): Boolean =
             context.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) ==
                 PackageManager.PERMISSION_GRANTED
+
+        fun isHidden(context: Context): Boolean =
+            global(context, FORCE_FSG) == 1 && global(context, HIDE_LINE) == 1
+
+        /** Gives the phone its own gesture bar back. Needs [canWrite]. */
+        fun show(context: Context) {
+            if (global(context, FORCE_FSG) == 1) write(context, hidden = false)
+        }
+
+        private fun write(context: Context, hidden: Boolean) {
+            runCatching {
+                val resolver = context.contentResolver
+                if (hidden) Settings.Global.putInt(resolver, HIDE_LINE, 1)
+                Settings.Global.putInt(resolver, FORCE_FSG, if (hidden) 1 else 0)
+            }.onFailure { Log.w(TAG, "Could not write the gesture-bar settings", it) }
+        }
+
+        private fun global(context: Context, key: String): Int =
+            runCatching { Settings.Global.getInt(context.contentResolver, key, 0) }.getOrDefault(0)
 
         /** What the user types once, from a computer, to let this app hide the bar. */
         const val GRANT_COMMAND =

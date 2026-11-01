@@ -18,6 +18,7 @@
 
 package com.vijayyaso.navgesture.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -41,6 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -48,27 +51,59 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.lifecycleScope
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.ui.theme.NavGestureTheme
-import com.vijayyaso.navgesture.update.UpdateViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * Held by the activity, not the composable, so onNewIntent can reach it. The screen stack
+     * consumes it, and the extra is removed, so a rotation never reopens the disclosure.
+     */
+    private val openDisclosure = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Android 15 draws edge to edge anyway, and without this the status bar keeps white
         // icons on the light theme, so the clock and battery vanish.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) consumeDisclosureExtra(intent)
         setContent {
-            NavGestureTheme { NavGestureApp() }
+            NavGestureTheme { NavGestureApp(openDisclosure) }
         }
+    }
+
+    // singleTop: a tile tap while the app is open arrives here instead of a second copy.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        consumeDisclosureExtra(intent)
+    }
+
+    private fun consumeDisclosureExtra(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_SHOW_DISCLOSURE, false) != true) return
+        intent.removeExtra(EXTRA_SHOW_DISCLOSURE)
+        openDisclosure.value = true
+    }
+
+    // Opening the app is the user's first move when the swipes are gone.
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch(Dispatchers.IO) { ServiceKeeper.check(applicationContext, "app opened") }
+    }
+
+    companion object {
+        /** Set by the tile: open on the disclosure, since consent is still missing. */
+        const val EXTRA_SHOW_DISCLOSURE = "com.vijayyaso.navgesture.SHOW_DISCLOSURE"
     }
 }
 
@@ -83,6 +118,7 @@ internal enum class Screen(@param:StringRes val title: Int) {
     GESTURE_SETTINGS(R.string.section_gestures),
     TROUBLESHOOTING(R.string.section_troubleshooting),
     ABOUT(R.string.section_about),
+    DISCLOSURE(R.string.disclosure_title),
 }
 
 private val BackStackSaver = Saver<List<Screen>, ArrayList<String>>(
@@ -92,18 +128,29 @@ private val BackStackSaver = Saver<List<Screen>, ArrayList<String>>(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NavGestureApp() {
+private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     val model = rememberAppModel()
-    // Held here rather than in Updates. The daily check runs on app open and home reads its result.
-    val updates: UpdateViewModel = viewModel()
-    LifecycleResumeEffect(updates) {
-        updates.onResume()
-        onPauseOrDispose {}
-    }
+    val context = LocalContext.current
+    Store.Bind()
     var stack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(listOf(Screen.HOME)) }
     val screen = stack.last()
     val back = { stack = stack.dropLast(1) }
     BackHandler(enabled = stack.size > 1, onBack = back)
+
+    // From the tile: home with the disclosure on top, whatever was showing before.
+    if (openDisclosure.value) {
+        LaunchedEffect(Unit) {
+            stack = listOf(Screen.HOME, Screen.DISCLOSURE)
+            openDisclosure.value = false
+        }
+    }
+    // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
+    if (model.disclosureRequested) {
+        LaunchedEffect(Unit) {
+            if (stack.last() != Screen.DISCLOSURE) stack = stack + Screen.DISCLOSURE
+            model.disclosureRequested = false
+        }
+    }
 
     // Test tags become resource ids, so the e2e suites select rows without matching text.
     Scaffold(
@@ -140,17 +187,26 @@ private fun NavGestureApp() {
                     .padding(bottom = 16.dp),
             ) {
                 when (screen) {
-                    Screen.HOME -> HomeScreen(model, updates) { stack = stack + it }
+                    Screen.HOME -> HomeScreen(model) { stack = stack + it }
                     Screen.SETUP -> SetupScreen(model)
                     Screen.APP_SWITCHING -> AppSwitchingScreen(model) {
                         stack = stack + Screen.FAVOURITE_APPS
                     }
                     Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
                     Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)
-                    Screen.UPDATES -> UpdatesScreen(updates)
+                    Screen.UPDATES -> Store.UpdatesScreen()
                     Screen.GESTURE_SETTINGS -> GestureSettingsScreen(model)
                     Screen.TROUBLESHOOTING -> TroubleshootingScreen(model)
                     Screen.ABOUT -> AboutScreen(model)
+                    // Back and Not now are the same: nothing is recorded.
+                    Screen.DISCLOSURE -> DisclosureScreen(
+                        onAgree = {
+                            model.acceptDisclosure()
+                            back()
+                            openAccessibility(context)
+                        },
+                        onNotNow = back,
+                    )
                 }
             }
         }

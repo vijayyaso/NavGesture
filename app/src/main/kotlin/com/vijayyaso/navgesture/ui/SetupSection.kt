@@ -67,7 +67,7 @@ internal fun SetupRows(items: List<SetupItem>, model: AppModel) {
                 },
                 done = R.string.step_accessibility_done,
                 open = (if (model.status == ServiceStatus.STOPPED) R.string.action_fix else R.string.action_turn_on) to
-                    { openAccessibility(context) },
+                    { model.requestAccessibility(context) },
             )
             SetupStep.BATTERY -> StepRow(
                 item = item,

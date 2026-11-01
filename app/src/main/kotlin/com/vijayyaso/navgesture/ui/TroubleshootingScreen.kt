@@ -45,20 +45,22 @@ internal fun TroubleshootingScreen(model: AppModel) {
         title = stringResource(R.string.fix_stopped_title),
         supporting = stringResource(R.string.fix_stopped_body),
         actions = {
-            OutlinedButton(onClick = { openAccessibility(context) }) {
+            OutlinedButton(onClick = { model.requestAccessibility(context) }) {
                 Text(stringResource(R.string.action_open))
             }
         },
     )
-    InfoRow(
-        title = stringResource(R.string.fix_greyed_out_title),
-        supporting = stringResource(R.string.fix_greyed_out_body),
-        actions = {
-            OutlinedButton(onClick = { openAppInfo(context) }) {
-                Text(stringResource(R.string.action_open_app_info))
-            }
-        },
-    )
+    if (model.restrictedSettingsApply) {
+        InfoRow(
+            title = stringResource(R.string.fix_greyed_out_title),
+            supporting = stringResource(R.string.fix_greyed_out_body),
+            actions = {
+                OutlinedButton(onClick = { openAppInfo(context) }) {
+                    Text(stringResource(R.string.action_open_app_info))
+                }
+            },
+        )
+    }
 
     SectionHeader(stringResource(R.string.section_this_device))
     DeviceRows(diagnostics)
@@ -76,6 +78,15 @@ internal fun TroubleshootingScreen(model: AppModel) {
         InfoRow(title = stringResource(R.string.diag_recorded_failure))
         Text(
             text = failure.take(MAX_FAILURE_CHARS),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+    diagnostics.serviceHistory?.let { history ->
+        InfoRow(title = stringResource(R.string.diag_service_history))
+        Text(
+            text = history.take(MAX_FAILURE_CHARS),
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.padding(horizontal = 16.dp),

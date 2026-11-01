@@ -34,8 +34,21 @@ android {
         // edge overlays need to be positioned correctly.
         minSdk = 30
         targetSdk = 37
-        versionCode = 9
-        versionName = "1.1.0"
+        versionCode = 10
+        versionName = "1.1.1"
+    }
+
+    // Two builds from one codebase: github ships the self-updater, play does not.
+    flavorDimensions += "store"
+    productFlavors {
+        create("github") {
+            dimension = "store"
+            buildConfigField("boolean", "IS_PLAY", "false")
+        }
+        create("play") {
+            dimension = "store"
+            buildConfigField("boolean", "IS_PLAY", "true")
+        }
     }
 
     // android.keystore and .env are both gitignored. Missing either degrades to an
@@ -81,6 +94,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     compileOptions {
@@ -106,11 +120,11 @@ kotlin {
 
 // Both paths are AGP-internal and moved in AGP 9; sonar-project.properties tracks them.
 // Naming exact locations rather than scanning build/ keeps Gradle's task validation happy.
-val kotlinClassesDir = "intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"
-val coverageExec = "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
+val kotlinClassesDir = "intermediates/built_in_kotlinc/githubDebug/compileGithubDebugKotlin/classes"
+val coverageExec = "outputs/unit_test_code_coverage/githubDebugUnitTest/testGithubDebugUnitTest.exec"
 
 tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest")
+    dependsOn("testGithubDebugUnitTest")
     reports {
         xml.required.set(true)
         html.required.set(true)
@@ -120,7 +134,7 @@ tasks.register<JacocoReport>("jacocoTestReport") {
             exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Manifest*.*")
         },
     )
-    sourceDirectories.setFrom(files("src/main/kotlin"))
+    sourceDirectories.setFrom(files("src/main/kotlin", "src/github/kotlin"))
     executionData.setFrom(layout.buildDirectory.file(coverageExec))
 }
 

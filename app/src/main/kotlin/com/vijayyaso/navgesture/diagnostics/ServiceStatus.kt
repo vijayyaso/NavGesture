@@ -34,6 +34,11 @@ enum class ServiceStatus {
     }
 }
 
+/** The list with [entry] added at the end, keeping every other service exactly as it was. */
+fun withServiceListed(enabledServices: String?, entry: String): String =
+    (enabledServices.orEmpty().split(':').filter { it.isNotBlank() && it != entry } + entry)
+        .joinToString(":")
+
 /** Reads the `package/class` entries joined by ':', the form AOSP Settings writes and splits. */
 fun isServiceListed(enabledServices: String?, packageName: String, className: String): Boolean =
     enabledServices.orEmpty().split(':').any { entry ->
