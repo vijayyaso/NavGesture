@@ -88,6 +88,10 @@ internal class EdgeTouchOverlay(
 
     private val pillExpiry = Runnable(::onPillTimeout)
 
+    // A touch that ends without ACTION_UP or ACTION_CANCEL would leave the strips inert
+    // forever, since an inert strip can no longer receive the event that releases it.
+    private val streamWatchdog = Runnable(::onStreamWatchdog)
+
     fun install(configuration: GestureConfiguration, geometry: ScreenGeometry) {
         remove()
         confirmation.configure(configuration.landscapeConfirmEnabled, geometry.landscape)
@@ -140,6 +144,7 @@ internal class EdgeTouchOverlay(
         bubbles.values.forEach(FluidBubbleOverlay::remove)
         bubbles.clear()
         handler.removeCallbacks(pillExpiry)
+        handler.removeCallbacks(streamWatchdog)
         pill?.remove()
         pill = null
         pillVisible = false
@@ -168,6 +173,7 @@ internal class EdgeTouchOverlay(
             bubble = bubbles[edge],
             controller = switcherController,
             onStreamStart = { onStreamStart(edge) },
+            onStreamActivity = ::armStreamWatchdog,
             admit = { action -> admit(action, edge) },
             onFire = { action -> onFire(action, edge) },
             onUnused = { samples -> onUnused(edge, samples) },
@@ -236,6 +242,7 @@ internal class EdgeTouchOverlay(
         syncPill()
         streamHeld = true
         applyInteractivity()
+        armStreamWatchdog()
     }
 
     /** False when the gesture is held back behind the pill instead. */
@@ -253,6 +260,8 @@ internal class EdgeTouchOverlay(
     private fun onUnused(edge: ScreenEdge, samples: List<TouchSample>) {
         confirmation.onReplayed(edge)
         syncPill(immediate = true)
+        // The replay has its own timeout (3 s stroke at most), well inside the watchdog.
+        armStreamWatchdog()
         val dispatched = replayer.replay(samples) { releaseStream() }
         if (!dispatched) releaseStream()
     }
@@ -286,7 +295,21 @@ internal class EdgeTouchOverlay(
         if (immediate) overlay?.hide() else overlay?.fadeOut()
     }
 
+    /** Restarts the idle timer. Does nothing when no stream is held. */
+    private fun armStreamWatchdog() {
+        if (!streamHeld) return
+        handler.removeCallbacks(streamWatchdog)
+        handler.postDelayed(streamWatchdog, STREAM_IDLE_LIMIT_MS)
+    }
+
+    private fun onStreamWatchdog() {
+        if (!streamHeld) return
+        Log.w(TAG, "STREAM_WATCHDOG no touch event for ${STREAM_IDLE_LIMIT_MS}ms; forcing strips interactive")
+        releaseStream()
+    }
+
     private fun releaseStream() {
+        handler.removeCallbacks(streamWatchdog)
         streamHeld = false
         applyInteractivity()
         Log.d(TAG, "stream released; strips interactive again")
@@ -320,6 +343,7 @@ internal class EdgeTouchOverlay(
         private val bubble: FluidBubbleOverlay?,
         private val controller: EdgeSwitcherController?,
         private val onStreamStart: () -> Unit,
+        private val onStreamActivity: () -> Unit,
         private val admit: (GestureAction) -> Boolean,
         private val onFire: (GestureAction) -> Unit,
         private val onUnused: (List<TouchSample>) -> Unit,
@@ -364,6 +388,7 @@ internal class EdgeTouchOverlay(
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    onStreamActivity()
                     if (!abandoned) {
                         if (samples.size < MAX_SAMPLES) samples += sample
                         if (switching) controller?.move(sample) else
@@ -375,6 +400,7 @@ internal class EdgeTouchOverlay(
                     // Never a navigation gesture, and replaying a partial pinch would be
                     // worse than dropping it.
                     Log.d(TAG, "$edge ABANDONED second pointer went down")
+                    onStreamActivity()
                     abandoned = true
                     switching = false
                     controller?.cancel()
@@ -544,5 +570,12 @@ internal class EdgeTouchOverlay(
 
     private companion object {
         const val TAG = "NavGesture"
+
+        /**
+         * Longest a held stream may stay silent before the strips are forced back. Past a
+         * resting finger's usual hold, and past the replay's own timeout (3 s stroke plus
+         * a 1 s grace). Releasing early is harmless: a touch keeps its original window.
+         */
+        const val STREAM_IDLE_LIMIT_MS = 10_000L
     }
 }
