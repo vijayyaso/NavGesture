@@ -17,11 +17,14 @@
 
 package com.vijayyaso.navgesture.service
 
+import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.LruCache
-import android.graphics.drawable.Drawable
 import android.view.HapticFeedbackConstants
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.FavouriteList
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SwitcherSelection
@@ -35,22 +38,30 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Owns one held selector stream, including its cancellable metadata lookup. */
+/**
+ * Owns the app list: one held selector stream, or the touch-mode panel left open after it,
+ * including the cancellable metadata lookup.
+ *
+ * [style] decides what a lift does: Drag opens the selected app, Tap leaves the list open
+ * for touching, and Both opens the app only if the finger moved the selection at least one
+ * step (step count not zero), else leaves the list open.
+ */
 internal class EdgeSwitcherController(
     private val panel: SwitcherPanelOverlay,
     private val switcher: AppSwitcher,
     private val favourites: () -> List<String>,
     private val density: Float,
-    /** Display height, which places the panel just above the bottom edge. */
-    private val screenHeightPx: Float,
+    private val style: AppListStyle,
+    private val stepDp: Float,
     private val haptic: (Int) -> Unit,
 ) {
     private val context = switcher.context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val handler = Handler(Looper.getMainLooper())
     private val icons = LruCache<String, Drawable>(24)
     private var load: Job? = null
     private var generation = 0L
-    /** True when this stream shows recent apps; false when it shows favourites. */
+    /** True when this list shows recent apps; false when it shows favourites. */
     private var recents = true
     private var origin: TouchSample? = null
     private var latest: TouchSample? = null
@@ -59,7 +70,27 @@ internal class EdgeSwitcherController(
     private var favouriteApps: List<PanelApp>? = null
     private var apps: List<PanelApp>? = null
     private var opened = false
+    /** The finger has lifted and the panel waits for a touch. */
+    private var touchMode = false
+    private var steps = 0
     private var selected: Int? = null
+
+    private val idleTimeout = Runnable {
+        Log.i(TAG, "SWITCHER_TIMEOUT")
+        cancel()
+    }
+
+    init {
+        panel.onPick = ::onPick
+        panel.onDismiss = {
+            Log.i(TAG, "SWITCHER_DISMISSED")
+            cancel()
+        }
+        panel.onTouchStart = { if (waitingForTouch) armIdleTimeout() }
+    }
+
+    /** True while the touch-mode panel waits for a touch. */
+    val waitingForTouch: Boolean get() = opened && touchMode
 
     /**
      * Called once a bottom swipe arms, before it can pause. The drag direction is not known
@@ -68,6 +99,122 @@ internal class EdgeSwitcherController(
     fun prepare(edge: ScreenEdge) {
         cancel()
         if (edge != ScreenEdge.BOTTOM) return
+        startLoad()
+    }
+
+    fun open(action: TrackerAction.OpenSwitcher) {
+        if (action.edge != ScreenEdge.BOTTOM || opened) return
+        origin = action.origin
+        latest = action.origin
+        recents = action.recents
+        apps = if (recents) recentsApps else favouriteApps
+        steps = 0
+        opened = true
+        touchMode = false
+        render()
+        // A distinct buzz at once: the row may still say "Loading apps", and this is the
+        // only sign the short drag landed.
+        haptic(HapticFeedbackConstants.CONFIRM)
+        Log.i(TAG, "SWITCHER_OPEN bottom ${if (recents) "recents" else "favourites"} ${style.name}")
+    }
+
+    /**
+     * Opens the list straight into touch mode, from a corner shortcut. The finger has
+     * already lifted, and no arm loaded the lists, so this loads its own.
+     */
+    fun openForTouch(recents: Boolean) {
+        cancel()
+        this.recents = recents
+        opened = true
+        touchMode = true
+        startLoad()
+        render()
+        armIdleTimeout()
+        Log.i(TAG, "SWITCHER_OPEN corner ${if (recents) "recents" else "favourites"}")
+    }
+
+    fun move(sample: TouchSample) {
+        if (!opened || touchMode) return
+        latest = sample
+        // Sliding back down to the edge gives up: close without opening anything.
+        val openedAt = origin?.yPx ?: return
+        if (sample.yPx - openedAt >= density * CANCEL_DP) {
+            Log.i(TAG, "SWITCHER_CANCEL")
+            cancel()
+            return
+        }
+        if (style != AppListStyle.TAP) updateSelection()
+    }
+
+    fun release(sample: TouchSample) {
+        if (!opened || touchMode) {
+            if (!touchMode) cancel()
+            return
+        }
+        latest = sample
+        if (style != AppListStyle.TAP) updateSelection()
+        val stayOpen = when (style) {
+            AppListStyle.DRAG -> false
+            AppListStyle.TAP -> true
+            AppListStyle.BOTH -> steps == 0
+        }
+        if (stayOpen) {
+            touchMode = true
+            selected = null
+            render()
+            armIdleTimeout()
+            Log.i(TAG, "SWITCHER_TOUCH_MODE")
+            return
+        }
+        launchAndClose(selected)
+    }
+
+    /** A new edge touch closes a panel left open for touching. */
+    fun onStreamStart() {
+        if (waitingForTouch) {
+            Log.i(TAG, "SWITCHER_CLOSED_BY_GESTURE")
+            cancel()
+        }
+    }
+
+    fun cancel() {
+        generation++
+        load?.cancel()
+        load = null
+        handler.removeCallbacks(idleTimeout)
+        origin = null
+        latest = null
+        recentsApps = null
+        favouriteApps = null
+        apps = null
+        steps = 0
+        selected = null
+        opened = false
+        touchMode = false
+        panel.hide()
+    }
+
+    private fun onPick(index: Int) {
+        if (!waitingForTouch) return
+        launchAndClose(index)
+    }
+
+    private fun launchAndClose(index: Int?) {
+        val packageName = index?.let { apps?.getOrNull(it)?.packageName }
+        // Hide before starting another activity, even if metadata arrived only just now.
+        cancel()
+        if (packageName != null && switcher.launch(packageName)) {
+            haptic(HapticFeedbackConstants.CONFIRM)
+            Log.i(TAG, "SWITCHER_LAUNCHED $packageName")
+        }
+    }
+
+    private fun armIdleTimeout() {
+        handler.removeCallbacks(idleTimeout)
+        handler.postDelayed(idleTimeout, IDLE_TIMEOUT_MS)
+    }
+
+    private fun startLoad() {
         val token = generation
         val savedFavourites = favourites().toList()
         load = scope.launch {
@@ -110,109 +257,54 @@ internal class EdgeSwitcherController(
         }
     }
 
-    fun open(action: TrackerAction.OpenSwitcher) {
-        if (action.edge != ScreenEdge.BOTTOM || opened) return
-        origin = action.origin
-        latest = action.origin
-        recents = action.recents
-        apps = if (recents) recentsApps else favouriteApps
-        opened = true
-        render()
-        // A distinct buzz at once: the row may still say "Loading apps", and this is the
-        // only sign the short drag landed.
-        haptic(HapticFeedbackConstants.CONFIRM)
-        Log.i(TAG, "SWITCHER_OPEN bottom ${if (recents) "recents" else "favourites"}")
-    }
-
-    fun move(sample: TouchSample) {
-        if (!opened) return
-        latest = sample
-        // Sliding back down to the edge gives up: close without opening anything.
-        val openedAt = origin?.yPx ?: return
-        if (sample.yPx - openedAt >= density * CANCEL_DP) {
-            Log.i(TAG, "SWITCHER_CANCEL")
-            cancel()
-            return
-        }
-        updateSelection()
-    }
-
-    fun release(sample: TouchSample) {
-        if (!opened) {
-            cancel()
-            return
-        }
-        latest = sample
-        updateSelection()
-        val packageName = selected?.let { apps?.getOrNull(it)?.packageName }
-        // Hide before starting another activity, even if metadata arrived only just now.
-        cancel()
-        if (packageName != null && switcher.launch(packageName)) {
-            haptic(HapticFeedbackConstants.CONFIRM)
-            Log.i(TAG, "SWITCHER_LAUNCHED $packageName")
-        }
-    }
-
-    fun cancel() {
-        generation++
-        load?.cancel()
-        load = null
-        origin = null
-        latest = null
-        recentsApps = null
-        favouriteApps = null
-        apps = null
-        selected = null
-        opened = false
-        panel.hide()
-    }
-
     private fun render() {
-        val y = panelCentreY()
         val list = apps
         Log.i(
             TAG,
             "SWITCHER_ROWS ${if (recents) "recents" else "favourites"} " +
                 (list?.joinToString(",") { it.packageName } ?: "loading"),
         )
+        // Touch mode and the Tap style show the grid; drag styles show the row while held.
+        val grid = touchMode || style == AppListStyle.TAP
         when {
-            list == null -> panel.showMessage(context.getString(R.string.switcher_loading), y)
+            list == null -> panel.showMessage(context.getString(R.string.switcher_loading), touchMode)
             list.isEmpty() -> panel.showMessage(context.getString(
                 if (recents) R.string.switcher_no_recents else R.string.switcher_no_favourites,
-            ), y)
-            else -> panel.show(list, if (recents) 0 else null, y)
+            ), touchMode)
+            grid -> panel.showGrid(list, dimmedIndex(), touchMode)
+            else -> {
+                panel.showRow(list, dimmedIndex(), startIndex(), steps)
+                updateSelection()
+            }
         }
-        updateSelection()
     }
 
-    /** The panel floats just above the bottom edge, where the gesture started. */
-    private fun panelCentreY(): Float = screenHeightPx - density * BOTTOM_PANEL_CENTRE_DP
+    // Recents show the current app first, dimmed, so selection starts at 1 and never falls
+    // to it. Favourites have no such slot and start at 0.
+    private fun dimmedIndex(): Int? = if (recents) 0 else null
+
+    private fun startIndex(): Int = if (recents) 1 else 0
 
     private fun updateSelection() {
         val start = origin ?: return
         val sample = latest ?: return
-        // Recents show the current app first, dimmed, so selection starts at 1 and never
-        // falls to it. Favourites have no such slot and start at 0.
-        val next = SwitcherSelection.looped(
-            offsetDp = (sample.xPx - start.xPx) / density,
-            count = apps?.size ?: 0,
-            startIndex = if (recents) 1 else 0,
-        )
+        steps = SwitcherSelection.steps((sample.xPx - start.xPx) / density, stepDp, steps)
+        val next = SwitcherSelection.indexFor(steps, apps?.size ?: 0, startIndex())
         if (next != selected) {
             selected = next
             Log.i(TAG, "SWITCHER_SELECTED $next")
             haptic(HapticFeedbackConstants.CLOCK_TICK)
         }
-        panel.select(selected)
+        panel.select(steps, selected)
     }
 
     private companion object {
         const val TAG = "NavGesture"
 
-        /** Panel centre above the bottom edge; its lower edge then clears the gesture bar. */
-        const val BOTTOM_PANEL_CENTRE_DP = 96f
-
         /** Downward travel from the open point that gives up and closes the row. */
         const val CANCEL_DP = 32f
+
+        /** A touch-mode panel left alone this long closes itself; any touch on it restarts it. */
+        const val IDLE_TIMEOUT_MS = 10_000L
     }
 }

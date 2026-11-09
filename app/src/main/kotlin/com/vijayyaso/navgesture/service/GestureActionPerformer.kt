@@ -22,6 +22,7 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.widget.Toast
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 
@@ -44,20 +45,49 @@ class GestureActionPerformer(private val service: AccessibilityService) {
             GestureAction.Home -> AccessibilityService.GLOBAL_ACTION_HOME
             GestureAction.Recents -> AccessibilityService.GLOBAL_ACTION_RECENTS
             GestureAction.CircleToSearch -> return circleToSearch()
+            // The overlay resolves a corner to its shortcut and calls [performShortcut].
+            is GestureAction.Corner -> {
+                lastFailure = "${action.id}: corner reached perform() without its shortcut"
+                return false
+            }
         }
+        return global(action.id, globalAction)
+    }
+
+    /** Runs a corner shortcut. The two app-list shortcuts are the overlay's, not this. */
+    fun performShortcut(shortcut: CornerShortcut): Boolean {
+        val globalAction = when (shortcut) {
+            CornerShortcut.Notifications -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+            CornerShortcut.QuickSettings -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+            CornerShortcut.Screenshot -> AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT
+            CornerShortcut.LockScreen -> AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN
+            CornerShortcut.PowerMenu -> AccessibilityService.GLOBAL_ACTION_POWER_DIALOG
+            CornerShortcut.SplitScreen -> AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN
+            is CornerShortcut.OpenApp -> {
+                val launched = switcher.launch(shortcut.packageName)
+                if (!launched) lastFailure = "corner ${shortcut.id}: ${AppSwitcher.lastFailure}"
+                return launched
+            }
+            CornerShortcut.None, CornerShortcut.RecentsList, CornerShortcut.FavouritesList -> return false
+        }
+        Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
+        return global(shortcut.id, globalAction)
+    }
+
+    private fun global(name: String, globalAction: Int): Boolean {
 
         // performGlobalAction throws instead of returning false once the service has been
         // unbound; uncaught that kills the process and flags the service "malfunctioning".
         val performed = runCatching { service.performGlobalAction(globalAction) }
             .getOrElse { throwable ->
-                lastFailure = "${action.id}: performGlobalAction threw ${throwable.javaClass.name}"
-                Log.w(TAG, "performGlobalAction(${action.id}) threw", throwable)
+                lastFailure = "$name: performGlobalAction threw ${throwable.javaClass.name}"
+                Log.w(TAG, "performGlobalAction($name) threw", throwable)
                 return false
             }
         if (!performed) {
             // No retry: a repeated global action can double-navigate.
-            lastFailure = "${action.id}: performGlobalAction returned false"
-            Log.w(TAG, "performGlobalAction(${action.id}) returned false")
+            lastFailure = "$name: performGlobalAction returned false"
+            Log.w(TAG, "performGlobalAction($name) returned false")
         }
         return performed
     }

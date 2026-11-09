@@ -62,12 +62,13 @@ class PackageListStore private constructor(
     companion object {
         /** The apps a leftward drag from the bottom shows, in order. */
         fun favourites(context: Context) =
-            PackageListStore(context.applicationContext, "favourite_apps", debugOverride = null)
+            PackageListStore(context.applicationContext, "favourite_apps", FAVOURITES_OVERRIDE)
 
         /** The apps that pause NavGesture while they are open; see bankpause/BankPause.kt. */
         fun bankApps(context: Context) =
             PackageListStore(context.applicationContext, "bank_apps", BANK_APPS_OVERRIDE)
 
         const val BANK_APPS_OVERRIDE = "navgesture_bank_apps"
+        const val FAVOURITES_OVERRIDE = "navgesture_favourites"
     }
 }

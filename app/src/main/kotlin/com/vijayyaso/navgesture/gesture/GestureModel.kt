@@ -41,9 +41,106 @@ sealed interface GestureAction {
     data object CircleToSearch : GestureAction {
         override val id: String = "CircleToSearch"
     }
+
+    /** A swipe up and inward from a bottom corner; the corner's shortcut says what it does. */
+    data class Corner(val side: BottomCorner) : GestureAction {
+        override val id: String = "Corner${side.name}"
+    }
 }
 
 enum class ScreenEdge { LEFT, RIGHT, BOTTOM }
+
+enum class BottomCorner { LEFT, RIGHT }
+
+/** How the bottom app list is picked from. */
+enum class AppListStyle {
+    /** The selection follows the held finger; lifting opens it. */
+    DRAG,
+
+    /** The list stays open after the finger lifts, and the user touches an app. */
+    TAP,
+
+    /** Drag to pick, or lift without moving a step to keep the list open for touching. */
+    BOTH,
+    ;
+
+    companion object {
+        fun decode(stored: String?): AppListStyle =
+            entries.firstOrNull { it.name == stored } ?: DRAG
+    }
+}
+
+/** What a corner swipe does. [id] is what settings store. */
+sealed interface CornerShortcut {
+    val id: String
+
+    data object None : CornerShortcut {
+        override val id: String = "none"
+    }
+
+    data object RecentsList : CornerShortcut {
+        override val id: String = "recents_list"
+    }
+
+    data object FavouritesList : CornerShortcut {
+        override val id: String = "favourites_list"
+    }
+
+    data object Notifications : CornerShortcut {
+        override val id: String = "notifications"
+    }
+
+    data object QuickSettings : CornerShortcut {
+        override val id: String = "quick_settings"
+    }
+
+    data object Screenshot : CornerShortcut {
+        override val id: String = "screenshot"
+    }
+
+    data object LockScreen : CornerShortcut {
+        override val id: String = "lock_screen"
+    }
+
+    data object PowerMenu : CornerShortcut {
+        override val id: String = "power_menu"
+    }
+
+    data object SplitScreen : CornerShortcut {
+        override val id: String = "split_screen"
+    }
+
+    data class OpenApp(val packageName: String) : CornerShortcut {
+        override val id: String = APP_PREFIX + packageName
+    }
+
+    companion object {
+        private const val APP_PREFIX = "app:"
+
+        /** Every choice that is not an app, in the order the picker lists them. */
+        val fixed: List<CornerShortcut> = listOf(
+            None,
+            RecentsList,
+            FavouritesList,
+            Notifications,
+            QuickSettings,
+            Screenshot,
+            LockScreen,
+            PowerMenu,
+            SplitScreen,
+        )
+
+        /** An unknown or empty id is [None], so a downgrade never leaves a broken corner. */
+        fun decode(stored: String?): CornerShortcut {
+            if (stored == null) return None
+            if (stored.startsWith(APP_PREFIX)) {
+                val packageName = stored.removePrefix(APP_PREFIX)
+                return if (packageName.isBlank()) None else OpenApp(packageName)
+            }
+            return fixed.firstOrNull { it.id == stored } ?: None
+        }
+    }
+}
 
 data class TouchSample(val xPx: Float, val yPx: Float, val timestampMs: Long)
 
@@ -75,6 +172,14 @@ data class GestureConfiguration(
     val offAxisToleranceRatio: Float = 1.0f,
     /** Swipe up from the bottom and drag sideways to show the app list. */
     val edgeAppListEnabled: Boolean = true,
+    /** Drag to pick, touch to pick, or both. */
+    val appListStyle: AppListStyle = AppListStyle.DRAG,
+    /** Sideways travel that moves the app list selection by one app. */
+    val switcherStepDp: Float = SwitcherSelection.DEFAULT_STEP_DP,
+    /** What a swipe up and inward from the bottom-left corner does. */
+    val leftCornerShortcut: CornerShortcut = CornerShortcut.None,
+    /** What a swipe up and inward from the bottom-right corner does. */
+    val rightCornerShortcut: CornerShortcut = CornerShortcut.None,
     val leftEdgeBackEnabled: Boolean = true,
     val rightEdgeBackEnabled: Boolean = true,
     val hapticFeedbackEnabled: Boolean = true,
@@ -91,6 +196,15 @@ data class GestureConfiguration(
     /** Read from the device at runtime and never persisted. */
     val platform: PlatformDefaults = PlatformDefaults(),
 ) {
+    fun shortcutFor(corner: BottomCorner): CornerShortcut = when (corner) {
+        BottomCorner.LEFT -> leftCornerShortcut
+        BottomCorner.RIGHT -> rightCornerShortcut
+    }
+
+    val anyCornerShortcut: Boolean
+        get() = leftCornerShortcut != CornerShortcut.None ||
+            rightCornerShortcut != CornerShortcut.None
+
     val effectiveCircleToSearchHoldMs: Long
         get() = if (circleToSearchFollowsSystemTiming) {
             platform.longPressTimeoutMs
@@ -148,6 +262,12 @@ sealed interface TrackerAction {
         val origin: TouchSample,
         val recents: Boolean,
     ) : TrackerAction
+
+    /**
+     * A corner diagonal passed its trigger. Nothing runs yet: the release fires
+     * [GestureAction.Corner], so a cancel or a second finger can still drop it.
+     */
+    data class CornerReady(val corner: BottomCorner) : TrackerAction
 
     data class Fire(val action: GestureAction, val edge: ScreenEdge) : TrackerAction
 

@@ -19,6 +19,7 @@
 package com.vijayyaso.navgesture.gesture
 
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.pow
 
@@ -40,6 +41,10 @@ import kotlin.math.pow
  * Released low and not moving up, a bottom swipe reverts to the app it started on, as POCO's
  * does in its safe area.
  *
+ * A bottom touch that starts in a corner with a shortcut, and travels up and inward on a
+ * diagonal, becomes that corner's shortcut instead. The test runs before every other rule
+ * and has no time limit, since a slow, careful diagonal is exactly what it is for.
+ *
  * Arming has deliberately no minimum-velocity threshold, which would penalise the slow,
  * deliberate swipes a careful user makes.
  */
@@ -51,6 +56,8 @@ class GestureTracker(
     private val handleCenterXPx: Float? = null,
     /** Full display height; the POCO constants scale with it. */
     private val screenHeightPx: Float = REFERENCE_HEIGHT_PX,
+    /** Full display width, which places the corners; null turns corner shortcuts off. */
+    private val screenWidthPx: Float? = null,
 ) {
 
     // What an armed gesture became, as one field.
@@ -69,7 +76,16 @@ class GestureTracker(
 
         /** A side swipe pulled back inside the trigger, which re-arms if pushed out again. */
         data object Retracted : Arm
+
+        /** A corner diagonal passed its trigger; the release fires the corner's shortcut. */
+        data class Corner(val side: BottomCorner) : Arm
     }
+
+    // The corner this touch started in, when that corner has a shortcut.
+    private var corner: BottomCorner? = null
+
+    // A corner touch outlived the arm window. Only the corner test may still claim it.
+    private var armTimedOut = false
 
     // The DOWN sample, kept after tracking ends so a release can still be explained: the arm
     // timeout stops the gesture and the UP behind it still reports a rejection reason.
@@ -154,6 +170,8 @@ class GestureTracker(
         tailX = pivotX(sample)
         tailY = pivotY(sample)
         tailAtMs = sample.timestampMs
+        corner = cornerAt(sample)
+        armTimedOut = false
         longPressPending = edge == ScreenEdge.BOTTOM &&
             longPressAction != null && overHandle(sample)
         return if (longPressPending) {
@@ -164,13 +182,22 @@ class GestureTracker(
     }
 
     fun onMove(sample: TouchSample): TrackerAction {
-        if (arm == Arm.Switcher) return TrackerAction.None
+        if (arm == Arm.Switcher || arm is Arm.Corner) return TrackerAction.None
         val origin = tracked ?: return TrackerAction.None
         if (longPressPending && strayedBeyondSlop(origin, sample)) longPressPending = false
         // The tail chases the pivot as it stood until now, then the pivot moves.
         advanceTail(sample.timestampMs)
         remember(sample)
         val state = arm
+        // Before the arm rules: a 60-degree diagonal never arms Home (45-degree cone), and
+        // would otherwise be replayed to the app.
+        val side = corner
+        if (side != null && (state == null || state == Arm.Rising) && isCornerSwipe(side, origin, sample)) {
+            arm = Arm.Corner(side)
+            longPressPending = false
+            return TrackerAction.CornerReady(side)
+        }
+        if (armTimedOut) return TrackerAction.None
         return if (state == null) whileArming(origin, sample) else whileArmed(origin, state, sample)
     }
 
@@ -180,6 +207,11 @@ class GestureTracker(
         if (!longPressPending &&
             sample.timestampMs - origin.timestampMs > configuration.maximumArmDurationMs
         ) {
+            if (corner != null) {
+                // Still a corner swipe in the making; nothing else may claim it now.
+                armTimedOut = true
+                return TrackerAction.None
+            }
             tracked = null
             return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
         }
@@ -265,9 +297,15 @@ class GestureTracker(
         tracked = null
         longPressPending = false
 
+        if (state is Arm.Corner) return TrackerAction.Fire(GestureAction.Corner(state.side), edge)
         if (state == Arm.Switcher || state is Arm.Fired) return TrackerAction.None
         if (origin == null) return TrackerAction.Unused(rejectionFor(start, sample))
         remember(sample)
+        // A DOWN then UP with no MOVE between can still be a whole corner diagonal.
+        val side = corner
+        if (side != null && (state == null || state == Arm.Rising) && isCornerSwipe(side, origin, sample)) {
+            return TrackerAction.Fire(GestureAction.Corner(side), edge)
+        }
         if (state != null) {
             // The release point decides, so a swipe brought back to the edge in one batched
             // event reverts as surely as one that disarmed on the way.
@@ -280,6 +318,7 @@ class GestureTracker(
             return TrackerAction.Fire(shortAction, edge)
         }
 
+        if (armTimedOut) return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
         // A stream can arrive as DOWN then UP with no MOVE between - event batching under
         // load does this, and a slow emulator does it reliably. The release is still a
         // swipe if it clears the threshold on its own, so judge it by the same rule.
@@ -293,9 +332,38 @@ class GestureTracker(
         start = null
         tracked = null
         arm = null
+        corner = null
+        armTimedOut = false
         longPressPending = false
         latest = null
         recent.clear()
+    }
+
+    /** The bottom corner [sample] starts in, if that corner has a shortcut. */
+    private fun cornerAt(sample: TouchSample): BottomCorner? {
+        if (edge != ScreenEdge.BOTTOM) return null
+        val width = screenWidthPx ?: return null
+        // Capped in dp, so landscape does not turn a large share of the bottom into corners.
+        val zone = minOf(width * CORNER_ZONE_OF_WIDTH, density * CORNER_ZONE_MAX_DP)
+        val side = when {
+            sample.xPx <= zone -> BottomCorner.LEFT
+            sample.xPx >= width - zone -> BottomCorner.RIGHT
+            else -> return null
+        }
+        return side.takeIf { configuration.shortcutFor(it) != CornerShortcut.None }
+    }
+
+    /** Up and inward, long enough, and between [CORNER_MIN_DEGREES] and [CORNER_MAX_DEGREES]. */
+    private fun isCornerSwipe(side: BottomCorner, origin: TouchSample, sample: TouchSample): Boolean {
+        val inward = when (side) {
+            BottomCorner.LEFT -> sample.xPx - origin.xPx
+            BottomCorner.RIGHT -> origin.xPx - sample.xPx
+        }
+        val up = origin.yPx - sample.yPx
+        if (inward <= 0f || up <= 0f) return false
+        if (hypot(inward, up) < density * CORNER_DISTANCE_DP) return false
+        val degreesFromVertical = Math.toDegrees(atan2(inward, up).toDouble())
+        return degreesFromVertical in CORNER_MIN_DEGREES..CORNER_MAX_DEGREES
     }
 
     /** Low on the screen and not rising: POCO's safe area with no fast pull up. */
@@ -415,6 +483,21 @@ class GestureTracker(
     companion object {
         /** Sideways travel that turns a bottom swipe into the app list. Short on purpose. */
         const val SWITCHER_DRAG_DP = 40f
+
+        /** Share of the screen width, from each side, where a bottom touch is a corner start. */
+        const val CORNER_ZONE_OF_WIDTH = 0.12f
+
+        /** The most a corner zone may span, about 47 dp on a typical portrait phone. */
+        const val CORNER_ZONE_MAX_DP = 56f
+
+        /** Diagonal travel that triggers a corner shortcut; under [SWITCHER_DRAG_DP] on purpose. */
+        const val CORNER_DISTANCE_DP = 32f
+
+        /** Steeper than this from straight up is a normal Home or Recents swipe. */
+        const val CORNER_MIN_DEGREES = 30.0
+
+        /** Flatter than this is the sideways app-list drag. */
+        const val CORNER_MAX_DEGREES = 75.0
 
         /** POCO samples its tail once per 60Hz frame. */
         const val FRAME_MS = 16L

@@ -24,6 +24,8 @@ internal object TestTags {
     const val ROW_SETUP = "row_setup"
     const val ROW_APP_SWITCHING = "row_app_switching"
     const val ROW_FAVOURITE_APPS = "row_favourite_apps"
+    const val ROW_LEFT_CORNER = "row_left_corner"
+    const val ROW_RIGHT_CORNER = "row_right_corner"
     const val ROW_BANK_APPS = "row_bank_apps"
     const val ROW_CIRCLE_TO_SEARCH = "row_circle_to_search"
     const val ROW_UPDATES = "row_updates"
@@ -47,4 +49,7 @@ internal object TestTags {
     const val UPDATE_CHECK_NOW = "update_check_now"
     const val UPDATE_INSTALL = "update_install"
     const val UPDATE_ALLOW_INSTALLS = "update_allow_installs"
+
+    fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
+        "list_style_${style.name.lowercase()}"
 }

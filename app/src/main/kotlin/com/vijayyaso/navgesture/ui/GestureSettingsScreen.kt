@@ -185,6 +185,9 @@ private fun CheatSheet(configuration: GestureConfiguration) {
         if (configuration.circleToSearchEnabled) {
             add(R.string.gesture_circle_to_search_name to R.string.gesture_circle_to_search_how)
         }
+        if (configuration.anyCornerShortcut) {
+            add(R.string.gesture_corner_name to R.string.gesture_corner_how)
+        }
     }.forEach { (name, how) -> InfoRow(title = stringResource(name), supporting = stringResource(how)) }
 }
 

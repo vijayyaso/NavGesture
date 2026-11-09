@@ -27,7 +27,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.vijayyaso.navgesture.gesture.AppListStyle
+import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -58,6 +61,10 @@ class GestureSettingsRepository(private val context: Context) {
             preferences[RECENTS_LINE_PERCENT] = updated.recentsLinePercent
             preferences[OFF_AXIS_TOLERANCE] = updated.offAxisToleranceRatio
             preferences[EDGE_APP_LIST] = updated.edgeAppListEnabled
+            preferences[APP_LIST_STYLE] = updated.appListStyle.name
+            preferences[SWITCHER_STEP_DP] = updated.switcherStepDp
+            preferences[LEFT_CORNER] = updated.leftCornerShortcut.id
+            preferences[RIGHT_CORNER] = updated.rightCornerShortcut.id
             preferences[LEFT_EDGE_BACK] = updated.leftEdgeBackEnabled
             preferences[RIGHT_EDGE_BACK] = updated.rightEdgeBackEnabled
             preferences[HAPTIC_FEEDBACK] = updated.hapticFeedbackEnabled
@@ -85,6 +92,13 @@ class GestureSettingsRepository(private val context: Context) {
                 preferences[OFF_AXIS_TOLERANCE] ?: defaults.offAxisToleranceRatio,
             edgeAppListEnabled =
                 debugEdgeAppListEnabled() ?: (preferences[EDGE_APP_LIST] ?: defaults.edgeAppListEnabled),
+            appListStyle = (debugOverride(APP_LIST_STYLE_OVERRIDE) ?: preferences[APP_LIST_STYLE])
+                ?.let(AppListStyle::decode) ?: defaults.appListStyle,
+            switcherStepDp = preferences[SWITCHER_STEP_DP] ?: defaults.switcherStepDp,
+            leftCornerShortcut = (debugOverride(LEFT_CORNER_OVERRIDE) ?: preferences[LEFT_CORNER])
+                ?.let(CornerShortcut::decode) ?: defaults.leftCornerShortcut,
+            rightCornerShortcut = (debugOverride(RIGHT_CORNER_OVERRIDE) ?: preferences[RIGHT_CORNER])
+                ?.let(CornerShortcut::decode) ?: defaults.rightCornerShortcut,
             leftEdgeBackEnabled = preferences[LEFT_EDGE_BACK] ?: defaults.leftEdgeBackEnabled,
             rightEdgeBackEnabled = preferences[RIGHT_EDGE_BACK] ?: defaults.rightEdgeBackEnabled,
             hapticFeedbackEnabled = preferences[HAPTIC_FEEDBACK] ?: defaults.hapticFeedbackEnabled,
@@ -101,17 +115,21 @@ class GestureSettingsRepository(private val context: Context) {
     }
 
     /** Test seam that spares the debug emulator run a tap on the toggle. Debug only. */
-    private fun debugEdgeAppListEnabled(): Boolean? {
+    private fun debugEdgeAppListEnabled(): Boolean? =
+        debugOverride(EDGE_APP_LIST_OVERRIDE)?.let { it == "1" || it.equals("true", ignoreCase = true) }
+
+    /** A global setting the e2e suites set in place of the UI, read by debug builds only. */
+    private fun debugOverride(name: String): String? {
         if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return null
-        return runCatching {
-            Settings.Global.getString(context.contentResolver, EDGE_APP_LIST_OVERRIDE)?.let {
-                it == "1" || it.equals("true", ignoreCase = true)
-            }
-        }.getOrNull()
+        return runCatching { Settings.Global.getString(context.contentResolver, name) }
+            .getOrNull()?.takeIf { it.isNotEmpty() && it != "null" }
     }
 
     private companion object {
         const val EDGE_APP_LIST_OVERRIDE = "navgesture_edge_app_list"
+        const val APP_LIST_STYLE_OVERRIDE = "navgesture_app_list_style"
+        const val LEFT_CORNER_OVERRIDE = "navgesture_left_corner"
+        const val RIGHT_CORNER_OVERRIDE = "navgesture_right_corner"
 
         val EDGE_WIDTH_DP = floatPreferencesKey("edge_width_dp")
         val SIDE_MIN_DISTANCE_DP = floatPreferencesKey("side_minimum_swipe_distance_dp")
@@ -120,6 +138,10 @@ class GestureSettingsRepository(private val context: Context) {
         val RECENTS_LINE_PERCENT = floatPreferencesKey("recents_line_percent")
         val OFF_AXIS_TOLERANCE = floatPreferencesKey("off_axis_tolerance_ratio")
         val EDGE_APP_LIST = booleanPreferencesKey("edge_app_list_enabled")
+        val APP_LIST_STYLE = stringPreferencesKey("app_list_style")
+        val SWITCHER_STEP_DP = floatPreferencesKey("switcher_step_dp")
+        val LEFT_CORNER = stringPreferencesKey("left_corner_shortcut")
+        val RIGHT_CORNER = stringPreferencesKey("right_corner_shortcut")
         val LEFT_EDGE_BACK = booleanPreferencesKey("left_edge_back_enabled")
         val RIGHT_EDGE_BACK = booleanPreferencesKey("right_edge_back_enabled")
         val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback_enabled")

@@ -142,6 +142,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             onGestureAction = ::onGestureAction,
             switcher = performer.switcher,
             favourites = { favourites },
+            onShortcut = { performer.performShortcut(it) },
         )
 
         (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)

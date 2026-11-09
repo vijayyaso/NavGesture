@@ -32,7 +32,9 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.ConfirmVerdict
+import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.GestureTracker
@@ -65,8 +67,12 @@ internal class EdgeTouchOverlay(
     private val onGestureAction: (GestureAction, ScreenEdge) -> Unit,
     private val switcher: AppSwitcher,
     private val favourites: () -> List<String>,
+    /** Runs a corner shortcut that is not an app list: a system action or an app. */
+    private val onShortcut: (CornerShortcut) -> Unit,
     private val layout: OverlayLayout = OverlayLayout(),
 ) {
+
+    private var configuration = GestureConfiguration()
 
     private val strips = mutableMapOf<ScreenEdge, View>()
 
@@ -94,21 +100,26 @@ internal class EdgeTouchOverlay(
 
     fun install(configuration: GestureConfiguration, geometry: ScreenGeometry) {
         remove()
+        this.configuration = configuration
         confirmation.configure(configuration.landscapeConfirmEnabled, geometry.landscape)
         if (configuration.landscapeConfirmEnabled && geometry.landscape) {
             pill = ConfirmPillOverlay(context, windowManager, geometry).also { it.install() }
         }
         syncPill()
 
-        if (configuration.edgeAppListEnabled) {
-            val panel = SwitcherPanelOverlay(context, windowManager, geometry).also { it.install() }
+        val listShortcut = listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut)
+            .any { it == CornerShortcut.RecentsList || it == CornerShortcut.FavouritesList }
+        if (configuration.edgeAppListEnabled || listShortcut) {
+            val stripPx = (configuration.edgeWidthDp * geometry.density).toInt() + geometry.navBottomPx
+            val panel = SwitcherPanelOverlay(context, windowManager, geometry, stripPx).also { it.install() }
             switcherPanel = panel
             switcherController = EdgeSwitcherController(
                 panel = panel,
                 switcher = switcher,
                 favourites = favourites,
                 density = geometry.density,
-                screenHeightPx = geometry.heightPx.toFloat(),
+                style = configuration.appListStyle,
+                stepDp = configuration.switcherStepDp,
             ) { feedback ->
                 if (configuration.hapticFeedbackEnabled) {
                     strips.values.firstOrNull()?.performHapticFeedback(feedback)
@@ -168,10 +179,12 @@ internal class EdgeTouchOverlay(
                 // Display coordinates, like the rawX the tracker is fed.
                 handleCenterXPx = if (edge == ScreenEdge.BOTTOM) geometry.widthPx / 2f else null,
                 screenHeightPx = geometry.heightPx.toFloat(),
+                screenWidthPx = geometry.widthPx.toFloat(),
             ),
             hapticsEnabled = configuration.hapticFeedbackEnabled,
             bubble = bubbles[edge],
             controller = switcherController,
+            dragListEnabled = configuration.edgeAppListEnabled,
             onStreamStart = { onStreamStart(edge) },
             onStreamActivity = ::armStreamWatchdog,
             admit = { action -> admit(action, edge) },
@@ -215,9 +228,9 @@ internal class EdgeTouchOverlay(
                 Gravity.END or Gravity.CENTER_VERTICAL,
             )
             ScreenEdge.BOTTOM -> Triple(
-                (geometry.widthPx * layout.bottomLengthPercent / 100).coerceAtLeast(1),
+                bottomSpan(configuration, geometry).let { (left, right) -> right - left }.coerceAtLeast(1),
                 thicknessPx + geometry.navBottomPx,
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+                Gravity.BOTTOM or Gravity.LEFT,
             )
         }
 
@@ -233,10 +246,27 @@ internal class EdgeTouchOverlay(
             this.gravity = gravity
             // Without this the strip is pushed inside the inset it was just extended across.
             fitInsetsTypes = 0
+            if (edge == ScreenEdge.BOTTOM) x = bottomSpan(configuration, geometry).first
         }
     }
 
+    /**
+     * The bottom strip's left and right x. Centred and short of both corners, so they stay
+     * natively touchable, except that a corner with a shortcut is covered to the screen edge.
+     */
+    private fun bottomSpan(configuration: GestureConfiguration, geometry: ScreenGeometry): Pair<Int, Int> {
+        val margin = geometry.widthPx * (100 - layout.bottomLengthPercent) / 200
+        val left = if (configuration.leftCornerShortcut != CornerShortcut.None) 0 else margin
+        val right = if (configuration.rightCornerShortcut != CornerShortcut.None) {
+            geometry.widthPx
+        } else {
+            geometry.widthPx - margin
+        }
+        return left to right
+    }
+
     private fun onStreamStart(edge: ScreenEdge) {
+        switcherController?.onStreamStart()
         bubbles.values.forEach(FluidBubbleOverlay::hide)
         confirmation.onDown(edge, SystemClock.uptimeMillis())
         syncPill()
@@ -254,7 +284,22 @@ internal class EdgeTouchOverlay(
     }
 
     private fun onFire(action: GestureAction, edge: ScreenEdge) {
+        if (action is GestureAction.Corner) {
+            // After the stream ends and the window update settles: the strips are visible again,
+            // which HyperOS needs to allow an app launch, and a screenshot misses the bubble.
+            handler.postDelayed({ runCorner(action.side) }, CORNER_SETTLE_MS)
+            return
+        }
         onGestureAction(action, edge)
+    }
+
+    private fun runCorner(side: BottomCorner) {
+        when (val shortcut = configuration.shortcutFor(side)) {
+            CornerShortcut.None -> Unit
+            CornerShortcut.RecentsList -> switcherController?.openForTouch(recents = true)
+            CornerShortcut.FavouritesList -> switcherController?.openForTouch(recents = false)
+            else -> onShortcut(shortcut)
+        }
     }
 
     private fun onUnused(edge: ScreenEdge, samples: List<TouchSample>) {
@@ -342,6 +387,7 @@ internal class EdgeTouchOverlay(
         private val hapticsEnabled: Boolean,
         private val bubble: FluidBubbleOverlay?,
         private val controller: EdgeSwitcherController?,
+        private val dragListEnabled: Boolean,
         private val onStreamStart: () -> Unit,
         private val onStreamActivity: () -> Unit,
         private val admit: (GestureAction) -> Boolean,
@@ -474,6 +520,12 @@ internal class EdgeTouchOverlay(
                     controller?.open(action)
                     samples.lastOrNull()?.let { controller?.move(it) }
                 }
+                is TrackerAction.CornerReady -> {
+                    // The diagonal is a shortcut now, not a Home swipe: the drop goes away.
+                    cancelHold()
+                    bubble?.release()
+                    Log.i(TAG, "CORNER_READY ${action.corner}")
+                }
                 is TrackerAction.ScheduleLongPress -> {
                     removeCallbacks(longPressRunnable)
                     postDelayed(longPressRunnable, action.delayMs)
@@ -520,7 +572,7 @@ internal class EdgeTouchOverlay(
             bubble?.follow(action, sample.xPx, sample.yPx)
             // Only a real swipe can pause into the app list, so a tap on the bottom strip
             // never pays for a package lookup. Arming happens once per gesture per edge.
-            if (action is TrackerAction.Armed) controller?.prepare(edge)
+            if (action is TrackerAction.Armed && dragListEnabled) controller?.prepare(edge)
             return handle(action, replayable)
         }
 
@@ -577,5 +629,11 @@ internal class EdgeTouchOverlay(
          * a 1 s grace). Releasing early is harmless: a touch keeps its original window.
          */
         const val STREAM_IDLE_LIMIT_MS = 10_000L
+
+        /**
+         * Wait before a corner shortcut runs: the strips' return to visible is an async
+         * window update, and an app launch is allowed only once a visible overlay is back.
+         */
+        const val CORNER_SETTLE_MS = 80L
     }
 }

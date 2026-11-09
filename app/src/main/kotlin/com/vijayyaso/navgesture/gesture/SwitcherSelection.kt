@@ -17,31 +17,53 @@
 
 package com.vijayyaso.navgesture.gesture
 
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-/** Pure selection and scrolling maths for the bottom app switcher. */
+/** Pure selection, scrolling and grid maths for the bottom app switcher. */
 object SwitcherSelection {
-    /** Sideways travel per icon. */
-    const val STEP_DP = 56f
+    /** Default sideways travel per icon. The user can change it in settings. */
+    const val DEFAULT_STEP_DP = 72f
 
     /**
-     * Maps sideways finger travel to an index, one icon per [STEP_DP]. The list loops: past
-     * the last icon comes the first, and before the first comes the last, so a short drag
-     * always finds every app. [startIndex] keeps the dimmed current app out of reach.
+     * How far, in steps, the finger must stray from the current step before the selection
+     * moves. Past the half-way line by a quarter step, so a finger resting on a boundary
+     * between two apps does not flip between them.
      */
-    fun looped(offsetDp: Float, count: Int, startIndex: Int): Int? {
+    const val HYSTERESIS_STEPS = 0.75f
+
+    /**
+     * The finger's travel counted in whole steps, unbounded in both directions. [previous] is
+     * the count this stream showed last; it is kept until the finger has clearly left it.
+     */
+    fun steps(offsetDp: Float, stepDp: Float, previous: Int): Int {
+        if (stepDp <= 0f) return previous
+        val continuous = offsetDp / stepDp
+        if (abs(continuous - previous) <= HYSTERESIS_STEPS) return previous
+        return continuous.roundToInt()
+    }
+
+    /**
+     * Maps an unbounded step count to an app index. The list loops: past the last app comes
+     * the first, and before the first comes the last. [startIndex] keeps the dimmed current
+     * app out of reach.
+     */
+    fun indexFor(steps: Int, count: Int, startIndex: Int): Int? {
         if (count <= 0 || startIndex !in 0 until count) return null
         val span = count - startIndex
-        if (span <= 0) return null
-        val steps = (offsetDp / STEP_DP).roundToInt()
         return startIndex + Math.floorMod(steps, span)
     }
 
-    /** Reveals one more icon as selection moves past the initial window's end. */
-    fun visibleWindow(selected: Int, count: Int, maxVisible: Int = 6): IntRange {
-        if (count <= 0 || maxVisible <= 0) return IntRange.EMPTY
-        val size = minOf(count, maxVisible)
-        val start = (selected.coerceIn(0, count - 1) - size + 1).coerceAtLeast(0)
-        return start until start + size
+    /** Columns and rows of the touch grid; apps past [maxRows] rows are not shown. */
+    fun tapGrid(count: Int, availableDp: Float, cellDp: Float, maxRows: Int = 3): Grid {
+        if (count <= 0 || cellDp <= 0f) return Grid(0, 0)
+        val columns = (availableDp / cellDp).toInt().coerceAtLeast(1).coerceAtMost(count)
+        val rows = ceil(count / columns.toFloat()).toInt().coerceAtMost(maxRows)
+        return Grid(columns, rows)
+    }
+
+    data class Grid(val columns: Int, val rows: Int) {
+        val capacity: Int get() = columns * rows
     }
 }

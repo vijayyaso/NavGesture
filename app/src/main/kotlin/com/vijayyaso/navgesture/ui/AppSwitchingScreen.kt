@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.CornerShortcut
 
 @Composable
 internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
@@ -39,6 +40,30 @@ internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
         tag = TestTags.ROW_FAVOURITE_APPS,
         onClick = onOpenFavourites,
     )
+    SectionHeader(stringResource(R.string.section_list_style))
+    AppListStyleChoice(configuration.appListStyle) { style ->
+        model.update { it.copy(appListStyle = style) }
+    }
+    ThresholdSlider(
+        label = stringResource(R.string.label_drag_step),
+        value = configuration.switcherStepDp,
+        range = DRAG_STEP_RANGE,
+        formatter = { stringResource(R.string.value_dp, it) },
+        supporting = stringResource(R.string.label_drag_step_body),
+    ) { updated -> model.update { it.copy(switcherStepDp = updated) } }
+
+    SectionHeader(stringResource(R.string.section_corner_shortcuts))
+    FootNote(stringResource(R.string.corner_shortcuts_body))
+    CornerShortcutRow(
+        title = stringResource(R.string.label_left_corner),
+        shortcut = configuration.leftCornerShortcut,
+        tag = TestTags.ROW_LEFT_CORNER,
+    ) { picked -> model.update { it.copy(leftCornerShortcut = picked) } }
+    CornerShortcutRow(
+        title = stringResource(R.string.label_right_corner),
+        shortcut = configuration.rightCornerShortcut,
+        tag = TestTags.ROW_RIGHT_CORNER,
+    ) { picked -> model.update { it.copy(rightCornerShortcut = picked) } }
     SectionHeader(stringResource(R.string.section_needs))
     InfoRow(
         title = stringResource(R.string.label_usage_access),
@@ -65,6 +90,9 @@ internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
     )
     LastProblem(model.diagnostics.lastAppSwitchFailure)
 }
+
+/** Sideways travel per app, from twitchy to calm. */
+private val DRAG_STEP_RANGE = 40f..120f
 
 /** The supporting text of a feature row on home, naming what it still needs. */
 @Composable

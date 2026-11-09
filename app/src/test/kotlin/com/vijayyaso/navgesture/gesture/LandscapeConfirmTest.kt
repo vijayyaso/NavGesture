@@ -265,4 +265,16 @@ class LandscapeConfirmTest {
         const val BOTTOM_Y = 1075f
         const val STEP_MS = 20L
     }
+
+    @Test
+    fun `a corner shortcut in landscape waits for a second swipe like Home`() {
+        val confirm = LandscapeConfirm()
+        confirm.configure(enabled = true, landscape = true)
+        val corner = GestureAction.Corner(BottomCorner.LEFT)
+        confirm.onDown(ScreenEdge.BOTTOM, 0L)
+        assertTrue(confirm.onFire(corner, ScreenEdge.BOTTOM, 10L) is ConfirmVerdict.ShowPill)
+        confirm.onStreamEnd(ScreenEdge.BOTTOM, 20L)
+        confirm.onDown(ScreenEdge.BOTTOM, 500L)
+        assertEquals(ConfirmVerdict.Perform, confirm.onFire(corner, ScreenEdge.BOTTOM, 510L))
+    }
 }

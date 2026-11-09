@@ -36,6 +36,8 @@ class HapticGate {
         }
         // POCO's performEnterRecent tick; the Recents release behind it then stays quiet.
         is TrackerAction.RecentsPrimed -> true.also { armTicked = true }
+        // The corner ticks where its diagonal lands; the shortcut's release then stays quiet.
+        is TrackerAction.CornerReady -> true.also { armTicked = true }
         is TrackerAction.Disarmed -> {
             armTicked = false
             false
