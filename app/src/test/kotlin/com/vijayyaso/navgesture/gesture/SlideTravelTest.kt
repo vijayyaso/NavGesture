@@ -37,8 +37,8 @@ class SlideTravelTest {
         assertEquals(200f, travel.dp, 0.01f)
     }
 
-    @Test fun `a slow slide moves less than the finger`() {
-        // 144 dp in 1.2 s = 120 dp/s: two steps of finger travel give under two steps.
+    @Test fun `a slow slide moves at the slow gain`() {
+        // 144 dp in 1.2 s = 120 dp/s, below the speed where the gain starts to rise.
         val travel = SlideTravel(adaptive = true).apply { start(0f, 0L) }
         slide(travel, 0f, 144f, 1200L)
         assertEquals(144f * SlideTravel.SLOW_GAIN, travel.dp, 1f)
@@ -49,9 +49,9 @@ class SlideTravelTest {
         slide(slow, 0f, 200f, 1600L)
         val fast = SlideTravel(adaptive = true).apply { start(0f, 0L) }
         slide(fast, 0f, 200f, 80L)
-        assertTrue("fast ${fast.dp} vs slow ${slow.dp}", fast.dp > slow.dp * 3f)
-        assertEquals(SwitcherSelection.steps(slow.dp, 72f, 0), 2)
-        assertTrue(SwitcherSelection.steps(fast.dp, 72f, 0) >= 6)
+        assertTrue("fast ${fast.dp} vs slow ${slow.dp}", fast.dp > slow.dp * 2f)
+        assertEquals(3, SwitcherSelection.steps(slow.dp, 72f, 0))
+        assertTrue(SwitcherSelection.steps(fast.dp, 72f, 0) >= 7)
     }
 
     @Test fun `sliding back moves the selection back`() {
@@ -69,7 +69,7 @@ class SlideTravelTest {
         // Finger held still for half a second, then one slow 8 dp move.
         travel.add(200f, 600L)
         travel.add(208f, 700L)
-        assertTrue(travel.dp - before < 8f)
+        assertEquals(8f * SlideTravel.SLOW_GAIN, travel.dp - before, 1f)
     }
 
     @Test fun `gain curve`() {

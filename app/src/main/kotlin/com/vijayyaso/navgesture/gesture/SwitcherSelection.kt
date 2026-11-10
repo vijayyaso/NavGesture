@@ -118,11 +118,11 @@ class SlideTravel(private val adaptive: Boolean) {
     }
 
     companion object {
-        /** At or below this speed the gain is [SLOW_GAIN]: careful slides are precise. */
+        /** At or below this speed the gain is [SLOW_GAIN], a little faster than the finger. */
         const val SLOW_DP_S = 200f
         /** At or above this speed the gain is [FAST_GAIN]. */
         const val FAST_DP_S = 1500f
-        const val SLOW_GAIN = 0.8f
+        const val SLOW_GAIN = 1.2f
         const val FAST_GAIN = 3f
         private const val SMOOTHING_MS = 40f
         /** A pause longer than this counts as this long, so speed falls to the slow gain. */
