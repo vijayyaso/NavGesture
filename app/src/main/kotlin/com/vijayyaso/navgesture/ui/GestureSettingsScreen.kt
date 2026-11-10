@@ -17,11 +17,12 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,8 +37,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.BuildConfig
+import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.navigation.NavigationModeReader
@@ -47,49 +48,68 @@ import kotlin.math.roundToInt
 internal fun GestureSettingsScreen(model: AppModel) {
     val configuration = model.configuration
     var adjustOpen by rememberSaveable { mutableStateOf(false) }
-    SectionHeader(stringResource(R.string.gestures_title))
-    CheatSheet(configuration)
+    SettingsGroup(title = stringResource(R.string.gestures_title)) {
+        CheatSheet(configuration)
+    }
 
-    SectionHeader(stringResource(R.string.section_edges))
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.label_edge_width),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(R.string.value_dp, configuration.edgeWidthDp.roundToInt()),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium,
-        )
+    SettingsGroup(title = stringResource(R.string.section_edges)) {
+        // One child, so no line cuts through the touch-area block.
+        Column(modifier = Modifier.padding(vertical = 12.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.label_edge_width),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = stringResource(R.string.value_dp, configuration.edgeWidthDp.roundToInt()),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = stringResource(R.string.label_edge_width_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+            FilledTonalButton(
+                onClick = { adjustOpen = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                    .testTag(TestTags.EDGE_AREA_ADJUST),
+            ) {
+                Text(stringResource(R.string.edge_area_adjust))
+            }
+            Text(
+                text = stringResource(R.string.edge_area_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp),
+            )
+        }
+        ToggleRow(
+            label = stringResource(R.string.label_left_edge_back),
+            checked = configuration.leftEdgeBackEnabled,
+        ) { updated -> model.update { it.copy(leftEdgeBackEnabled = updated) } }
+        ToggleRow(
+            label = stringResource(R.string.label_right_edge_back),
+            checked = configuration.rightEdgeBackEnabled,
+        ) { updated -> model.update { it.copy(rightEdgeBackEnabled = updated) } }
+        ToggleRow(
+            label = stringResource(R.string.label_landscape_confirm),
+            checked = configuration.landscapeConfirmEnabled,
+            supporting = stringResource(R.string.label_landscape_confirm_body),
+            tag = TestTags.SWITCH_LANDSCAPE_CONFIRM,
+        ) { updated -> model.update { it.copy(landscapeConfirmEnabled = updated) } }
     }
-    Text(
-        text = stringResource(R.string.label_edge_width_body),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-    )
-    OutlinedButton(
-        onClick = { adjustOpen = true },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .testTag(TestTags.EDGE_AREA_ADJUST),
-    ) {
-        Text(stringResource(R.string.edge_area_adjust))
-    }
-    Text(
-        text = stringResource(R.string.edge_area_hint),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-    )
     if (adjustOpen) {
         TouchAreaAdjuster(
             configuration = configuration,
@@ -98,50 +118,37 @@ internal fun GestureSettingsScreen(model: AppModel) {
             onDismiss = { adjustOpen = false },
         )
     }
-    ToggleRow(
-        label = stringResource(R.string.label_left_edge_back),
-        checked = configuration.leftEdgeBackEnabled,
-    ) { updated -> model.update { it.copy(leftEdgeBackEnabled = updated) } }
-    ToggleRow(
-        label = stringResource(R.string.label_right_edge_back),
-        checked = configuration.rightEdgeBackEnabled,
-    ) { updated -> model.update { it.copy(rightEdgeBackEnabled = updated) } }
-    ToggleRow(
-        label = stringResource(R.string.label_landscape_confirm),
-        checked = configuration.landscapeConfirmEnabled,
-        supporting = stringResource(R.string.label_landscape_confirm_body),
-        tag = TestTags.SWITCH_LANDSCAPE_CONFIRM,
-    ) { updated -> model.update { it.copy(landscapeConfirmEnabled = updated) } }
 
-    SectionHeader(stringResource(R.string.section_distance_and_timing))
-    ThresholdSlider(
-        label = stringResource(R.string.label_side_distance),
-        value = configuration.sideMinimumSwipeDistanceDp,
-        range = 8f..80f,
-        formatter = { stringResource(R.string.value_dp, it) },
-        supporting = stringResource(R.string.label_side_distance_body),
-    ) { updated -> model.update { it.copy(sideMinimumSwipeDistanceDp = updated) } }
-    ThresholdSlider(
-        label = stringResource(R.string.label_bottom_distance),
-        value = configuration.bottomMinimumSwipeDistanceDp,
-        range = 4f..60f,
-        formatter = { stringResource(R.string.value_dp, it) },
-        supporting = stringResource(R.string.label_bottom_distance_body),
-    ) { updated -> model.update { it.copy(bottomMinimumSwipeDistanceDp = updated) } }
-    ThresholdSlider(
-        label = stringResource(R.string.label_recents_line),
-        value = configuration.recentsLinePercent,
-        range = 5f..30f,
-        formatter = { stringResource(R.string.value_percent, it) },
-        supporting = stringResource(R.string.label_recents_line_body),
-    ) { updated -> model.update { it.copy(recentsLinePercent = updated) } }
-    ThresholdSlider(
-        label = stringResource(R.string.label_maximum_duration),
-        value = configuration.maximumArmDurationMs.toFloat(),
-        range = 300f..3000f,
-        formatter = { stringResource(R.string.value_seconds, it / 1000f) },
-        supporting = stringResource(R.string.label_maximum_duration_body),
-    ) { updated -> model.update { it.copy(maximumArmDurationMs = updated.toLong()) } }
+    SettingsGroup(title = stringResource(R.string.section_distance_and_timing)) {
+        ThresholdSlider(
+            label = stringResource(R.string.label_side_distance),
+            value = configuration.sideMinimumSwipeDistanceDp,
+            range = 8f..80f,
+            formatter = { stringResource(R.string.value_dp, it) },
+            supporting = stringResource(R.string.label_side_distance_body),
+        ) { updated -> model.update { it.copy(sideMinimumSwipeDistanceDp = updated) } }
+        ThresholdSlider(
+            label = stringResource(R.string.label_bottom_distance),
+            value = configuration.bottomMinimumSwipeDistanceDp,
+            range = 4f..60f,
+            formatter = { stringResource(R.string.value_dp, it) },
+            supporting = stringResource(R.string.label_bottom_distance_body),
+        ) { updated -> model.update { it.copy(bottomMinimumSwipeDistanceDp = updated) } }
+        ThresholdSlider(
+            label = stringResource(R.string.label_recents_line),
+            value = configuration.recentsLinePercent,
+            range = 5f..30f,
+            formatter = { stringResource(R.string.value_percent, it) },
+            supporting = stringResource(R.string.label_recents_line_body),
+        ) { updated -> model.update { it.copy(recentsLinePercent = updated) } }
+        ThresholdSlider(
+            label = stringResource(R.string.label_maximum_duration),
+            value = configuration.maximumArmDurationMs.toFloat(),
+            range = 300f..3000f,
+            formatter = { stringResource(R.string.value_seconds, it / 1000f) },
+            supporting = stringResource(R.string.label_maximum_duration_body),
+        ) { updated -> model.update { it.copy(maximumArmDurationMs = updated.toLong()) } }
+    }
 
     // Read on every recomposition, so a grant made while the app is open shows on return.
     val canHide = GestureBarHider.canWrite(LocalContext.current)
@@ -151,17 +158,18 @@ internal fun GestureSettingsScreen(model: AppModel) {
         GestureBarSection(configuration, canHide, model)
     }
 
-    SectionHeader(stringResource(R.string.section_feedback))
-    ToggleRow(
-        label = stringResource(R.string.label_haptics),
-        checked = configuration.hapticFeedbackEnabled,
-    ) { updated -> model.update { it.copy(hapticFeedbackEnabled = updated) } }
+    SettingsGroup(title = stringResource(R.string.section_feedback)) {
+        ToggleRow(
+            label = stringResource(R.string.label_haptics),
+            checked = configuration.hapticFeedbackEnabled,
+        ) { updated -> model.update { it.copy(hapticFeedbackEnabled = updated) } }
+    }
 
     val resetMessage = stringResource(R.string.snackbar_reset)
     val undo = stringResource(R.string.action_undo)
     TextButton(
         onClick = { model.resetGestureSettings(resetMessage, undo) },
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Text(stringResource(R.string.action_reset_defaults))
     }
@@ -204,14 +212,15 @@ private val EDGE_WIDTH_RANGE = 8f..64f
 
 @Composable
 private fun GestureBarSection(configuration: GestureConfiguration, canHide: Boolean, model: AppModel) {
-    SectionHeader(stringResource(R.string.section_gesture_bar))
-    ToggleRow(
-        label = stringResource(R.string.label_hide_gesture_bar),
-        checked = configuration.hideGestureBar && canHide,
-        supporting = if (canHide) {
-            stringResource(R.string.hide_gesture_bar_body)
-        } else {
-            stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND)
-        },
-    ) { updated -> if (canHide) model.update { it.copy(hideGestureBar = updated) } }
+    SettingsGroup(title = stringResource(R.string.section_gesture_bar)) {
+        ToggleRow(
+            label = stringResource(R.string.label_hide_gesture_bar),
+            checked = configuration.hideGestureBar && canHide,
+            supporting = if (canHide) {
+                stringResource(R.string.hide_gesture_bar_body)
+            } else {
+                stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND)
+            },
+        ) { updated -> if (canHide) model.update { it.copy(hideGestureBar = updated) } }
+    }
 }

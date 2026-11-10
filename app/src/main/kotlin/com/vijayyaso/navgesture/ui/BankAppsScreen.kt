@@ -24,9 +24,10 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,10 +37,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
@@ -82,67 +85,68 @@ internal fun BankAppsScreen(model: AppModel) {
         scope.launch { store.set(updated) }
     }
 
-    FootNote(stringResource(R.string.bank_apps_intro))
-    FootNote(stringResource(R.string.bank_apps_first_open))
+    FootNote(stringResource(R.string.bank_apps_intro), Modifier.padding(horizontal = 16.dp))
+    FootNote(stringResource(R.string.bank_apps_first_open), Modifier.padding(horizontal = 16.dp))
 
-    SectionHeader(stringResource(R.string.section_needs))
     val canWrite = resumes >= 0 && GestureBarHider.canWrite(context)
-    InfoRow(
-        title = stringResource(R.string.label_adb_grant),
-        supporting = if (canWrite) {
-            stringResource(R.string.label_granted)
-        } else {
-            stringResource(R.string.bank_apps_needs_grant, GestureBarHider.GRANT_COMMAND)
-        },
-    )
-    InfoRow(
-        title = stringResource(R.string.label_usage_access),
-        supporting = stringResource(
-            if (model.usageAccess) R.string.label_usage_access_granted else R.string.bank_apps_needs_usage,
-        ),
-        trailing = if (model.usageAccess) {
-            null
-        } else {
-            {
-                OutlinedButton(onClick = { openUsageAccess(context) }) {
-                    Text(stringResource(R.string.action_grant_usage_access))
-                }
-            }
-        },
-    )
     val notifications = resumes >= 0 && NotificationManagerCompat.from(context).areNotificationsEnabled()
-    InfoRow(
-        title = stringResource(R.string.label_notifications),
-        supporting = stringResource(
-            if (notifications) R.string.bank_apps_notifications_on else R.string.bank_apps_notifications_off,
-        ),
-        trailing = if (notifications) {
-            null
-        } else {
-            {
-                OutlinedButton(onClick = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        context.startFirst(notificationSettings(context.packageName))
+    SettingsGroup(title = stringResource(R.string.section_needs)) {
+        InfoRow(
+            title = stringResource(R.string.label_adb_grant),
+            supporting = if (canWrite) {
+                stringResource(R.string.label_granted)
+            } else {
+                stringResource(R.string.bank_apps_needs_grant, GestureBarHider.GRANT_COMMAND)
+            },
+        )
+        InfoRow(
+            title = stringResource(R.string.label_usage_access),
+            supporting = stringResource(
+                if (model.usageAccess) R.string.label_usage_access_granted else R.string.bank_apps_needs_usage,
+            ),
+            trailing = if (model.usageAccess) {
+                null
+            } else {
+                {
+                    FilledTonalButton(onClick = { openUsageAccess(context) }) {
+                        Text(stringResource(R.string.action_grant_usage_access))
                     }
-                }) { Text(stringResource(R.string.action_allow)) }
-            }
-        },
-    )
-
-    SectionHeader(stringResource(R.string.section_bank_apps_picked))
-    if (chosen.isEmpty()) FootNote(stringResource(R.string.bank_apps_empty))
-    chosen.forEach { packageName ->
-        ListItem(
-            leadingContent = { AppIconImage(icons[packageName]) },
-            headlineContent = { Text(labels[packageName] ?: packageName) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                }
+            },
+        )
+        InfoRow(
+            title = stringResource(R.string.label_notifications),
+            supporting = stringResource(
+                if (notifications) R.string.bank_apps_notifications_on else R.string.bank_apps_notifications_off,
+            ),
+            trailing = if (notifications) {
+                null
+            } else {
+                {
+                    FilledTonalButton(onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            context.startFirst(notificationSettings(context.packageName))
+                        }
+                    }) { Text(stringResource(R.string.action_allow)) }
+                }
+            },
         )
     }
-
-    SectionHeader(stringResource(R.string.section_all_apps))
-    AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
+    SettingsGroup(title = stringResource(R.string.section_bank_apps_picked)) {
+        if (chosen.isEmpty()) FootNote(stringResource(R.string.bank_apps_empty))
+        chosen.forEach { packageName ->
+            ListItem(
+                leadingContent = { AppIconImage(icons[packageName]) },
+                headlineContent = { Text(labels[packageName] ?: packageName) },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
+    }
+    SettingsGroup(title = stringResource(R.string.section_all_apps)) {
+        AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
+    }
 }
 
 /** The home row's supporting text: what is picked, or what the pause still needs. */

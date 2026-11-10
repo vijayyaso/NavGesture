@@ -29,29 +29,31 @@ internal fun AboutScreen(model: AppModel) {
     val context = LocalContext.current
     val sourceUrl = stringResource(R.string.url_source)
     val licenseUrl = stringResource(R.string.url_license)
-    ValueRow(
-        stringResource(R.string.about_version),
-        model.diagnostics.appVersionName ?: stringResource(R.string.diag_unknown),
-    )
-    // Plain text until the site is live, so there is nothing to open yet.
-    ValueRow(stringResource(R.string.about_website), stringResource(R.string.value_website))
-    // A device with no browser throws ActivityNotFoundException, which startFirst absorbs.
-    NavigationRow(
-        title = stringResource(R.string.about_source),
-        supporting = stringResource(R.string.value_source),
-    ) { context.startFirst(Intent(Intent.ACTION_VIEW, sourceUrl.toUri())) }
-    NavigationRow(
-        title = stringResource(R.string.diag_license),
-        supporting = stringResource(R.string.value_license),
-    ) { context.startFirst(Intent(Intent.ACTION_VIEW, licenseUrl.toUri())) }
-
-    SectionHeader(stringResource(R.string.section_credits))
-    InfoRow(
-        title = stringResource(R.string.credit_victor),
-        supporting = stringResource(R.string.credit_victor_body),
-    )
-    InfoRow(
-        title = stringResource(R.string.credit_cts),
-        supporting = stringResource(R.string.credit_cts_body),
-    )
+    SettingsGroup {
+        ValueRow(
+            stringResource(R.string.about_version),
+            model.diagnostics.appVersionName ?: stringResource(R.string.diag_unknown),
+        )
+        // Plain text until the site is live, so there is nothing to open yet.
+        ValueRow(stringResource(R.string.about_website), stringResource(R.string.value_website))
+        // A device with no browser throws ActivityNotFoundException, which startFirst absorbs.
+        NavigationRow(
+            title = stringResource(R.string.about_source),
+            supporting = stringResource(R.string.value_source),
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, sourceUrl.toUri())) }
+        NavigationRow(
+            title = stringResource(R.string.diag_license),
+            supporting = stringResource(R.string.value_license),
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, licenseUrl.toUri())) }
+    }
+    SettingsGroup(title = stringResource(R.string.section_credits)) {
+        InfoRow(
+            title = stringResource(R.string.credit_victor),
+            supporting = stringResource(R.string.credit_victor_body),
+        )
+        InfoRow(
+            title = stringResource(R.string.credit_cts),
+            supporting = stringResource(R.string.credit_cts_body),
+        )
+    }
 }

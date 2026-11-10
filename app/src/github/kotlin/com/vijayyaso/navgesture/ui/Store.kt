@@ -17,6 +17,8 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.ui.theme.IconTint
 import com.vijayyaso.navgesture.update.UpdateViewModel
 
 /**
@@ -42,19 +45,18 @@ internal object Store {
         }
     }
 
-    /** The Updates row on home; draws nothing in play. */
+    /** The Updates tile on home; null in play. */
     @Composable
-    fun HomeRow(onOpen: () -> Unit) {
+    fun homeTile(onOpen: () -> Unit): HomeTile? {
         val updates = viewModel<UpdateViewModel>()
         val state by updates.state.collectAsState()
-        SplitSwitchRow(
+        return HomeTile(
             title = stringResource(R.string.section_updates),
-            supporting = updatesSummary(state),
-            checked = state.enabled,
-            rowTag = TestTags.ROW_UPDATES,
-            switchTag = TestTags.SWITCH_UPDATE_CHECK,
+            summary = updatesSummary(state),
+            icon = GroupIcon(Icons.Filled.Refresh, IconTint.GREEN),
+            tag = TestTags.ROW_UPDATES,
+            toggle = TileToggle(state.enabled, TestTags.SWITCH_UPDATE_CHECK, updates::setEnabled),
             onOpen = onOpen,
-            onChange = updates::setEnabled,
         )
     }
 

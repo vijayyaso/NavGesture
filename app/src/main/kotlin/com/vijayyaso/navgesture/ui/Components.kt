@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 package com.vijayyaso.navgesture.ui
 
 import androidx.compose.foundation.background
@@ -24,9 +25,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -37,7 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,11 +50,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.ui.theme.onSuccessContainer
@@ -62,14 +73,19 @@ import kotlin.math.roundToInt
 
 internal fun Modifier.tagged(tag: String?): Modifier = if (tag != null) testTag(tag) else this
 
+/** Corners of a group card and of a home tile. */
+internal val CardShape = RoundedCornerShape(16.dp)
+internal val TileShape = RoundedCornerShape(20.dp)
+
+/** A group's title: small grey text, lined up with the text inside the card below it. */
 @Composable
 internal fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+        modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 20.dp, bottom = 8.dp),
     )
 }
 
@@ -81,6 +97,149 @@ internal fun FootNote(text: String, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
+}
+
+/**
+ * Rows grouped in one white rounded card, with an optional grey title above it and an optional
+ * grey footer under it. A thin line separates each child from the next, so a block made of
+ * several composables that belong together must be passed as one child (wrap it in a Column).
+ */
+@Composable
+internal fun SettingsGroup(
+    title: String? = null,
+    footer: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (title != null) SectionHeader(title) else Spacer(Modifier.size(12.dp))
+        DividedCard(content)
+        footer?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 8.dp),
+            )
+        }
+    }
+}
+
+/** Stacks its children like a Column and draws a hairline between each child and the next. */
+@Composable
+private fun DividedCard(content: @Composable () -> Unit) {
+    val lineColor = MaterialTheme.colorScheme.outlineVariant
+    // Written at placement, read at draw, so a change in the rows redraws the lines.
+    var edges by remember { mutableStateOf(IntArray(0)) }
+    Layout(
+        content = content,
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .clip(CardShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .drawWithContent {
+                drawContent()
+                val inset = 16.dp.toPx()
+                val stroke = 0.5.dp.toPx().coerceAtLeast(1f)
+                edges.forEach { y ->
+                    val line = y - stroke / 2
+                    drawLine(lineColor, Offset(inset, line), Offset(size.width, line), stroke)
+                }
+            },
+    ) { measurables, constraints ->
+        val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0)) }
+        val height = placeables.sumOf { it.height }
+        layout(constraints.maxWidth, height) {
+            var y = 0
+            val found = ArrayList<Int>(placeables.size)
+            placeables.forEachIndexed { index, placeable ->
+                placeable.placeRelative(0, y)
+                y += placeable.height
+                if (index < placeables.lastIndex && placeable.height > 0) found += y
+            }
+            val updated = found.toIntArray()
+            if (!updated.contentEquals(edges)) edges = updated
+        }
+    }
+}
+
+/** A glyph and the colour of the square it sits on. */
+internal data class GroupIcon(val icon: ImageVector, val tint: Color)
+
+/** A small rounded square in the icon's colour with the glyph in white. */
+@Composable
+internal fun IconBadge(icon: GroupIcon, size: Dp = 30.dp) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size)
+            .background(icon.tint, RoundedCornerShape(size * 0.27f)),
+    ) {
+        Icon(icon.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
+    }
+}
+
+/** A home tile's own on/off switch. */
+internal data class TileToggle(val checked: Boolean, val tag: String, val onChange: (Boolean) -> Unit)
+
+/** One tile on home: a screen to open, with its state and, for a feature, its switch. */
+internal data class HomeTile(
+    val title: String,
+    val summary: String,
+    val icon: GroupIcon,
+    val tag: String,
+    val toggle: TileToggle? = null,
+    val onOpen: () -> Unit,
+)
+
+/**
+ * The switch sits on top of the tile as a sibling of the clickable area, not inside it, so the
+ * two stay separate touch targets and separate accessibility nodes, and the tile's centre opens
+ * the screen.
+ */
+@Composable
+internal fun FeatureTile(tile: HomeTile, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(TileShape)
+            .background(MaterialTheme.colorScheme.surface),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .heightIn(min = 128.dp)
+                .testTag(tile.tag)
+                .clickable(role = Role.Button, onClick = tile.onOpen)
+                .padding(16.dp),
+        ) {
+            IconBadge(tile.icon, size = 36.dp)
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = tile.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = tile.summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        tile.toggle?.let { toggle ->
+            Switch(
+                checked = toggle.checked,
+                onCheckedChange = toggle.onChange,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 12.dp)
+                    .testTag(toggle.tag),
+            )
+        }
+    }
 }
 
 /** Green for done, amber for something to do, neutral for a fact or a wait. */
@@ -139,50 +298,24 @@ internal fun ToggleRow(
     )
 }
 
-/** A label that opens a screen beside a switch that toggles in place, as AOSP Settings does. */
-@Composable
-internal fun SplitSwitchRow(
-    title: String,
-    supporting: String,
-    checked: Boolean,
-    rowTag: String,
-    switchTag: String,
-    onOpen: () -> Unit,
-    onChange: (Boolean) -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        ListItem(
-            headlineContent = { Text(title) },
-            supportingContent = { SupportingText(supporting) },
-            colors = transparentItem,
-            modifier = Modifier
-                .weight(1f)
-                .testTag(rowTag)
-                .clickable(onClick = onOpen),
-        )
-        VerticalDivider(modifier = Modifier.height(32.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .testTag(switchTag),
-        )
-    }
-}
-
 @Composable
 internal fun NavigationRow(
     title: String,
     supporting: String? = null,
     tag: String? = null,
+    icon: GroupIcon? = null,
     onClick: () -> Unit,
 ) {
     ListItem(
+        leadingContent = icon?.let { { IconBadge(it) } },
         headlineContent = { Text(title) },
         supportingContent = supporting?.let { { SupportingText(it) } },
         trailingContent = {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+            )
         },
         colors = transparentItem,
         modifier = Modifier
@@ -217,7 +350,7 @@ internal fun InfoRow(
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             itemVerticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 8.dp),
                         ) { it() }
                     }
                 }
@@ -228,7 +361,8 @@ internal fun InfoRow(
     )
 }
 
-private const val STACKED_FONT_SCALE = 1.5f
+/** From this font scale on, side-by-side layouts stack: chips go under titles, tiles one per row. */
+internal const val STACKED_FONT_SCALE = 1.5f
 
 /** Label and value stacked once a large font leaves no room beside each other. */
 @Composable
@@ -247,8 +381,6 @@ internal fun ValueRow(label: String, value: String, valueTag: String? = null) {
     )
 }
 
-// Commits on release only, since every write re-emits the config flow and rebuilds all three
-// overlay windows, which visibly stutters on HyperOS.
 @Composable
 internal fun ThresholdSlider(
     label: String,
@@ -262,7 +394,7 @@ internal fun ThresholdSlider(
     var local by remember { mutableFloatStateOf(value) }
     LaunchedEffect(value) { if (!dragging) local = value }
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)) {
         Row(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = label,
@@ -275,7 +407,7 @@ internal fun ThresholdSlider(
                 text = formatter(local.roundToInt()),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
             )
         }
         if (supporting != null) {

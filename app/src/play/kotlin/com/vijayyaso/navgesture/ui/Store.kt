@@ -26,9 +26,9 @@ internal object Store {
     @Composable
     fun Bind() {}
 
-    /** The play build has no updater. */
+    /** The play build has no updater, so home has no Updates tile. */
     @Composable
-    fun HomeRow(onOpen: () -> Unit) {}
+    fun homeTile(onOpen: () -> Unit): HomeTile? = null
 
     /** The play build has no updater. */
     @Composable

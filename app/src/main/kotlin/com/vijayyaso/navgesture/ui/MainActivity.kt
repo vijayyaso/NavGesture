@@ -32,14 +32,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.vijayyaso.navgesture.R
@@ -157,25 +158,25 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     Scaffold(
         modifier = Modifier.semantics { testTagsAsResourceId = true },
         topBar = {
-            // The bar takes the screen background, matching the list below it.
-            TopAppBar(
-                title = { Text(stringResource(screen.title)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-                navigationIcon = {
-                    if (screen != Screen.HOME) {
+            // Home opens on its own large title instead, so it has no bar and no back arrow.
+            if (screen != Screen.HOME) {
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(screen.title), fontWeight = FontWeight.SemiBold) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                    ),
+                    navigationIcon = {
                         IconButton(onClick = back, modifier = Modifier.testTag(TestTags.NAV_BACK)) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.action_navigate_up),
                             )
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(model.snackbar) },
     ) { padding ->
         // Keyed by screen. Each one opens at its top rather than at the previous scroll.
@@ -185,7 +186,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                     .fillMaxSize()
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 24.dp),
             ) {
                 when (screen) {
                     Screen.HOME -> HomeScreen(model) { stack = stack + it }

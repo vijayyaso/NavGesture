@@ -18,7 +18,7 @@
 package com.vijayyaso.navgesture.ui
 
 import android.view.ViewConfiguration
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
@@ -29,52 +29,56 @@ import com.vijayyaso.navgesture.R
 internal fun CircleToSearchScreen(model: AppModel) {
     val context = LocalContext.current
     val configuration = model.configuration
-    ToggleRow(
-        label = stringResource(R.string.label_circle_to_search),
-        checked = configuration.circleToSearchEnabled,
-        tag = TestTags.SWITCH_CIRCLE_TO_SEARCH,
-    ) { updated -> model.update { it.copy(circleToSearchEnabled = updated) } }
-    FootNote(stringResource(R.string.section_circle_to_search_body))
+    SettingsGroup(footer = stringResource(R.string.section_circle_to_search_body)) {
+        ToggleRow(
+            label = stringResource(R.string.label_circle_to_search),
+            checked = configuration.circleToSearchEnabled,
+            tag = TestTags.SWITCH_CIRCLE_TO_SEARCH,
+        ) { updated -> model.update { it.copy(circleToSearchEnabled = updated) } }
+    }
     if (!configuration.circleToSearchEnabled) return
 
-    SectionHeader(stringResource(R.string.section_timing))
-    ToggleRow(
-        label = stringResource(R.string.label_circle_to_search_system_timing),
-        supporting = stringResource(
-            R.string.value_seconds,
-            ViewConfiguration.getLongPressTimeout() / 1000f,
-        ),
-        checked = configuration.circleToSearchFollowsSystemTiming,
-    ) { updated -> model.update { it.copy(circleToSearchFollowsSystemTiming = updated) } }
-    if (!configuration.circleToSearchFollowsSystemTiming) {
-        ThresholdSlider(
-            label = stringResource(R.string.label_circle_to_search_hold),
-            value = configuration.circleToSearchHoldMs.toFloat(),
-            range = 250f..1500f,
-            formatter = { stringResource(R.string.value_seconds, it / 1000f) },
-        ) { updated -> model.update { it.copy(circleToSearchHoldMs = updated.toLong()) } }
+    SettingsGroup(title = stringResource(R.string.section_timing)) {
+        ToggleRow(
+            label = stringResource(R.string.label_circle_to_search_system_timing),
+            supporting = stringResource(
+                R.string.value_seconds,
+                ViewConfiguration.getLongPressTimeout() / 1000f,
+            ),
+            checked = configuration.circleToSearchFollowsSystemTiming,
+        ) { updated -> model.update { it.copy(circleToSearchFollowsSystemTiming = updated) } }
+        if (!configuration.circleToSearchFollowsSystemTiming) {
+            ThresholdSlider(
+                label = stringResource(R.string.label_circle_to_search_hold),
+                value = configuration.circleToSearchHoldMs.toFloat(),
+                range = 250f..1500f,
+                formatter = { stringResource(R.string.value_seconds, it / 1000f) },
+            ) { updated -> model.update { it.copy(circleToSearchHoldMs = updated.toLong()) } }
+        }
     }
-    SectionHeader(stringResource(R.string.section_needs))
-    InfoRow(
-        title = stringResource(R.string.label_assistant),
-        supporting = stringResource(
-            when (model.assistant) {
-                Assistant.GOOGLE -> R.string.assistant_google
-                Assistant.OTHER -> R.string.assistant_other
-                Assistant.UNKNOWN -> R.string.label_circle_to_search_assistant
-            },
-        ),
-        actions = if (model.assistant == Assistant.GOOGLE) {
-            null
-        } else {
-            {
-                OutlinedButton(onClick = { openAssistantSettings(context) }) {
-                    Text(stringResource(R.string.action_open_assistant_settings))
+
+    SettingsGroup(title = stringResource(R.string.section_needs)) {
+        InfoRow(
+            title = stringResource(R.string.label_assistant),
+            supporting = stringResource(
+                when (model.assistant) {
+                    Assistant.GOOGLE -> R.string.assistant_google
+                    Assistant.OTHER -> R.string.assistant_other
+                    Assistant.UNKNOWN -> R.string.label_circle_to_search_assistant
+                },
+            ),
+            actions = if (model.assistant == Assistant.GOOGLE) {
+                null
+            } else {
+                {
+                    FilledTonalButton(onClick = { openAssistantSettings(context) }) {
+                        Text(stringResource(R.string.action_open_assistant_settings))
+                    }
                 }
-            }
-        },
-    )
-    LastProblem(model.diagnostics.lastCircleToSearchFailure)
+            },
+        )
+        LastProblem(model.diagnostics.lastCircleToSearchFailure)
+    }
 }
 
 @Composable

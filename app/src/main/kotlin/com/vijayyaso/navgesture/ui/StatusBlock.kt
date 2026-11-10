@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 package com.vijayyaso.navgesture.ui
 
 import androidx.compose.foundation.background
@@ -26,14 +27,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -42,8 +47,6 @@ import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
-import com.vijayyaso.navgesture.ui.theme.success
-import com.vijayyaso.navgesture.ui.theme.warning
 
 /** The answer to why the app was opened, with the one action the current state needs. */
 @Composable
@@ -54,6 +57,7 @@ internal fun StatusBlock(
     onTurnOn: () -> Unit,
 ) {
     val context = LocalContext.current
+    val working = status == ServiceStatus.WORKING
     val title = when (status) {
         ServiceStatus.OFF -> R.string.status_off
         ServiceStatus.STOPPED -> R.string.status_stopped
@@ -64,58 +68,63 @@ internal fun StatusBlock(
         ServiceStatus.STOPPED -> R.string.status_stopped_body
         ServiceStatus.WORKING -> workingBody(configuration)
     }
-    Card(
+    val (badge, glyph) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .clip(TileShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(20.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .background(if (status == ServiceStatus.WORKING) success else warning, CircleShape),
-                )
-                Text(
-                    text = stringResource(title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .padding(start = 10.dp)
-                        .testTag(TestTags.SERVICE_STATUS),
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(badge, CircleShape),
+            ) {
+                Icon(
+                    imageVector = if (working) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = glyph,
+                    modifier = Modifier.size(26.dp),
                 )
             }
             Text(
-                text = stringResource(body),
-                style = MaterialTheme.typography.bodyMedium,
+                text = stringResource(title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .padding(start = 14.dp)
+                    .testTag(TestTags.SERVICE_STATUS),
+            )
+        }
+        Text(
+            text = stringResource(body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!working) {
+            Button(
+                onClick = onTurnOn,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(TestTags.STATUS_TURN_ON),
+            ) {
+                Text(stringResource(if (status == ServiceStatus.OFF) R.string.action_turn_on else R.string.action_fix))
+            }
+        }
+        // Restricted settings arrived in Android 13, for apps installed outside a store.
+        if (status == ServiceStatus.OFF && restrictedSettingsApply) {
+            Text(
+                text = stringResource(R.string.status_restricted_hint),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            when (status) {
-                ServiceStatus.OFF -> {
-                    Button(onClick = onTurnOn, modifier = Modifier.testTag(TestTags.STATUS_TURN_ON)) {
-                        Text(stringResource(R.string.action_turn_on))
-                    }
-                    // Restricted settings arrived in Android 13, for apps installed outside a store.
-                    if (restrictedSettingsApply) {
-                        Text(
-                            text = stringResource(R.string.status_restricted_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(onClick = { openAppInfo(context) }) {
-                            Text(stringResource(R.string.action_open_app_info))
-                        }
-                    }
-                }
-                ServiceStatus.STOPPED -> Button(onClick = onTurnOn, modifier = Modifier.testTag(TestTags.STATUS_TURN_ON)) {
-                    Text(stringResource(R.string.action_fix))
-                }
-                ServiceStatus.WORKING -> Unit
+            TextButton(onClick = { openAppInfo(context) }) {
+                Text(stringResource(R.string.action_open_app_info))
             }
         }
     }

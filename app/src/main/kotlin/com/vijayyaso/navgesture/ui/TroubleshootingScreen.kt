@@ -17,9 +17,10 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,62 +41,68 @@ internal fun TroubleshootingScreen(model: AppModel) {
     val context = LocalContext.current
     LaunchedEffect(Unit) { model.refresh() }
     val diagnostics = model.diagnostics
-    SectionHeader(stringResource(R.string.section_known_fixes))
-    InfoRow(
-        title = stringResource(R.string.fix_stopped_title),
-        supporting = stringResource(R.string.fix_stopped_body),
-        actions = {
-            OutlinedButton(onClick = { model.requestAccessibility(context) }) {
-                Text(stringResource(R.string.action_open))
-            }
-        },
-    )
-    if (model.restrictedSettingsApply) {
+    SettingsGroup(title = stringResource(R.string.section_known_fixes)) {
         InfoRow(
-            title = stringResource(R.string.fix_greyed_out_title),
-            supporting = stringResource(R.string.fix_greyed_out_body),
+            title = stringResource(R.string.fix_stopped_title),
+            supporting = stringResource(R.string.fix_stopped_body),
             actions = {
-                OutlinedButton(onClick = { openAppInfo(context) }) {
-                    Text(stringResource(R.string.action_open_app_info))
+                FilledTonalButton(onClick = { model.requestAccessibility(context) }) {
+                    Text(stringResource(R.string.action_open))
                 }
             },
         )
+        if (model.restrictedSettingsApply) {
+            InfoRow(
+                title = stringResource(R.string.fix_greyed_out_title),
+                supporting = stringResource(R.string.fix_greyed_out_body),
+                actions = {
+                    FilledTonalButton(onClick = { openAppInfo(context) }) {
+                        Text(stringResource(R.string.action_open_app_info))
+                    }
+                },
+            )
+        }
     }
 
-    SectionHeader(stringResource(R.string.section_this_device))
-    DeviceRows(diagnostics)
+    SettingsGroup(title = stringResource(R.string.section_this_device)) {
+        DeviceRows(diagnostics)
+    }
 
-    SectionHeader(stringResource(R.string.section_last_problems))
-    val none = stringResource(R.string.diag_none)
-    ValueRow(stringResource(R.string.diag_last_failure), diagnostics.lastGlobalActionFailure ?: none)
-    ValueRow(stringResource(R.string.label_last_app_switch_failure), diagnostics.lastAppSwitchFailure ?: none)
-    ValueRow(
-        label = stringResource(R.string.diag_last_circle_to_search_failure),
-        value = diagnostics.lastCircleToSearchFailure ?: none,
-        valueTag = TestTags.DIAG_CIRCLE_TO_SEARCH_FAILURE,
-    )
-    diagnostics.lastRecordedFailure?.let { failure ->
-        InfoRow(title = stringResource(R.string.diag_recorded_failure))
-        Text(
-            text = failure.take(MAX_FAILURE_CHARS),
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 16.dp),
+    SettingsGroup(title = stringResource(R.string.section_last_problems)) {
+        val none = stringResource(R.string.diag_none)
+        ValueRow(stringResource(R.string.diag_last_failure), diagnostics.lastGlobalActionFailure ?: none)
+        ValueRow(stringResource(R.string.label_last_app_switch_failure), diagnostics.lastAppSwitchFailure ?: none)
+        ValueRow(
+            label = stringResource(R.string.diag_last_circle_to_search_failure),
+            value = diagnostics.lastCircleToSearchFailure ?: none,
+            valueTag = TestTags.DIAG_CIRCLE_TO_SEARCH_FAILURE,
         )
+        diagnostics.lastRecordedFailure?.let { failure ->
+            LogBlock(stringResource(R.string.diag_recorded_failure), failure)
+        }
+        diagnostics.serviceHistory?.let { history ->
+            LogBlock(stringResource(R.string.diag_service_history), history)
+        }
     }
-    diagnostics.serviceHistory?.let { history ->
-        InfoRow(title = stringResource(R.string.diag_service_history))
-        Text(
-            text = history.take(MAX_FAILURE_CHARS),
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        )
-    }
-    TextButton(onClick = model::refresh, modifier = Modifier.padding(horizontal = 4.dp)) {
+
+    TextButton(onClick = model::refresh, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
         Text(stringResource(R.string.action_refresh_diagnostics))
     }
-    FootNote(stringResource(R.string.diag_local_only))
+    FootNote(stringResource(R.string.diag_local_only), Modifier.padding(horizontal = 16.dp))
+}
+
+/** A title with a log under it, kept as one child so the card draws no line between them. */
+@Composable
+private fun LogBlock(title: String, text: String) {
+    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+        InfoRow(title = title)
+        Text(
+            text = text.take(MAX_FAILURE_CHARS),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
 }
 
 @Composable

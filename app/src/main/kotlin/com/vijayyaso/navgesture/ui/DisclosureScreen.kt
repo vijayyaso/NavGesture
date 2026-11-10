@@ -20,7 +20,7 @@ package com.vijayyaso.navgesture.ui
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -41,33 +41,47 @@ import com.vijayyaso.navgesture.R
  */
 @Composable
 internal fun DisclosureScreen(onAgree: () -> Unit, onNotNow: () -> Unit) {
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.disclosure_intro),
-            style = MaterialTheme.typography.bodyLarge,
-        )
+    Text(
+        text = stringResource(R.string.disclosure_intro),
+        style = MaterialTheme.typography.bodyLarge,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+    )
+    SettingsGroup {
         Part(R.string.disclosure_reads_title, R.string.disclosure_reads_body)
         Part(R.string.disclosure_does_title, R.string.disclosure_does_body)
         Part(R.string.disclosure_never_title, R.string.disclosure_never_body)
-        // Wraps onto a second line rather than squeezing a button at a large font.
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onAgree, modifier = Modifier.testTag(TestTags.DISCLOSURE_AGREE)) {
-                Text(stringResource(R.string.disclosure_agree))
-            }
-            OutlinedButton(onClick = onNotNow, modifier = Modifier.testTag(TestTags.DISCLOSURE_NOT_NOW)) {
-                Text(stringResource(R.string.disclosure_not_now))
-            }
-        }
-        SupportingText(stringResource(R.string.disclosure_footnote))
     }
+    // Full width and stacked, so a large font never squeezes either button.
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+    ) {
+        Button(
+            onClick = onAgree,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(TestTags.DISCLOSURE_AGREE),
+        ) {
+            Text(stringResource(R.string.disclosure_agree))
+        }
+        OutlinedButton(
+            onClick = onNotNow,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(TestTags.DISCLOSURE_NOT_NOW),
+        ) {
+            Text(stringResource(R.string.disclosure_not_now))
+        }
+    }
+    FootNote(stringResource(R.string.disclosure_footnote), Modifier.padding(horizontal = 4.dp))
 }
 
 @Composable
 private fun Part(@StringRes title: Int, @StringRes body: Int) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(16.dp),
+    ) {
         Text(text = stringResource(title), style = MaterialTheme.typography.titleMedium)
         SupportingText(stringResource(body))
     }

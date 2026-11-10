@@ -24,17 +24,19 @@ import com.vijayyaso.navgesture.R
 @Composable
 internal fun SetupScreen(model: AppModel) {
     val checklist = model.checklist
-    SectionHeader(stringResource(R.string.setup_group_required))
-    SetupRows(checklist.required, model)
-    SectionHeader(stringResource(R.string.setup_group_recommended))
-    SetupRows(checklist.recommended, model)
-    FootNote(
-        stringResource(
+    SettingsGroup(title = stringResource(R.string.setup_group_required)) {
+        SetupRows(checklist.required, model)
+    }
+    SettingsGroup(
+        title = stringResource(R.string.setup_group_recommended),
+        footer = stringResource(
             if (model.diagnostics.navigationIntegrationAvailable) {
                 R.string.setup_footer_hyperos
             } else {
                 R.string.setup_footer
             },
         ),
-    )
+    ) {
+        SetupRows(checklist.recommended, model)
+    }
 }

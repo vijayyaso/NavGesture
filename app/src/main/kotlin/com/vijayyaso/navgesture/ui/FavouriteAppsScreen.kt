@@ -68,37 +68,38 @@ internal fun FavouriteAppsScreen() {
         scope.launch { store.set(updated) }
     }
 
-    SectionHeader(stringResource(R.string.section_favourites))
-    if (chosen.isEmpty()) {
-        FootNote(stringResource(R.string.favourites_empty))
-    }
-    chosen.forEachIndexed { index, packageName ->
-        ListItem(
-            leadingContent = { AppIconImage(appIcons[packageName]) },
-            headlineContent = { Text(labels[packageName] ?: packageName) },
-            trailingContent = {
-                Row {
-                    IconButton(
-                        onClick = { save(FavouriteList.moveUp(chosen, index)) },
-                        enabled = index > 0,
-                    ) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowUp,
-                            contentDescription = stringResource(R.string.action_move_up),
-                        )
+    SettingsGroup(title = stringResource(R.string.section_favourites)) {
+        if (chosen.isEmpty()) {
+            FootNote(stringResource(R.string.favourites_empty))
+        }
+        chosen.forEachIndexed { index, packageName ->
+            ListItem(
+                leadingContent = { AppIconImage(appIcons[packageName]) },
+                headlineContent = { Text(labels[packageName] ?: packageName) },
+                trailingContent = {
+                    Row {
+                        IconButton(
+                            onClick = { save(FavouriteList.moveUp(chosen, index)) },
+                            enabled = index > 0,
+                        ) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowUp,
+                                contentDescription = stringResource(R.string.action_move_up),
+                            )
+                        }
+                        IconButton(onClick = { save(FavouriteList.toggle(chosen, packageName)) }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.action_remove_favourite),
+                            )
+                        }
                     }
-                    IconButton(onClick = { save(FavouriteList.toggle(chosen, packageName)) }) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.action_remove_favourite),
-                        )
-                    }
-                }
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
     }
-
-    SectionHeader(stringResource(R.string.section_all_apps))
-    AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
+    SettingsGroup(title = stringResource(R.string.section_all_apps)) {
+        AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
+    }
 }

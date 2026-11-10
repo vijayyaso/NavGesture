@@ -17,84 +17,98 @@
 
 package com.vijayyaso.navgesture.ui
 
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.CornerShortcut
+import com.vijayyaso.navgesture.ui.theme.IconTint
 
 @Composable
 internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
     val context = LocalContext.current
     val configuration = model.configuration
-    ToggleRow(
-        label = stringResource(R.string.label_edge_app_list),
-        checked = configuration.edgeAppListEnabled,
-        supporting = stringResource(R.string.edge_app_list_body),
-        tag = TestTags.SWITCH_EDGE_APP_LIST,
-    ) { updated -> model.update { it.copy(edgeAppListEnabled = updated) } }
-    NavigationRow(
-        title = stringResource(R.string.section_favourite_apps),
-        tag = TestTags.ROW_FAVOURITE_APPS,
-        onClick = onOpenFavourites,
-    )
-    SectionHeader(stringResource(R.string.section_list_style))
-    AppListStyleChoice(configuration.appListStyle) { style ->
-        model.update { it.copy(appListStyle = style) }
+    SettingsGroup {
+        ToggleRow(
+            label = stringResource(R.string.label_edge_app_list),
+            checked = configuration.edgeAppListEnabled,
+            supporting = stringResource(R.string.edge_app_list_body),
+            tag = TestTags.SWITCH_EDGE_APP_LIST,
+        ) { updated -> model.update { it.copy(edgeAppListEnabled = updated) } }
+        NavigationRow(
+            title = stringResource(R.string.section_favourite_apps),
+            tag = TestTags.ROW_FAVOURITE_APPS,
+            icon = GroupIcon(Icons.Filled.Star, IconTint.ORANGE),
+            onClick = onOpenFavourites,
+        )
     }
-    ThresholdSlider(
-        label = stringResource(R.string.label_drag_step),
-        value = configuration.switcherStepDp,
-        range = DRAG_STEP_RANGE,
-        formatter = { stringResource(R.string.value_dp, it) },
-        supporting = stringResource(R.string.label_drag_step_body),
-    ) { updated -> model.update { it.copy(switcherStepDp = updated) } }
-    ToggleRow(
-        label = stringResource(R.string.label_adaptive_speed),
-        checked = configuration.switcherAdaptiveSpeed,
-        supporting = stringResource(R.string.label_adaptive_speed_body),
-        tag = TestTags.SWITCH_ADAPTIVE_SPEED,
-    ) { updated -> model.update { it.copy(switcherAdaptiveSpeed = updated) } }
-
-    SectionHeader(stringResource(R.string.section_corner_shortcuts))
-    FootNote(stringResource(R.string.corner_shortcuts_body))
-    CornerShortcutRow(
-        title = stringResource(R.string.label_left_corner),
-        shortcut = configuration.leftCornerShortcut,
-        tag = TestTags.ROW_LEFT_CORNER,
-    ) { picked -> model.update { it.copy(leftCornerShortcut = picked) } }
-    CornerShortcutRow(
-        title = stringResource(R.string.label_right_corner),
-        shortcut = configuration.rightCornerShortcut,
-        tag = TestTags.ROW_RIGHT_CORNER,
-    ) { picked -> model.update { it.copy(rightCornerShortcut = picked) } }
-    SectionHeader(stringResource(R.string.section_needs))
-    InfoRow(
-        title = stringResource(R.string.label_usage_access),
-        supporting = stringResource(
-            if (model.usageAccess) R.string.label_usage_access_granted else R.string.label_usage_access_missing,
-        ),
-        supportingTag = TestTags.USAGE_ACCESS,
-        trailing = if (model.usageAccess) {
-            null
-        } else {
-            {
-                OutlinedButton(onClick = { openUsageAccess(context) }) {
-                    Text(stringResource(R.string.action_grant_usage_access))
+    SettingsGroup(title = stringResource(R.string.section_list_style)) {
+        AppListStyleChoice(configuration.appListStyle) { style ->
+            model.update { it.copy(appListStyle = style) }
+        }
+        ThresholdSlider(
+            label = stringResource(R.string.label_drag_step),
+            value = configuration.switcherStepDp,
+            range = DRAG_STEP_RANGE,
+            formatter = { stringResource(R.string.value_dp, it) },
+            supporting = stringResource(R.string.label_drag_step_body),
+        ) { updated -> model.update { it.copy(switcherStepDp = updated) } }
+        ToggleRow(
+            label = stringResource(R.string.label_adaptive_speed),
+            checked = configuration.switcherAdaptiveSpeed,
+            supporting = stringResource(R.string.label_adaptive_speed_body),
+            tag = TestTags.SWITCH_ADAPTIVE_SPEED,
+        ) { updated -> model.update { it.copy(switcherAdaptiveSpeed = updated) } }
+    }
+    SettingsGroup(
+        title = stringResource(R.string.section_corner_shortcuts),
+        footer = stringResource(R.string.corner_shortcuts_body),
+    ) {
+        CornerShortcutRow(
+            title = stringResource(R.string.label_left_corner),
+            shortcut = configuration.leftCornerShortcut,
+            tag = TestTags.ROW_LEFT_CORNER,
+        ) { picked -> model.update { it.copy(leftCornerShortcut = picked) } }
+        CornerShortcutRow(
+            title = stringResource(R.string.label_right_corner),
+            shortcut = configuration.rightCornerShortcut,
+            tag = TestTags.ROW_RIGHT_CORNER,
+        ) { picked -> model.update { it.copy(rightCornerShortcut = picked) } }
+    }
+    // The explainer is the footer, outside the tagged status text that the status-refresh
+    // suite compares exactly.
+    SettingsGroup(
+        title = stringResource(R.string.section_needs),
+        footer = stringResource(R.string.usage_access_explainer),
+    ) {
+        InfoRow(
+            title = stringResource(R.string.label_usage_access),
+            supporting = stringResource(
+                if (model.usageAccess) R.string.label_usage_access_granted else R.string.label_usage_access_missing,
+            ),
+            supportingTag = TestTags.USAGE_ACCESS,
+            trailing = if (model.usageAccess) {
+                null
+            } else {
+                {
+                    FilledTonalButton(onClick = { openUsageAccess(context) }) {
+                        Text(stringResource(R.string.action_grant_usage_access))
+                    }
                 }
-            }
-        },
-    )
-    // Its own line, outside the tagged status text that the status-refresh suite compares exactly.
-    FootNote(stringResource(R.string.usage_access_explainer))
-    SectionHeader(stringResource(R.string.section_gestures_it_adds))
-    InfoRow(
-        title = stringResource(R.string.gesture_switch_apps_name),
-        supporting = stringResource(R.string.gesture_switch_apps_how),
-    )
-    LastProblem(model.diagnostics.lastAppSwitchFailure)
+            },
+        )
+    }
+    SettingsGroup(title = stringResource(R.string.section_gestures_it_adds)) {
+        InfoRow(
+            title = stringResource(R.string.gesture_switch_apps_name),
+            supporting = stringResource(R.string.gesture_switch_apps_how),
+        )
+        LastProblem(model.diagnostics.lastAppSwitchFailure)
+    }
 }
 
 /** Sideways travel per app, from twitchy to calm. */

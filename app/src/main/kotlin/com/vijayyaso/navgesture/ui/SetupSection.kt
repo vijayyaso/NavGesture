@@ -18,7 +18,7 @@
 package com.vijayyaso.navgesture.ui
 
 import android.os.Build
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -150,7 +150,7 @@ private fun StepRow(
             actionable && (open != null || onConfirm != null) -> {
                 {
                     open?.let { (label, action) ->
-                        OutlinedButton(onClick = action) { Text(stringResource(label)) }
+                        FilledTonalButton(onClick = action) { Text(stringResource(label)) }
                     }
                     if (item.state == StepState.UNVERIFIED && onConfirm != null) {
                         TextButton(onClick = { onConfirm(true) }) {

@@ -36,26 +36,29 @@ internal fun UpdatesScreenContent(updates: UpdateViewModel) {
     val context = LocalContext.current
     val state by updates.state.collectAsState()
     Column(modifier = Modifier.testTag(TestTags.SCREEN_UPDATES)) {
-        ToggleRow(
-            label = stringResource(R.string.update_switch),
-            checked = state.enabled,
-            tag = TestTags.SWITCH_UPDATE_CHECK,
-            onChange = updates::setEnabled,
-        )
-        FootNote(stringResource(R.string.update_switch_body))
+        SettingsGroup(footer = stringResource(R.string.update_switch_body)) {
+            ToggleRow(
+                label = stringResource(R.string.update_switch),
+                checked = state.enabled,
+                tag = TestTags.SWITCH_UPDATE_CHECK,
+                onChange = updates::setEnabled,
+            )
+        }
         if (!state.enabled) return@Column
-        UpdateStatusRow(
-            state = state,
-            onCheckNow = updates::checkNow,
-            onInstall = updates::downloadAndInstall,
-            onAllowInstalls = {
-                context.startFirst(
-                    Intent(
-                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        "package:${context.packageName}".toUri(),
-                    ),
-                )
-            },
-        )
+        SettingsGroup {
+            UpdateStatusRow(
+                state = state,
+                onCheckNow = updates::checkNow,
+                onInstall = updates::downloadAndInstall,
+                onAllowInstalls = {
+                    context.startFirst(
+                        Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            "package:${context.packageName}".toUri(),
+                        ),
+                    )
+                },
+            )
+        }
     }
 }
