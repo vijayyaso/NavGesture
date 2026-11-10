@@ -199,6 +199,8 @@ data class GestureConfiguration(
     val appListStyle: AppListStyle = AppListStyle.DRAG,
     /** Sideways travel that moves the app list selection by one app. */
     val switcherStepDp: Float = SwitcherSelection.DEFAULT_STEP_DP,
+    /** A fast slide moves through more apps than a slow one, like a laptop trackpad. */
+    val switcherAdaptiveSpeed: Boolean = true,
     /** What a swipe up and inward from the bottom-left corner does. */
     val leftCornerShortcut: CornerShortcut = CornerShortcut.None,
     /** What a swipe up and inward from the bottom-right corner does. */

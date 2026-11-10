@@ -120,6 +120,7 @@ internal class EdgeTouchOverlay(
                 density = geometry.density,
                 style = configuration.appListStyle,
                 stepDp = configuration.switcherStepDp,
+                adaptiveSpeed = configuration.switcherAdaptiveSpeed,
             ) { feedback ->
                 if (configuration.hapticFeedbackEnabled) {
                     strips.values.firstOrNull()?.performHapticFeedback(feedback)

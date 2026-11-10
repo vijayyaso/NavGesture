@@ -122,6 +122,8 @@
     <string name="list_style_both_body">Slide to pick and lift to open. Or lift without sliding, and the list stays open for touching.</string>
     <string name="label_drag_step">Drag step</string>
     <string name="label_drag_step_body">How far you slide to move to the next app. Larger is calmer.</string>
+    <string name="label_adaptive_speed">Speed-adaptive sliding</string>
+    <string name="label_adaptive_speed_body">Slide slowly to move one app at a time. Slide quickly to jump across many apps, like a laptop trackpad.</string>
     <string name="section_corner_shortcuts">Corner shortcuts</string>
     <string name="corner_shortcuts_body">Swipe up and inward from a bottom corner, at a slant, to run its shortcut.</string>
     <string name="label_left_corner">Bottom-left corner</string>

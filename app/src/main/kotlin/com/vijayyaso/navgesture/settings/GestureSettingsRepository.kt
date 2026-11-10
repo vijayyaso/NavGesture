@@ -63,6 +63,7 @@ class GestureSettingsRepository(private val context: Context) {
             preferences[EDGE_APP_LIST] = updated.edgeAppListEnabled
             preferences[APP_LIST_STYLE] = updated.appListStyle.name
             preferences[SWITCHER_STEP_DP] = updated.switcherStepDp
+            preferences[SWITCHER_ADAPTIVE_SPEED] = updated.switcherAdaptiveSpeed
             preferences[LEFT_CORNER] = updated.leftCornerShortcut.id
             preferences[RIGHT_CORNER] = updated.rightCornerShortcut.id
             preferences[LEFT_EDGE_BACK] = updated.leftEdgeBackEnabled
@@ -95,6 +96,7 @@ class GestureSettingsRepository(private val context: Context) {
             appListStyle = (debugOverride(APP_LIST_STYLE_OVERRIDE) ?: preferences[APP_LIST_STYLE])
                 ?.let(AppListStyle::decode) ?: defaults.appListStyle,
             switcherStepDp = preferences[SWITCHER_STEP_DP] ?: defaults.switcherStepDp,
+            switcherAdaptiveSpeed = preferences[SWITCHER_ADAPTIVE_SPEED] ?: defaults.switcherAdaptiveSpeed,
             leftCornerShortcut = (debugOverride(LEFT_CORNER_OVERRIDE) ?: preferences[LEFT_CORNER])
                 ?.let(CornerShortcut::decode) ?: defaults.leftCornerShortcut,
             rightCornerShortcut = (debugOverride(RIGHT_CORNER_OVERRIDE) ?: preferences[RIGHT_CORNER])
@@ -140,6 +142,7 @@ class GestureSettingsRepository(private val context: Context) {
         val EDGE_APP_LIST = booleanPreferencesKey("edge_app_list_enabled")
         val APP_LIST_STYLE = stringPreferencesKey("app_list_style")
         val SWITCHER_STEP_DP = floatPreferencesKey("switcher_step_dp")
+        val SWITCHER_ADAPTIVE_SPEED = booleanPreferencesKey("switcher_adaptive_speed")
         val LEFT_CORNER = stringPreferencesKey("left_corner_shortcut")
         val RIGHT_CORNER = stringPreferencesKey("right_corner_shortcut")
         val LEFT_EDGE_BACK = booleanPreferencesKey("left_edge_back_enabled")

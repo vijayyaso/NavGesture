@@ -33,6 +33,7 @@ internal object TestTags {
     const val ROW_TROUBLESHOOTING = "row_troubleshooting"
     const val ROW_ABOUT = "row_about"
     const val SWITCH_EDGE_APP_LIST = "switch_edge_app_list"
+    const val SWITCH_ADAPTIVE_SPEED = "switch_adaptive_speed"
     const val EDGE_AREA_OVERLAY = "edge_area_overlay"
     const val EDGE_AREA_ADJUST = "edge_area_adjust"
     const val EDGE_AREA_VALUE = "edge_area_value"

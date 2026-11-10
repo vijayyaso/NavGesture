@@ -51,6 +51,12 @@ internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
         formatter = { stringResource(R.string.value_dp, it) },
         supporting = stringResource(R.string.label_drag_step_body),
     ) { updated -> model.update { it.copy(switcherStepDp = updated) } }
+    ToggleRow(
+        label = stringResource(R.string.label_adaptive_speed),
+        checked = configuration.switcherAdaptiveSpeed,
+        supporting = stringResource(R.string.label_adaptive_speed_body),
+        tag = TestTags.SWITCH_ADAPTIVE_SPEED,
+    ) { updated -> model.update { it.copy(switcherAdaptiveSpeed = updated) } }
 
     SectionHeader(stringResource(R.string.section_corner_shortcuts))
     FootNote(stringResource(R.string.corner_shortcuts_body))

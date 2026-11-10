@@ -28,6 +28,7 @@ import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.FavouriteList
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SwitcherSelection
+import com.vijayyaso.navgesture.gesture.SlideTravel
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
 import kotlinx.coroutines.CancellationException
@@ -53,6 +54,7 @@ internal class EdgeSwitcherController(
     private val density: Float,
     private val style: AppListStyle,
     private val stepDp: Float,
+    private val adaptiveSpeed: Boolean,
     private val haptic: (Int) -> Unit,
 ) {
     private val context = switcher.context
@@ -65,6 +67,8 @@ internal class EdgeSwitcherController(
     private var recents = true
     private var origin: TouchSample? = null
     private var latest: TouchSample? = null
+    /** Sideways travel since the open point, with speed gain when that setting is on. */
+    private var travel = SlideTravel(adaptiveSpeed)
     /** Both lists are resolved at prepare time; the drag direction picks one at open. */
     private var recentsApps: List<PanelApp>? = null
     /** The first recent app is the app in front now: shown dimmed, never selectable. */
@@ -110,6 +114,9 @@ internal class EdgeSwitcherController(
         if (action.edge != ScreenEdge.BOTTOM || opened) return
         origin = action.origin
         latest = action.origin
+        travel = SlideTravel(adaptiveSpeed).apply {
+            start(action.origin.xPx / density, action.origin.timestampMs)
+        }
         recents = action.recents
         apps = if (recents) recentsApps else favouriteApps
         steps = 0
@@ -147,6 +154,7 @@ internal class EdgeSwitcherController(
             cancel()
             return
         }
+        travel.add(sample.xPx / density, sample.timestampMs)
         if (style != AppListStyle.TAP) updateSelection()
     }
 
@@ -156,6 +164,7 @@ internal class EdgeSwitcherController(
             return
         }
         latest = sample
+        travel.add(sample.xPx / density, sample.timestampMs)
         if (style != AppListStyle.TAP) updateSelection()
         if (!style.opensOnLift(steps)) {
             touchMode = true
@@ -294,9 +303,8 @@ internal class EdgeSwitcherController(
     private fun startIndex(): Int = if (recents && recentsHasCurrent) 1 else 0
 
     private fun updateSelection() {
-        val start = origin ?: return
-        val sample = latest ?: return
-        steps = SwitcherSelection.steps((sample.xPx - start.xPx) / density, stepDp, steps)
+        if (origin == null) return
+        steps = SwitcherSelection.steps(travel.dp, stepDp, steps)
         val effective = style.effectiveSteps(steps)
         selected = SwitcherSelection.indexFor(effective, apps?.size ?: 0, startIndex())
         // What the row highlights is what a lift opens: in Both, nothing until a step is slid.

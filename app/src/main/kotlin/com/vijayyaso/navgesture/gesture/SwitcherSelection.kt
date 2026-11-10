@@ -67,3 +67,72 @@ object SwitcherSelection {
         val capacity: Int get() = columns * rows
     }
 }
+
+/**
+ * The sideways travel that drives the app list, with speed-based gain like a laptop trackpad:
+ * a slow slide moves through the apps slowly, a quick one covers many apps for the same
+ * distance. With [adaptive] off, the travel is the plain finger distance.
+ *
+ * Gain only scales each movement, so a slow slide back is not undone by a fast one out: the
+ * travel is summed piece by piece, not worked out from the start point.
+ */
+class SlideTravel(private val adaptive: Boolean) {
+    private var lastXDp = 0f
+    private var lastTimeMs = 0L
+    private var started = false
+    /** Smoothed finger speed, dp per second. */
+    private var speedDpS = 0f
+
+    /** Travel so far in dp, after gain. */
+    var dp = 0f
+        private set
+
+    fun start(xDp: Float, timeMs: Long) {
+        lastXDp = xDp
+        lastTimeMs = timeMs
+        speedDpS = 0f
+        dp = 0f
+        started = true
+    }
+
+    fun add(xDp: Float, timeMs: Long) {
+        if (!started) {
+            start(xDp, timeMs)
+            return
+        }
+        val dx = xDp - lastXDp
+        val dtMs = (timeMs - lastTimeMs).coerceIn(0L, MAX_GAP_MS)
+        lastXDp = xDp
+        lastTimeMs = timeMs
+        if (!adaptive) {
+            dp += dx
+            return
+        }
+        if (dtMs > 0) {
+            // A short moving average, so one jittery event does not spike the gain.
+            val instant = abs(dx) * 1000f / dtMs
+            val weight = dtMs / (dtMs + SMOOTHING_MS)
+            speedDpS += (instant - speedDpS) * weight
+        }
+        dp += dx * gain(speedDpS)
+    }
+
+    companion object {
+        /** At or below this speed the gain is [SLOW_GAIN]: careful slides are precise. */
+        const val SLOW_DP_S = 200f
+        /** At or above this speed the gain is [FAST_GAIN]. */
+        const val FAST_DP_S = 1500f
+        const val SLOW_GAIN = 0.8f
+        const val FAST_GAIN = 3f
+        private const val SMOOTHING_MS = 40f
+        /** A pause longer than this counts as this long, so speed falls to the slow gain. */
+        private const val MAX_GAP_MS = 100L
+
+        /** A smooth S-curve from [SLOW_GAIN] to [FAST_GAIN] over the speed range. */
+        fun gain(speedDpS: Float): Float {
+            val t = ((speedDpS - SLOW_DP_S) / (FAST_DP_S - SLOW_DP_S)).coerceIn(0f, 1f)
+            val eased = t * t * (3f - 2f * t)
+            return SLOW_GAIN + (FAST_GAIN - SLOW_GAIN) * eased
+        }
+    }
+}
