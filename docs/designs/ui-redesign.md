@@ -185,7 +185,8 @@ its rows.
     it.
 *   **`IconBadge(icon: GroupIcon)`** — new. A 30 dp rounded square (8 dp corners)
     in the tint colour, with an 18 dp white icon. Used as the leading element
-    of navigation rows and on tiles.
+    of navigation rows; tiles use a 36 dp version (corners and glyph scale
+    with it).
 *   **`FeatureTile(...)`** — new (see Home).
 *   `SectionHeader` becomes the group title style (grey `labelLarge`, not
     blue, start padding 32 dp so it lines up with the text inside a card).
@@ -355,7 +356,9 @@ become `SettingsGroup(title) { rows }`, and its standalone `FootNote`s become
 the group's footer where they explain that group.
 
 Each line below lists one screen's groups in order. A group is written as
-**Title**: its rows; *footer: …* names the grey text under that card. A
+**Title**: its rows; *footer: …* names the grey text under that card.
+Titles here are short names; the screen shows the existing string for each
+(for example **Edges** shows "Touch area"). A
 group with no title is written as **(no title)**.
 
 *   **Setup** — **Required**: required steps. **Recommended**: recommended
@@ -462,7 +465,8 @@ removed or renamed. No new test tag is needed.
     delete `SplitSwitchRow`.
 4.  `main/kotlin/com/vijayyaso/navgesture/ui/MainActivity.kt` — no app bar on
     home; `CenterAlignedTopAppBar` elsewhere with `nav_back`; scaffold
-    container colour = background; the large home title.
+    container colour = background. (The large home title is drawn by
+    `HomeScreen.kt`.)
 5.  `main/kotlin/com/vijayyaso/navgesture/ui/HomeScreen.kt` — status card,
     setup group, tile grid built from `HomeTile` specs (including
     `Store.homeTile`), "More" group.
@@ -482,8 +486,8 @@ removed or renamed. No new test tag is needed.
     `homeTile(onOpen): HomeTile?`.
 10. `play/kotlin/com/vijayyaso/navgesture/ui/Store.kt` — same API, returns
     `null`.
-11. `github/kotlin/com/vijayyaso/navgesture/ui/UpdatesScreen.kt`,
-    `UpdateRows.kt` — groups; buttons keep their tags.
+11. `github/kotlin/com/vijayyaso/navgesture/ui/UpdatesScreen.kt` — groups.
+    `UpdateRows.kt` is not changed (its buttons and tags already fit).
 
 ### Files not changed
 
