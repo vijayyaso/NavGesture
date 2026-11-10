@@ -315,9 +315,12 @@ instead (Verification 3 and 4).
 9.  `main/res/values/strings.xml` — add `corner_app_shortcut_named`,
     `corner_app_shortcut_missing`, `corner_section_app_lists`,
     `corner_section_phone_actions`, `corner_section_app_shortcuts`,
-    `corner_search_apps`. Change `corner_open_app` from "Open an app…" to
-    "Open an app" (now the section title). Delete `corner_pick_app` (only
-    the dialog used it).
+    `corner_search_apps`, `corner_app_shortcuts_body` (the App shortcuts
+    footer: private and run-time shortcuts cannot be shown),
+    `corner_expanded` / `corner_collapsed` (the app rows' state
+    description). Change `corner_open_app` from "Open an app…" to "Open an
+    app" (now the section title). Delete `corner_pick_app` and
+    `action_cancel` (only the dialog used them).
 
 Not changed: `TestTags.kt` (the two row tags stay), `e2e/`,
 `GestureSettingsRepository.kt` (stores the id string as today).
