@@ -77,6 +77,16 @@ enum class AppListStyle {
     /** Whether the row highlights an app while the finger is down; what shows is what opens. */
     fun showsSelection(steps: Int): Boolean = this != TAP && opensOnLift(steps)
 
+    /**
+     * The step that picks the app. Drag picks the app under step 0. Both has no pick at step 0
+     * (a lift there leaves the list open), so the first step right highlights the app already in
+     * the middle, and the next step moves on. Sliding left from 0 goes to the last app.
+     */
+    fun effectiveSteps(steps: Int): Int = when {
+        this == BOTH && steps > 0 -> steps - 1
+        else -> steps
+    }
+
     companion object {
         fun decode(stored: String?): AppListStyle =
             entries.firstOrNull { it.name == stored } ?: DRAG

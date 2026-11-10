@@ -76,6 +76,8 @@ internal class EdgeSwitcherController(
     private var touchMode = false
     private var steps = 0
     private var selected: Int? = null
+    /** The app the row last highlighted, so a tick follows each visible change. */
+    private var lastShown: Int? = null
 
     private val idleTimeout = Runnable {
         Log.i(TAG, "SWITCHER_TIMEOUT")
@@ -187,6 +189,7 @@ internal class EdgeSwitcherController(
         apps = null
         steps = 0
         selected = null
+        lastShown = null
         opened = false
         touchMode = false
         panel.hide()
@@ -294,14 +297,16 @@ internal class EdgeSwitcherController(
         val start = origin ?: return
         val sample = latest ?: return
         steps = SwitcherSelection.steps((sample.xPx - start.xPx) / density, stepDp, steps)
-        val next = SwitcherSelection.indexFor(steps, apps?.size ?: 0, startIndex())
-        if (next != selected) {
-            selected = next
-            Log.i(TAG, "SWITCHER_SELECTED $next")
+        val effective = style.effectiveSteps(steps)
+        selected = SwitcherSelection.indexFor(effective, apps?.size ?: 0, startIndex())
+        // What the row highlights is what a lift opens: in Both, nothing until a step is slid.
+        val shown = selected.takeIf { style.showsSelection(steps) }
+        if (shown != lastShown) {
+            lastShown = shown
+            Log.i(TAG, "SWITCHER_SELECTED $shown")
             haptic(HapticFeedbackConstants.CLOCK_TICK)
         }
-        // What the row highlights is what a lift opens: in Both, nothing until a step is slid.
-        panel.select(steps, selected.takeIf { style.showsSelection(steps) })
+        panel.select(effective, shown)
     }
 
     private class Loaded(

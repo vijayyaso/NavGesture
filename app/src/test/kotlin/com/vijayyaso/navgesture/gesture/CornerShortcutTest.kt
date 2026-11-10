@@ -66,4 +66,22 @@ class CornerShortcutTest {
         assertEquals(true, AppListStyle.BOTH.showsSelection(1))
         assertEquals(true, AppListStyle.BOTH.opensOnLift(-2))
     }
+
+    @Test fun `both picks the app in the middle on the first step, then moves on`() {
+        // Step 0 is "no slide" in Both, so the first step must land on the middle app.
+        assertEquals(0, AppListStyle.BOTH.effectiveSteps(0))
+        assertEquals(0, AppListStyle.BOTH.effectiveSteps(1))
+        assertEquals(1, AppListStyle.BOTH.effectiveSteps(2))
+        assertEquals(-1, AppListStyle.BOTH.effectiveSteps(-1))
+        // The apps reached: recents with the current app dimmed first, so the middle app is 1.
+        assertEquals(1, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(1), 5, 1))
+        assertEquals(2, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(2), 5, 1))
+        assertEquals(4, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(-1), 5, 1))
+    }
+
+    @Test fun `drag keeps step zero as the pick`() {
+        assertEquals(0, AppListStyle.DRAG.effectiveSteps(0))
+        assertEquals(2, AppListStyle.DRAG.effectiveSteps(2))
+        assertEquals(-3, AppListStyle.TAP.effectiveSteps(-3))
+    }
 }
