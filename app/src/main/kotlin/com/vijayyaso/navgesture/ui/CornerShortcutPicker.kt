@@ -137,16 +137,16 @@ internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
 @Composable
 private fun appShortcutLabel(shortcut: CornerShortcut.AppShortcut): String {
     val context = LocalContext.current
-    // Null while loading; an empty pair when the shortcut is gone.
-    val names by produceState<Pair<String, String>?>(initialValue = null, shortcut.id) {
+    // Null while loading; an empty list when the app no longer offers the shortcut.
+    val names by produceState<List<String>?>(initialValue = null, shortcut.id) {
         value = withContext(Dispatchers.IO) {
             val found = StaticShortcuts.find(context, shortcut.packageName, shortcut.shortcutId)
-            if (found == null) "" to "" else appLabel(context, shortcut.packageName) to found.label
+            if (found == null) emptyList() else listOf(appLabel(context, shortcut.packageName), found.label)
         }
     }
     val loaded = names ?: return stringResource(R.string.switcher_loading)
-    if (loaded.second.isEmpty()) return stringResource(R.string.corner_app_shortcut_missing)
-    return stringResource(R.string.corner_app_shortcut_named, loaded.first, loaded.second)
+    if (loaded.isEmpty()) return stringResource(R.string.corner_app_shortcut_missing)
+    return stringResource(R.string.corner_app_shortcut_named, loaded[0], loaded[1])
 }
 
 private fun appLabel(context: Context, packageName: String): String = runCatching {
@@ -282,14 +282,19 @@ private fun AppShortcutsGroup(
                 if (shortcuts.isEmpty()) return@mapNotNull null
                 AppShortcuts(
                     app,
-                    shortcuts.map { it to StaticShortcuts.icon(context, it)?.toIconBitmap(iconPx) },
+                    shortcuts.map { shortcut ->
+                        // A drawable that throws while drawing must not take the page down.
+                        shortcut to runCatching { StaticShortcuts.icon(context, shortcut)?.toIconBitmap(iconPx) }.getOrNull()
+                    },
                 )
             }
         }
     }
     val chosenPackage = (current as? CornerShortcut.AppShortcut)?.packageName
-    // The app holding the current choice starts open; a search opens every match.
-    var open by remember { mutableStateOf(setOfNotNull(chosenPackage)) }
+    // The app holding the current choice starts open (keyed, as the settings load late); a
+    // search opens every match, and those can still be closed one by one.
+    var open by remember(chosenPackage) { mutableStateOf(setOfNotNull(chosenPackage)) }
+    var closedInSearch by remember { mutableStateOf(emptySet<String>()) }
     SettingsGroup(
         title = stringResource(R.string.corner_section_app_shortcuts),
         footer = stringResource(R.string.corner_app_shortcuts_body),
@@ -307,11 +312,17 @@ private fun AppShortcutsGroup(
                 entry.shortcuts.filter { (shortcut, _) -> shortcut.label.contains(query, ignoreCase = true) }
             }
             if (shown.isEmpty()) return@forEach
-            val expanded = query.isNotEmpty() || entry.app.packageName in open
+            val name = entry.app.packageName
+            val searching = query.isNotEmpty()
+            val expanded = if (searching) name !in closedInSearch else name in open
             // One child per app, so the card draws its lines between apps, not inside one.
             Column {
                 AppHeaderRow(entry.app, expanded) {
-                    open = if (entry.app.packageName in open) open - entry.app.packageName else open + entry.app.packageName
+                    if (searching) {
+                        closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
+                    } else {
+                        open = if (name in open) open - name else open + name
+                    }
                 }
                 if (expanded) {
                     shown.forEach { (shortcut, icon) ->

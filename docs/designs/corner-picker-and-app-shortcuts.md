@@ -141,9 +141,10 @@ object StaticShortcuts {
 *   `forPackage` reads every launcher activity of the package (queried with
     `GET_META_DATA`) and parses its `android.app.shortcuts` XML with the
     rules in Constraints above.
-*   If reading an app fails (missing resources, malformed XML, any
-    exception), that app is skipped; if one shortcut fails, only that
-    shortcut is skipped.
+*   If reading one shortcuts file fails (missing resources, malformed XML,
+    any exception), that file's shortcuts are skipped; an app with several
+    launcher activities keeps the shortcuts of its other files. A shortcut
+    that breaks Android's rules is skipped alone.
 *   `launch` calls `context.startActivities(intents)`. On an exception it
     sets `lastFailure` to `"<id>: <exception class>"` and returns false.
 *   The corner looks the shortcut up again with `find` on every use, so an
@@ -232,7 +233,8 @@ existing `label_left_corner` / `label_right_corner`.
     sorted, home apps and NavGesture removed).
 *   App shortcuts: only apps from that list with at least one shortcut
     that passes the export check. An app row expands in place; the app
-    holding the current choice starts expanded. Shortcuts load once on
+    holding the current choice starts expanded. While a search is typed,
+    every matching app is expanded; each can still be closed by a tap. Shortcuts load once on
     `Dispatchers.IO` with icons; while loading, the group shows the existing
     `switcher_loading` text.
 *   App groups are plain `Column`s inside the page scroll, as the existing
