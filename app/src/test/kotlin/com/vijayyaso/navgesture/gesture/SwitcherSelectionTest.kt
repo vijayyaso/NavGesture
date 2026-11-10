@@ -67,40 +67,32 @@ class SwitcherSelectionTest {
     }
 
     @Test
-    fun `step zero is the start index`() {
-        assertEquals(1, SwitcherSelection.indexFor(0, 5, 1))
-        assertEquals(0, SwitcherSelection.indexFor(0, 5, 0))
+    fun `step zero is the first app`() {
+        assertEquals(0, SwitcherSelection.indexFor(0, 5))
     }
 
     @Test
     fun `past the last app comes the first`() {
-        // 4 selectable apps (1..4) with the dimmed current app at 0.
-        assertEquals(4, SwitcherSelection.indexFor(3, 5, 1))
-        assertEquals(1, SwitcherSelection.indexFor(4, 5, 1))
-        assertEquals(2, SwitcherSelection.indexFor(5, 5, 1))
+        assertEquals(4, SwitcherSelection.indexFor(4, 5))
+        assertEquals(0, SwitcherSelection.indexFor(5, 5))
+        assertEquals(1, SwitcherSelection.indexFor(6, 5))
     }
 
     @Test
     fun `before the first app comes the last`() {
-        assertEquals(4, SwitcherSelection.indexFor(-1, 5, 1))
-        assertEquals(3, SwitcherSelection.indexFor(-2, 5, 1))
-    }
-
-    @Test
-    fun `favourites loop over the whole list`() {
-        assertEquals(0, SwitcherSelection.indexFor(3, 3, 0))
-        assertEquals(2, SwitcherSelection.indexFor(-1, 3, 0))
+        assertEquals(4, SwitcherSelection.indexFor(-1, 5))
+        assertEquals(3, SwitcherSelection.indexFor(-2, 5))
     }
 
     @Test
     fun `an empty list selects nothing`() {
-        assertNull(SwitcherSelection.indexFor(2, 0, 0))
+        assertNull(SwitcherSelection.indexFor(2, 0))
     }
 
     @Test
-    fun `a one-app recents list cannot select itself`() {
-        assertNull(SwitcherSelection.indexFor(2, 1, 1))
-        assertNull(SwitcherSelection.indexFor(2, 3, 4))
+    fun `a one-app list always selects that app`() {
+        assertEquals(0, SwitcherSelection.indexFor(3, 1))
+        assertEquals(0, SwitcherSelection.indexFor(-2, 1))
     }
 
     @Test

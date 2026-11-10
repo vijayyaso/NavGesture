@@ -101,11 +101,11 @@ internal class SwitcherPanelOverlay(
     }
 
     /**
-     * The drag row: [startIndex] is where step zero lands, [dimmedIndex] the current app, and
-     * [steps] the stream's step count now, so a row that arrives mid-drag does not slide in.
+     * The drag row. [steps] is the stream's step count now, so a row that arrives mid-drag
+     * does not slide in.
      */
-    fun showRow(apps: List<PanelApp>, dimmedIndex: Int?, startIndex: Int, steps: Int) {
-        view.showRow(apps, dimmedIndex, startIndex, steps)
+    fun showRow(apps: List<PanelApp>, steps: Int) {
+        view.showRow(apps, steps)
         show(touchable = false)
     }
 
@@ -113,8 +113,8 @@ internal class SwitcherPanelOverlay(
     fun select(steps: Int, index: Int?) = view.select(steps, index)
 
     /** The touch grid. Touchable only once the finger that opened it has lifted. */
-    fun showGrid(apps: List<PanelApp>, dimmedIndex: Int?, touchable: Boolean) {
-        view.showGrid(apps, dimmedIndex)
+    fun showGrid(apps: List<PanelApp>, touchable: Boolean) {
+        view.showGrid(apps)
         show(touchable)
     }
 
@@ -156,8 +156,6 @@ internal class SwitcherPanelOverlay(
 
         private var mode = Mode.MESSAGE
         private var apps: List<PanelApp> = emptyList()
-        private var dimmedIndex: Int? = null
-        private var startIndex = 0
         private var selected: Int? = null
         private var message: String? = null
 
@@ -181,11 +179,9 @@ internal class SwitcherPanelOverlay(
         }
         private val box = RectF()
 
-        fun showRow(apps: List<PanelApp>, dimmedIndex: Int?, startIndex: Int, steps: Int) {
+        fun showRow(apps: List<PanelApp>, steps: Int) {
             mode = Mode.ROW
             this.apps = apps
-            this.dimmedIndex = dimmedIndex
-            this.startIndex = startIndex
             message = null
             // A fresh row starts where the step count is now, without sliding in.
             stopAnimation()
@@ -193,10 +189,9 @@ internal class SwitcherPanelOverlay(
             position = steps.toFloat()
         }
 
-        fun showGrid(apps: List<PanelApp>, dimmedIndex: Int?) {
+        fun showGrid(apps: List<PanelApp>) {
             mode = Mode.GRID
             this.apps = apps
-            this.dimmedIndex = dimmedIndex
             message = null
             selected = null
             downCell = null
@@ -281,8 +276,7 @@ internal class SwitcherPanelOverlay(
 
         private fun drawRow(canvas: Canvas) {
             val maxVisible = (availableDp / SLOT_DP).toInt().coerceIn(1, MAX_ROW_SLOTS)
-            val span = apps.size - startIndex
-            if (apps.size <= maxVisible || span < 2) drawFixedRow(canvas) else drawRing(canvas, maxVisible, span)
+            if (apps.size <= maxVisible || apps.size < 2) drawFixedRow(canvas) else drawRing(canvas, maxVisible, apps.size)
             selected?.let { apps.getOrNull(it) }?.let {
                 drawLabel(canvas, text, it.label, width - 64f * density, width / 2f, 88f * density)
             }
@@ -295,8 +289,8 @@ internal class SwitcherPanelOverlay(
             val selectedIndex = selected
             if (selectedIndex != null) {
                 // The highlight slides between the slot it came from and the selected one.
-                val from = SwitcherSelection.indexFor(floor(position).toInt(), apps.size, startIndex)
-                val to = SwitcherSelection.indexFor(floor(position).toInt() + 1, apps.size, startIndex)
+                val from = SwitcherSelection.indexFor(floor(position).toInt(), apps.size)
+                val to = SwitcherSelection.indexFor(floor(position).toInt() + 1, apps.size)
                 val fraction = position - floor(position)
                 val slot = if (from != null && to != null && abs(to - from) == 1) {
                     from + (to - from) * fraction
@@ -306,12 +300,12 @@ internal class SwitcherPanelOverlay(
                 drawHighlight(canvas, left + (18f + slot * SLOT_DP) * density)
             }
             apps.forEachIndexed { index, app ->
-                drawIcon(canvas, app, index, left + (18f + index * SLOT_DP) * density, 18f * density, 255)
+                drawIcon(canvas, app, left + (18f + index * SLOT_DP) * density, 18f * density, 255)
             }
         }
 
         /**
-         * More apps than fit: a ring of the selectable apps with the selection fixed in the
+         * More apps than fit: a ring of the apps with the selection fixed in the
          * centre. The ring position is the unbounded step count, so looping never jumps back.
          */
         private fun drawRing(canvas: Canvas, maxVisible: Int, span: Int) {
@@ -330,10 +324,10 @@ internal class SwitcherPanelOverlay(
             for (virtual in base - half - 1..base + half + 1) {
                 val offset = virtual - position
                 if (abs(offset) > half + 1) continue
-                val index = startIndex + Math.floorMod(virtual, span)
+                val index = Math.floorMod(virtual, span)
                 // Icons fade as they near the panel's ends.
                 val fade = (1f - (abs(offset) - half).coerceIn(0f, 1f))
-                drawIcon(canvas, apps[index], index, centreX + offset * SLOT_DP * density, 18f * density, (255 * fade).toInt())
+                drawIcon(canvas, apps[index], centreX + offset * SLOT_DP * density, 18f * density, (255 * fade).toInt())
             }
             canvas.restore()
         }
@@ -345,11 +339,8 @@ internal class SwitcherPanelOverlay(
             for (index in 0 until minOf(apps.size, shape.capacity)) {
                 val cell = cellRect(index, shape, left)
                 val iconLeft = cell.centerX() - ICON_DP / 2f * density
-                drawIcon(canvas, apps[index], index, iconLeft, cell.top + 8f * density, 255)
-                val labelColour = small.color
-                if (index == dimmedIndex) small.alpha = DIMMED_ALPHA
+                drawIcon(canvas, apps[index], iconLeft, cell.top + 8f * density, 255)
                 drawLabel(canvas, small, apps[index].label, (CELL_W_DP - 6f) * density, cell.centerX(), cell.top + 70f * density)
-                small.color = labelColour
             }
         }
 
@@ -386,9 +377,9 @@ internal class SwitcherPanelOverlay(
                     val started = downCell
                     downCell = null
                     when {
-                        cell != null && cell == started && cell != dimmedIndex -> onPick?.invoke(cell)
+                        cell != null && cell == started -> onPick?.invoke(cell)
                         cell == null && started == null -> onDismiss?.invoke()
-                        // Down and up in different cells, or on the dimmed current app: ignore.
+                        // Down and up in different cells: ignore.
                         else -> Unit
                     }
                 }
@@ -403,12 +394,11 @@ internal class SwitcherPanelOverlay(
             canvas.drawRoundRect(rect, 14f * density, 14f * density, highlight)
         }
 
-        private fun drawIcon(canvas: Canvas, app: PanelApp, index: Int, left: Float, top: Float, alpha: Int) {
+        private fun drawIcon(canvas: Canvas, app: PanelApp, left: Float, top: Float, alpha: Int) {
             if (alpha <= 0) return
             val icon = app.icon
             icon.setBounds(left.toInt(), top.toInt(), (left + ICON_DP * density).toInt(), (top + ICON_DP * density).toInt())
-            val dim = if (index == dimmedIndex) DIMMED_ALPHA else 255
-            icon.alpha = alpha * dim / 255
+            icon.alpha = alpha
             icon.draw(canvas)
             icon.alpha = 255
         }
@@ -442,8 +432,6 @@ internal class SwitcherPanelOverlay(
         const val CELL_W_DP = 72f
         const val CELL_H_DP = 84f
         const val GRID_PADDING_DP = 12f
-
-        const val DIMMED_ALPHA = 102
         const val SCROLL_MS = 160L
 
         const val NOT_TOUCHABLE_FLAGS =

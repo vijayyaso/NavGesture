@@ -71,8 +71,6 @@ internal class EdgeSwitcherController(
     private var travel = SlideTravel(adaptiveSpeed)
     /** Both lists are resolved at prepare time; the drag direction picks one at open. */
     private var recentsApps: List<PanelApp>? = null
-    /** The first recent app is the app in front now: shown dimmed, never selectable. */
-    private var recentsHasCurrent = false
     private var favouriteApps: List<PanelApp>? = null
     private var apps: List<PanelApp>? = null
     private var opened = false
@@ -194,7 +192,6 @@ internal class EdgeSwitcherController(
         latest = null
         recentsApps = null
         favouriteApps = null
-        recentsHasCurrent = false
         apps = null
         steps = 0
         selected = null
@@ -247,10 +244,11 @@ internal class EdgeSwitcherController(
                     }
                     val recentList = switcher.recentApps()
                     val recentPanel = resolve(recentList.packages)
-                    // A package that failed to resolve is dropped, so check the first survived.
+                    // The app in front now is left out: switching to it does nothing. A package
+                    // that failed to resolve is dropped, so check the first one survived.
                     val hasCurrent = recentList.currentFirst &&
                         recentPanel.firstOrNull()?.packageName == recentList.packages.firstOrNull()
-                    Loaded(recentPanel, resolve(favouriteNow), hasCurrent)
+                    Loaded(if (hasCurrent) recentPanel.drop(1) else recentPanel, resolve(favouriteNow))
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -263,7 +261,6 @@ internal class EdgeSwitcherController(
             if (resolved != null) {
                 recentsApps = resolved.recents
                 favouriteApps = resolved.favourites
-                recentsHasCurrent = resolved.recentsHasCurrent
                 if (opened) {
                     // The open may have run before this lookup finished, so take the list now.
                     apps = if (recents) recentsApps else favouriteApps
@@ -287,26 +284,19 @@ internal class EdgeSwitcherController(
             list.isEmpty() -> panel.showMessage(context.getString(
                 if (recents) R.string.switcher_no_recents else R.string.switcher_no_favourites,
             ), touchMode)
-            grid -> panel.showGrid(list, dimmedIndex(), touchMode)
+            grid -> panel.showGrid(list, touchMode)
             else -> {
-                panel.showRow(list, dimmedIndex(), startIndex(), steps)
+                panel.showRow(list, steps)
                 updateSelection()
             }
         }
     }
 
-    // When the app in front is first in the recents, it is shown dimmed so selection starts at
-    // 1 and never falls to it. Otherwise (favourites, or an app the list hides) there is no such
-    // slot, and every app can be picked from 0.
-    private fun dimmedIndex(): Int? = if (recents && recentsHasCurrent) 0 else null
-
-    private fun startIndex(): Int = if (recents && recentsHasCurrent) 1 else 0
-
     private fun updateSelection() {
         if (origin == null) return
         steps = SwitcherSelection.steps(travel.dp, stepDp, steps)
         val effective = style.effectiveSteps(steps)
-        selected = SwitcherSelection.indexFor(effective, apps?.size ?: 0, startIndex())
+        selected = SwitcherSelection.indexFor(effective, apps?.size ?: 0)
         // What the row highlights is what a lift opens: in Both, nothing until a step is slid.
         val shown = selected.takeIf { style.showsSelection(steps) }
         if (shown != lastShown) {
@@ -320,7 +310,6 @@ internal class EdgeSwitcherController(
     private class Loaded(
         val recents: List<PanelApp>,
         val favourites: List<PanelApp>,
-        val recentsHasCurrent: Boolean,
     )
 
     private companion object {

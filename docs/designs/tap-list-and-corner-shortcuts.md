@@ -75,15 +75,18 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     `round(offsetDp / stepDp)` (Kotlin `roundToInt`, so a fast flick may jump
     several steps). With 72 dp the first change needs 54 dp; going back needs
     the finger 18 dp short of the open point.
-*   The selected app is `SwitcherSelection.indexFor(steps, count, startIndex)`
-    = `startIndex + floorMod(steps, count − startIndex)`. For recents,
-    `startIndex` is 1, since index 0 is the current app, shown dimmed.
+*   `offsetDp` is the `SlideTravel` sum, not the raw finger distance: each
+    movement is scaled by a speed gain (1.2× at or below 200 dp/s, 3× at or
+    above 1500 dp/s, an S-curve between), like a laptop trackpad. The
+    "Speed-adaptive sliding" setting (on by default) turns it off.
+*   The selected app is `SwitcherSelection.indexFor(steps, count)`
+    = `floorMod(steps, count)`. The app in front now is left out of the
+    recents list, so every app shown can be picked.
 *   **Smooth row.** The panel animates a float position toward the step count
     (`ValueAnimator`, 160 ms, `DecelerateInterpolator`, a new target restarts
     from the current value). Slot pitch stays 56 dp, at most 6 slots.
     *   **Fits** (apps ≤ slots): the row stands still and the highlight slides.
-    *   **Ring** (more apps): only the selectable apps form a ring (the dimmed
-        app is left out), the highlight is fixed in the centre slot, and the
+    *   **Ring** (more apps): the apps form a ring, the highlight is fixed in the centre slot, and the
         ring position is the unbounded step count, so a loop keeps moving the
         same way. The ring shows an odd slot count below the app count, so no
         app shows twice; icons fade at the ends.
@@ -113,7 +116,7 @@ list (today's cancel).
     ellipsized), 12 dp padding. Columns = how many cells fit in the window
     width less 28 dp; at most 3 rows; apps past that are not shown (see
     Risks). Same list and order as the drag list: recents newest first (the
-    current app first, dimmed and not touchable, at most 8), favourites in
+    app in front now left out, at most 8), favourites in
     the user's order.
 *   A DOWN and UP in the same cell opens that app and closes the panel. A
     DOWN and UP inside the window but outside every cell closes it. A DOWN and

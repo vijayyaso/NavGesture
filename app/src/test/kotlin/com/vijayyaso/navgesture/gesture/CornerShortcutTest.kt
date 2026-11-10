@@ -73,10 +73,10 @@ class CornerShortcutTest {
         assertEquals(0, AppListStyle.BOTH.effectiveSteps(1))
         assertEquals(1, AppListStyle.BOTH.effectiveSteps(2))
         assertEquals(-1, AppListStyle.BOTH.effectiveSteps(-1))
-        // The apps reached: recents with the current app dimmed first, so the middle app is 1.
-        assertEquals(1, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(1), 5, 1))
-        assertEquals(2, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(2), 5, 1))
-        assertEquals(4, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(-1), 5, 1))
+        // The apps reached: the current app is left out, so the middle app is 0.
+        assertEquals(0, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(1), 5))
+        assertEquals(1, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(2), 5))
+        assertEquals(4, SwitcherSelection.indexFor(AppListStyle.BOTH.effectiveSteps(-1), 5))
     }
 
     @Test fun `drag keeps step zero as the pick`() {

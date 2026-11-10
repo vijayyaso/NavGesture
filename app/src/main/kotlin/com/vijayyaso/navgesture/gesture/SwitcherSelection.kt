@@ -46,13 +46,11 @@ object SwitcherSelection {
 
     /**
      * Maps an unbounded step count to an app index. The list loops: past the last app comes
-     * the first, and before the first comes the last. [startIndex] keeps the dimmed current
-     * app out of reach.
+     * the first, and before the first comes the last.
      */
-    fun indexFor(steps: Int, count: Int, startIndex: Int): Int? {
-        if (count <= 0 || startIndex !in 0 until count) return null
-        val span = count - startIndex
-        return startIndex + Math.floorMod(steps, span)
+    fun indexFor(steps: Int, count: Int): Int? {
+        if (count <= 0) return null
+        return Math.floorMod(steps, count)
     }
 
     /** Columns and rows of the touch grid; apps past [maxRows] rows are not shown. */
