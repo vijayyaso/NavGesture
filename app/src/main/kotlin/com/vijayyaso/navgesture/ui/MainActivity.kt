@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.ui.theme.NavGestureTheme
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,8 @@ internal enum class Screen(@param:StringRes val title: Int) {
     SETUP(R.string.section_setup),
     APP_SWITCHING(R.string.section_app_switch),
     FAVOURITE_APPS(R.string.section_favourite_apps),
+    LEFT_CORNER(R.string.label_left_corner),
+    RIGHT_CORNER(R.string.label_right_corner),
     BANK_APPS(R.string.section_bank_apps),
     CIRCLE_TO_SEARCH(R.string.section_circle_to_search),
     UPDATES(R.string.section_updates),
@@ -191,9 +194,18 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                 when (screen) {
                     Screen.HOME -> HomeScreen(model) { stack = stack + it }
                     Screen.SETUP -> SetupScreen(model)
-                    Screen.APP_SWITCHING -> AppSwitchingScreen(model) {
-                        stack = stack + Screen.FAVOURITE_APPS
-                    }
+                    Screen.APP_SWITCHING -> AppSwitchingScreen(
+                        model = model,
+                        onOpenFavourites = { stack = stack + Screen.FAVOURITE_APPS },
+                        onOpenCorner = { corner ->
+                            stack = stack + when (corner) {
+                                BottomCorner.LEFT -> Screen.LEFT_CORNER
+                                BottomCorner.RIGHT -> Screen.RIGHT_CORNER
+                            }
+                        },
+                    )
+                    Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = back)
+                    Screen.RIGHT_CORNER -> CornerPickerScreen(BottomCorner.RIGHT, model, onDone = back)
                     Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
                     Screen.BANK_APPS -> BankAppsScreen(model)
                     Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)

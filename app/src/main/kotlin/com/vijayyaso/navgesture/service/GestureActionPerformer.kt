@@ -56,6 +56,7 @@ class GestureActionPerformer(private val service: AccessibilityService) {
 
     /** Runs a corner shortcut. The two app-list shortcuts are the overlay's, not this. */
     fun performShortcut(shortcut: CornerShortcut): Boolean {
+        if (shortcut is CornerShortcut.AppShortcut) return appShortcut(shortcut)
         val globalAction = when (shortcut) {
             CornerShortcut.Notifications -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
             CornerShortcut.QuickSettings -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
@@ -68,10 +69,26 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 if (!launched) lastFailure = "corner ${shortcut.id}: ${AppSwitcher.lastFailure}"
                 return launched
             }
-            CornerShortcut.None, CornerShortcut.RecentsList, CornerShortcut.FavouritesList -> return false
+            CornerShortcut.None, CornerShortcut.RecentsList, CornerShortcut.FavouritesList,
+            is CornerShortcut.AppShortcut,
+            -> return false
         }
         Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
         return global(shortcut.id, globalAction)
+    }
+
+    /** Read again on every use, so an app update that moved the shortcut is followed. */
+    private fun appShortcut(shortcut: CornerShortcut.AppShortcut): Boolean {
+        Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
+        val found = StaticShortcuts.find(service, shortcut.packageName, shortcut.shortcutId)
+        if (found == null) {
+            lastFailure = "corner ${shortcut.id}: shortcut not found"
+            Log.w(TAG, lastFailure.orEmpty())
+            return false
+        }
+        val launched = StaticShortcuts.launch(service, found)
+        if (!launched) lastFailure = "corner ${shortcut.id}: ${StaticShortcuts.lastFailure}"
+        return launched
     }
 
     private fun global(name: String, globalAction: Int): Boolean {

@@ -15,36 +15,65 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+
 package com.vijayyaso.navgesture.ui
 
+import android.content.Context
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
+import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.CornerShortcut
+import com.vijayyaso.navgesture.service.StaticShortcut
+import com.vijayyaso.navgesture.service.StaticShortcuts
+import com.vijayyaso.navgesture.ui.theme.IconTint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** One radio row per list style. */
 @Composable
@@ -67,35 +96,23 @@ internal fun AppListStyleChoice(selected: AppListStyle, onChange: (AppListStyle)
     }
 }
 
-/** A corner's row: shows its shortcut, and opens the picker on a tap. */
+/** A corner's row on App switching: shows its shortcut and opens the picker page. */
 @Composable
 internal fun CornerShortcutRow(
     title: String,
     shortcut: CornerShortcut,
     tag: String,
-    onChange: (CornerShortcut) -> Unit,
+    onOpen: () -> Unit,
 ) {
-    var picking by rememberSaveable { mutableStateOf(false) }
     NavigationRow(
         title = title,
         supporting = shortcutLabel(shortcut),
         tag = tag,
-        onClick = { picking = true },
+        onClick = onOpen,
     )
-    if (picking) {
-        CornerShortcutDialog(
-            title = title,
-            current = shortcut,
-            onPick = { picked ->
-                picking = false
-                onChange(picked)
-            },
-            onDismiss = { picking = false },
-        )
-    }
 }
 
-/** The name a shortcut is shown by; an app shows its own name once the list has loaded. */
+/** The name a shortcut is shown by; an app or app shortcut shows its own name once loaded. */
 @Composable
 internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
     CornerShortcut.None -> stringResource(R.string.corner_none)
@@ -113,76 +130,296 @@ internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
             ?: shortcut.packageName
         stringResource(R.string.corner_open_named_app, label)
     }
+    is CornerShortcut.AppShortcut -> appShortcutLabel(shortcut)
 }
 
+/** "App: Shortcut", read off the main thread; says so when the app no longer offers it. */
 @Composable
-private fun CornerShortcutDialog(
-    title: String,
-    current: CornerShortcut,
-    onPick: (CornerShortcut) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var choosingApp by rememberSaveable { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (choosingApp) stringResource(R.string.corner_pick_app) else title) },
-        text = {
-            if (choosingApp) {
-                AppChoiceList(current, onPick)
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
-                    items(CornerShortcut.fixed) { shortcut ->
-                        ChoiceRow(shortcutLabel(shortcut), shortcut == current) { onPick(shortcut) }
-                    }
-                    item {
-                        ChoiceRow(
-                            text = stringResource(R.string.corner_open_app),
-                            selected = current is CornerShortcut.OpenApp,
-                        ) { choosingApp = true }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = { if (choosingApp) choosingApp = false else onDismiss() }) {
-                Text(stringResource(if (choosingApp) R.string.action_navigate_up else R.string.action_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun AppChoiceList(current: CornerShortcut, onPick: (CornerShortcut) -> Unit) {
-    val apps by rememberLaunchableApps()
-    val loaded = apps
-    if (loaded == null) {
-        Text(stringResource(R.string.switcher_loading))
-        return
+private fun appShortcutLabel(shortcut: CornerShortcut.AppShortcut): String {
+    val context = LocalContext.current
+    // Null while loading; an empty pair when the shortcut is gone.
+    val names by produceState<Pair<String, String>?>(initialValue = null, shortcut.id) {
+        value = withContext(Dispatchers.IO) {
+            val found = StaticShortcuts.find(context, shortcut.packageName, shortcut.shortcutId)
+            if (found == null) "" to "" else appLabel(context, shortcut.packageName) to found.label
+        }
     }
-    LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
-        items(loaded, key = { it.packageName }) { app ->
-            val selected = (current as? CornerShortcut.OpenApp)?.packageName == app.packageName
-            ListItem(
-                leadingContent = { AppIconImage(app.icon) },
-                headlineContent = { Text(app.label) },
-                trailingContent = { RadioButton(selected = selected, onClick = null) },
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.clickable { onPick(CornerShortcut.OpenApp(app.packageName)) },
-            )
+    val loaded = names ?: return stringResource(R.string.switcher_loading)
+    if (loaded.second.isEmpty()) return stringResource(R.string.corner_app_shortcut_missing)
+    return stringResource(R.string.corner_app_shortcut_named, loaded.first, loaded.second)
+}
+
+private fun appLabel(context: Context, packageName: String): String = runCatching {
+    val manager = context.packageManager
+    manager.getApplicationLabel(manager.getApplicationInfo(packageName, 0)).toString()
+}.getOrDefault(packageName)
+
+/**
+ * The picker page for one corner: the fixed choices, then a search box over the apps' own
+ * shortcuts and the apps themselves. Picking saves at once and goes back.
+ */
+@Composable
+internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: () -> Unit) {
+    val current = model.configuration.shortcutFor(corner)
+    val pick: (CornerShortcut) -> Unit = { picked ->
+        model.update {
+            when (corner) {
+                BottomCorner.LEFT -> it.copy(leftCornerShortcut = picked)
+                BottomCorner.RIGHT -> it.copy(rightCornerShortcut = picked)
+            }
+        }
+        onDone()
+    }
+
+    // The fixed choices keep the order of CornerShortcut.fixed, split into three cards.
+    val fixed = CornerShortcut.fixed.groupBy(::fixedSection)
+    FixedGroup(null, fixed[FixedSection.NOTHING].orEmpty(), current, pick)
+    FixedGroup(stringResource(R.string.corner_section_app_lists), fixed[FixedSection.LISTS].orEmpty(), current, pick)
+    FixedGroup(stringResource(R.string.corner_section_phone_actions), fixed[FixedSection.ACTIONS].orEmpty(), current, pick)
+
+    var query by rememberSaveable { mutableStateOf("") }
+    OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        placeholder = { Text(stringResource(R.string.corner_search_apps)) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 24.dp),
+    )
+
+    val apps by rememberLaunchableApps()
+    AppShortcutsGroup(apps, query.trim(), current, pick)
+    OpenAppGroup(apps, query.trim(), current, pick)
+}
+
+private enum class FixedSection { NOTHING, LISTS, ACTIONS }
+
+private fun fixedSection(shortcut: CornerShortcut): FixedSection = when (shortcut) {
+    CornerShortcut.None -> FixedSection.NOTHING
+    CornerShortcut.RecentsList, CornerShortcut.FavouritesList -> FixedSection.LISTS
+    else -> FixedSection.ACTIONS
+}
+
+@Composable
+private fun FixedGroup(
+    title: String?,
+    choices: List<CornerShortcut>,
+    current: CornerShortcut,
+    pick: (CornerShortcut) -> Unit,
+) {
+    if (choices.isEmpty()) return
+    SettingsGroup(title = title) {
+        choices.forEach { choice ->
+            PickRow(
+                title = shortcutLabel(choice),
+                selected = choice == current,
+                leading = { fixedIcon(choice)?.let { IconBadge(it) } },
+            ) { pick(choice) }
         }
     }
 }
 
+private fun fixedIcon(shortcut: CornerShortcut): GroupIcon? = when (shortcut) {
+    CornerShortcut.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
+    CornerShortcut.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
+    CornerShortcut.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)
+    CornerShortcut.Notifications -> GroupIcon(Icons.Filled.Notifications, IconTint.RED)
+    CornerShortcut.QuickSettings -> GroupIcon(Icons.Filled.Settings, IconTint.GREY)
+    CornerShortcut.Screenshot -> GroupIcon(ScreenshotGlyph, IconTint.TEAL)
+    CornerShortcut.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
+    CornerShortcut.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
+    CornerShortcut.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
+    is CornerShortcut.OpenApp, is CornerShortcut.AppShortcut -> null
+}
+
+/** A row that picks: a check mark marks the current choice, and it reads as a radio button. */
 @Composable
-private fun ChoiceRow(text: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(vertical = 4.dp),
+private fun PickRow(
+    title: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    leading: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        leadingContent = leading,
+        headlineContent = { Text(title) },
+        trailingContent = if (selected) {
+            { Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+        } else {
+            null
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+    )
+}
+
+/** An app with its usable fixed shortcuts and their icons, loaded once for the page. */
+private class AppShortcuts(val app: LaunchableApp, val shortcuts: List<Pair<StaticShortcut, ImageBitmap?>>)
+
+@Composable
+private fun AppShortcutsGroup(
+    apps: List<LaunchableApp>?,
+    query: String,
+    current: CornerShortcut,
+    pick: (CornerShortcut) -> Unit,
+) {
+    val context = LocalContext.current
+    val iconPx = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+    val all by produceState<List<AppShortcuts>?>(initialValue = null, apps) {
+        val loaded = apps ?: return@produceState
+        value = withContext(Dispatchers.IO) {
+            loaded.mapNotNull { app ->
+                val shortcuts = StaticShortcuts.forPackage(context, app.packageName)
+                if (shortcuts.isEmpty()) return@mapNotNull null
+                AppShortcuts(
+                    app,
+                    shortcuts.map { it to StaticShortcuts.icon(context, it)?.toIconBitmap(iconPx) },
+                )
+            }
+        }
+    }
+    val chosenPackage = (current as? CornerShortcut.AppShortcut)?.packageName
+    // The app holding the current choice starts open; a search opens every match.
+    var open by remember { mutableStateOf(setOfNotNull(chosenPackage)) }
+    SettingsGroup(
+        title = stringResource(R.string.corner_section_app_shortcuts),
+        footer = stringResource(R.string.corner_app_shortcuts_body),
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(text, modifier = Modifier.padding(start = 12.dp))
+        val loaded = all
+        if (loaded == null) {
+            FootNote(stringResource(R.string.switcher_loading))
+            return@SettingsGroup
+        }
+        loaded.forEach { entry ->
+            val appMatches = entry.app.label.contains(query, ignoreCase = true)
+            val shown = if (query.isEmpty() || appMatches) {
+                entry.shortcuts
+            } else {
+                entry.shortcuts.filter { (shortcut, _) -> shortcut.label.contains(query, ignoreCase = true) }
+            }
+            if (shown.isEmpty()) return@forEach
+            val expanded = query.isNotEmpty() || entry.app.packageName in open
+            // One child per app, so the card draws its lines between apps, not inside one.
+            Column {
+                AppHeaderRow(entry.app, expanded) {
+                    open = if (entry.app.packageName in open) open - entry.app.packageName else open + entry.app.packageName
+                }
+                if (expanded) {
+                    shown.forEach { (shortcut, icon) ->
+                        PickRow(
+                            title = shortcut.label,
+                            selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
+                            modifier = Modifier.padding(start = 40.dp),
+                            leading = { AppIconImage(icon ?: entry.app.icon) },
+                        ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
+                    }
+                }
+            }
+        }
     }
 }
+
+/** Opens or closes an app's shortcut list; it picks nothing itself. */
+@Composable
+private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, onToggle: () -> Unit) {
+    val state = stringResource(if (expanded) R.string.corner_expanded else R.string.corner_collapsed)
+    ListItem(
+        leadingContent = { AppIconImage(app.icon) },
+        headlineContent = { Text(app.label) },
+        trailingContent = {
+            Icon(
+                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = state },
+    )
+}
+
+@Composable
+private fun OpenAppGroup(
+    apps: List<LaunchableApp>?,
+    query: String,
+    current: CornerShortcut,
+    pick: (CornerShortcut) -> Unit,
+) {
+    SettingsGroup(title = stringResource(R.string.corner_open_app)) {
+        if (apps == null) {
+            FootNote(stringResource(R.string.switcher_loading))
+            return@SettingsGroup
+        }
+        apps.filter { query.isEmpty() || it.label.contains(query, ignoreCase = true) }.forEach { app ->
+            PickRow(
+                title = app.label,
+                selected = current == CornerShortcut.OpenApp(app.packageName),
+                leading = { AppIconImage(app.icon) },
+            ) { pick(CornerShortcut.OpenApp(app.packageName)) }
+        }
+    }
+}
+
+// material-icons-core has no screenshot, power or split-screen glyph, so these three are drawn
+// here on the same 24-unit grid. Icon() tints them like any other glyph.
+
+private val ScreenshotGlyph: ImageVector = ImageVector.Builder(
+    name = "Screenshot",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // Four corner brackets around the screen.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(3f, 3f); horizontalLineTo(10f); verticalLineTo(5f); horizontalLineTo(5f)
+        verticalLineTo(10f); horizontalLineTo(3f); close()
+        moveTo(21f, 3f); verticalLineTo(10f); horizontalLineTo(19f); verticalLineTo(5f)
+        horizontalLineTo(14f); verticalLineTo(3f); close()
+        moveTo(3f, 21f); verticalLineTo(14f); horizontalLineTo(5f); verticalLineTo(19f)
+        horizontalLineTo(10f); verticalLineTo(21f); close()
+        moveTo(21f, 21f); horizontalLineTo(14f); verticalLineTo(19f); horizontalLineTo(19f)
+        verticalLineTo(14f); horizontalLineTo(21f); close()
+    }
+}.build()
+
+private val PowerGlyph: ImageVector = ImageVector.Builder(
+    name = "Power",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // The stem, then a ring open at the top around it.
+    path(stroke = SolidColor(Color.Black), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
+        moveTo(12f, 3.5f)
+        verticalLineTo(11.5f)
+        moveTo(7.05f, 7.55f)
+        arcTo(7f, 7f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 16.95f, y1 = 7.55f)
+    }
+}.build()
+
+private val SplitScreenGlyph: ImageVector = ImageVector.Builder(
+    name = "SplitScreen",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // Two windows, one above the other.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(5f, 3f); horizontalLineTo(19f); verticalLineTo(11f); horizontalLineTo(5f); close()
+        moveTo(5f, 13f); horizontalLineTo(19f); verticalLineTo(21f); horizontalLineTo(5f); close()
+    }
+}.build()

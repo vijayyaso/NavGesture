@@ -31,6 +31,20 @@ class CornerShortcutTest {
         assertEquals(app, CornerShortcut.decode(app.id))
     }
 
+    @Test fun `an app shortcut round trips through its id, even with a slash in it`() {
+        val shortcut = CornerShortcut.AppShortcut("com.google.android.keep", "new/note")
+        assertEquals("shortcut:com.google.android.keep/new/note", shortcut.id)
+        assertEquals(shortcut, CornerShortcut.decode(shortcut.id))
+    }
+
+    @Test fun `a broken app shortcut id is nothing`() {
+        assertEquals(CornerShortcut.None, CornerShortcut.decode("shortcut:com.foo"))
+        assertEquals(CornerShortcut.None, CornerShortcut.decode("shortcut:/new_note"))
+        assertEquals(CornerShortcut.None, CornerShortcut.decode("shortcut:com.foo/"))
+        assertEquals(CornerShortcut.None, CornerShortcut.decode("shortcut: /x"))
+        assertEquals(CornerShortcut.None, CornerShortcut.decode("shortcut:"))
+    }
+
     @Test fun `missing, unknown and blank ids are nothing`() {
         assertEquals(CornerShortcut.None, CornerShortcut.decode(null))
         assertEquals(CornerShortcut.None, CornerShortcut.decode(""))

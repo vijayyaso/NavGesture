@@ -25,11 +25,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
-import com.vijayyaso.navgesture.gesture.CornerShortcut
+import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.ui.theme.IconTint
 
 @Composable
-internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
+internal fun AppSwitchingScreen(
+    model: AppModel,
+    onOpenFavourites: () -> Unit,
+    onOpenCorner: (BottomCorner) -> Unit,
+) {
     val context = LocalContext.current
     val configuration = model.configuration
     SettingsGroup {
@@ -72,12 +76,12 @@ internal fun AppSwitchingScreen(model: AppModel, onOpenFavourites: () -> Unit) {
             title = stringResource(R.string.label_left_corner),
             shortcut = configuration.leftCornerShortcut,
             tag = TestTags.ROW_LEFT_CORNER,
-        ) { picked -> model.update { it.copy(leftCornerShortcut = picked) } }
+        ) { onOpenCorner(BottomCorner.LEFT) }
         CornerShortcutRow(
             title = stringResource(R.string.label_right_corner),
             shortcut = configuration.rightCornerShortcut,
             tag = TestTags.ROW_RIGHT_CORNER,
-        ) { picked -> model.update { it.copy(rightCornerShortcut = picked) } }
+        ) { onOpenCorner(BottomCorner.RIGHT) }
     }
     // The explainer is the footer, outside the tagged status text that the status-refresh
     // suite compares exactly.

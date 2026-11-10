@@ -137,8 +137,14 @@ sealed interface CornerShortcut {
         override val id: String = APP_PREFIX + packageName
     }
 
+    /** One of an app's fixed shortcuts (the actions its icon offers on a long press). */
+    data class AppShortcut(val packageName: String, val shortcutId: String) : CornerShortcut {
+        override val id: String = SHORTCUT_PREFIX + packageName + "/" + shortcutId
+    }
+
     companion object {
         private const val APP_PREFIX = "app:"
+        private const val SHORTCUT_PREFIX = "shortcut:"
 
         /** Every choice that is not an app, in the order the picker lists them. */
         val fixed: List<CornerShortcut> = listOf(
@@ -159,6 +165,15 @@ sealed interface CornerShortcut {
             if (stored.startsWith(APP_PREFIX)) {
                 val packageName = stored.removePrefix(APP_PREFIX)
                 return if (packageName.isBlank()) None else OpenApp(packageName)
+            }
+            if (stored.startsWith(SHORTCUT_PREFIX)) {
+                // A package name never holds a '/', so the first one ends it; the id may hold more.
+                val rest = stored.removePrefix(SHORTCUT_PREFIX)
+                val slash = rest.indexOf('/')
+                if (slash < 1) return None
+                val packageName = rest.substring(0, slash)
+                val shortcutId = rest.substring(slash + 1)
+                return if (packageName.isBlank() || shortcutId.isBlank()) None else AppShortcut(packageName, shortcutId)
             }
             return fixed.firstOrNull { it.id == stored } ?: None
         }

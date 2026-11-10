@@ -94,7 +94,7 @@ internal fun AppIconImage(icon: ImageBitmap?) {
 }
 
 /** Draws an app icon into a square bitmap; adaptive icons draw fine this way. */
-private fun Drawable.toIconBitmap(sizePx: Int): ImageBitmap {
+internal fun Drawable.toIconBitmap(sizePx: Int): ImageBitmap {
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     setBounds(0, 0, sizePx, sizePx)
     draw(Canvas(bitmap))
