@@ -323,7 +323,7 @@ internal class SwitcherPanelOverlay(
             val panelWidth = (slots * SLOT_DP + 28f) * density
             val left = drawPanel(canvas, panelWidth)
             val centreX = left + (18f + half * SLOT_DP) * density
-            drawHighlight(canvas, centreX)
+            if (selected != null) drawHighlight(canvas, centreX)
             canvas.save()
             canvas.clipRect(box)
             val base = floor(position).toInt()

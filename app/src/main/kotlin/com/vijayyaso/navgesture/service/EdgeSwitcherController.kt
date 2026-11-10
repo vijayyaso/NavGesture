@@ -67,6 +67,8 @@ internal class EdgeSwitcherController(
     private var latest: TouchSample? = null
     /** Both lists are resolved at prepare time; the drag direction picks one at open. */
     private var recentsApps: List<PanelApp>? = null
+    /** The first recent app is the app in front now: shown dimmed, never selectable. */
+    private var recentsHasCurrent = false
     private var favouriteApps: List<PanelApp>? = null
     private var apps: List<PanelApp>? = null
     private var opened = false
@@ -153,12 +155,7 @@ internal class EdgeSwitcherController(
         }
         latest = sample
         if (style != AppListStyle.TAP) updateSelection()
-        val stayOpen = when (style) {
-            AppListStyle.DRAG -> false
-            AppListStyle.TAP -> true
-            AppListStyle.BOTH -> steps == 0
-        }
-        if (stayOpen) {
+        if (!style.opensOnLift(steps)) {
             touchMode = true
             selected = null
             render()
@@ -186,6 +183,7 @@ internal class EdgeSwitcherController(
         latest = null
         recentsApps = null
         favouriteApps = null
+        recentsHasCurrent = false
         apps = null
         steps = 0
         selected = null
@@ -235,7 +233,12 @@ internal class EdgeSwitcherController(
                         it != context.packageName && it !in homes &&
                             manager.getLaunchIntentForPackage(it) != null
                     }
-                    resolve(switcher.recentApps()) to resolve(favouriteNow)
+                    val recentList = switcher.recentApps()
+                    val recentPanel = resolve(recentList.packages)
+                    // A package that failed to resolve is dropped, so check the first survived.
+                    val hasCurrent = recentList.currentFirst &&
+                        recentPanel.firstOrNull()?.packageName == recentList.packages.firstOrNull()
+                    Loaded(recentPanel, resolve(favouriteNow), hasCurrent)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -246,8 +249,9 @@ internal class EdgeSwitcherController(
             // A cancelled lookup may finish its blocking package query after a new DOWN.
             if (token != generation) return@launch
             if (resolved != null) {
-                recentsApps = resolved.first
-                favouriteApps = resolved.second
+                recentsApps = resolved.recents
+                favouriteApps = resolved.favourites
+                recentsHasCurrent = resolved.recentsHasCurrent
                 if (opened) {
                     // The open may have run before this lookup finished, so take the list now.
                     apps = if (recents) recentsApps else favouriteApps
@@ -279,11 +283,12 @@ internal class EdgeSwitcherController(
         }
     }
 
-    // Recents show the current app first, dimmed, so selection starts at 1 and never falls
-    // to it. Favourites have no such slot and start at 0.
-    private fun dimmedIndex(): Int? = if (recents) 0 else null
+    // When the app in front is first in the recents, it is shown dimmed so selection starts at
+    // 1 and never falls to it. Otherwise (favourites, or an app the list hides) there is no such
+    // slot, and every app can be picked from 0.
+    private fun dimmedIndex(): Int? = if (recents && recentsHasCurrent) 0 else null
 
-    private fun startIndex(): Int = if (recents) 1 else 0
+    private fun startIndex(): Int = if (recents && recentsHasCurrent) 1 else 0
 
     private fun updateSelection() {
         val start = origin ?: return
@@ -295,8 +300,15 @@ internal class EdgeSwitcherController(
             Log.i(TAG, "SWITCHER_SELECTED $next")
             haptic(HapticFeedbackConstants.CLOCK_TICK)
         }
-        panel.select(steps, selected)
+        // What the row highlights is what a lift opens: in Both, nothing until a step is slid.
+        panel.select(steps, selected.takeIf { style.showsSelection(steps) })
     }
+
+    private class Loaded(
+        val recents: List<PanelApp>,
+        val favourites: List<PanelApp>,
+        val recentsHasCurrent: Boolean,
+    )
 
     private companion object {
         const val TAG = "NavGesture"

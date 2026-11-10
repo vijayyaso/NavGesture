@@ -64,6 +64,19 @@ enum class AppListStyle {
     BOTH,
     ;
 
+    /**
+     * Whether lifting the finger opens the selected app. Both treats a lift with no step slid
+     * as "leave the list open for touching", so nothing is selected until a step is slid.
+     */
+    fun opensOnLift(steps: Int): Boolean = when (this) {
+        DRAG -> true
+        TAP -> false
+        BOTH -> steps != 0
+    }
+
+    /** Whether the row highlights an app while the finger is down; what shows is what opens. */
+    fun showsSelection(steps: Int): Boolean = this != TAP && opensOnLift(steps)
+
     companion object {
         fun decode(stored: String?): AppListStyle =
             entries.firstOrNull { it.name == stored } ?: DRAG

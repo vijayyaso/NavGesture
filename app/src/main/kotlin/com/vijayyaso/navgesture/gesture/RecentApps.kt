@@ -27,4 +27,14 @@ object RecentApps {
     ): List<String> = resumedOldestFirst.asReversed()
         .distinct()
         .filter { it != self && it !in homes && launchable(it) }
+
+    /**
+     * True when the newest resumed package is the first of [ordered], that is, the app the user
+     * is in is part of the list. False when the newest one was dropped (a home screen, the
+     * phone's Settings, our own app), because then the first listed app is a different app.
+     */
+    fun currentIsFirst(resumedOldestFirst: List<String>, ordered: List<String>): Boolean {
+        val newest = resumedOldestFirst.lastOrNull() ?: return false
+        return newest == ordered.firstOrNull()
+    }
 }

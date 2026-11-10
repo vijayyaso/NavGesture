@@ -66,12 +66,12 @@ class AppSwitcher(internal val context: Context) {
      * every pair of apps and advertises CATEGORY_HOME rather than CATEGORY_LAUNCHER, so
      * leaving it in makes a step land on a package that cannot be started.
      */
-    fun recentApps(): List<String> {
+    fun recentApps(): RecentList {
         val usage = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-            ?: return emptyList()
+            ?: return RecentList(emptyList(), false)
         val now = System.currentTimeMillis()
         val events = runCatching { usage.queryEvents(now - TRAIL_WINDOW_MS, now) }.getOrNull()
-            ?: return emptyList()
+            ?: return RecentList(emptyList(), false)
         val resumed = mutableListOf<String>()
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
@@ -84,14 +84,20 @@ class AppSwitcher(internal val context: Context) {
         val alive = runningPackages()
         val recent = if (alive.isEmpty()) resumed else resumed.filter { it in alive }
         Log.i(TAG, "SWITCHER_POOL usage=${resumed.size} running=${alive.size} kept=${recent.size}")
-        return RecentApps.order(
+        val ordered = RecentApps.order(
             recent.filterNot { it in HOUSEKEEPING },
             context.packageName,
             homePackages(),
         ) { packageName ->
             context.packageManager.getLaunchIntentForPackage(packageName) != null
         }.take(MAX_APPS)
+        // The raw newest event, before any filter: when it was dropped the user is in an app
+        // the list hides, and the first listed app is not the current one.
+        return RecentList(ordered, RecentApps.currentIsFirst(resumed, ordered))
     }
+
+    /** [packages] newest first; [currentFirst] says the first one is the app in front now. */
+    data class RecentList(val packages: List<String>, val currentFirst: Boolean)
 
     /**
      * Packages with a live process. Android hides other apps' processes from ordinary

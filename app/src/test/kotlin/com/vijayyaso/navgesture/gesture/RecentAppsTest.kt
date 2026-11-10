@@ -40,4 +40,25 @@ class RecentAppsTest {
             ) { it != "y" },
         )
     }
+
+    @Test
+    fun `the app in front is first when it is in the list`() {
+        val resumed = listOf("a", "b", "c")
+        val ordered = RecentApps.order(resumed, "nav", emptySet()) { true }
+        assertEquals(true, RecentApps.currentIsFirst(resumed, ordered))
+    }
+
+    @Test
+    fun `a hidden app in front means the first listed app is not the current one`() {
+        // The user is in Settings, which advertises CATEGORY_HOME and is dropped.
+        val resumed = listOf("a", "b", "settings")
+        val ordered = RecentApps.order(resumed, "nav", setOf("settings")) { true }
+        assertEquals(listOf("b", "a"), ordered)
+        assertEquals(false, RecentApps.currentIsFirst(resumed, ordered))
+    }
+
+    @Test
+    fun `no usage events means no current app`() {
+        assertEquals(false, RecentApps.currentIsFirst(emptyList(), emptyList()))
+    }
 }

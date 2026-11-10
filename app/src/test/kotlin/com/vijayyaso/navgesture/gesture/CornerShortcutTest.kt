@@ -51,4 +51,19 @@ class CornerShortcutTest {
         assertEquals(true, configuration.anyCornerShortcut)
         assertEquals(false, GestureConfiguration().anyCornerShortcut)
     }
+
+    @Test fun `drag always opens what is highlighted, tap never highlights`() {
+        assertEquals(true, AppListStyle.DRAG.opensOnLift(0))
+        assertEquals(true, AppListStyle.DRAG.showsSelection(0))
+        assertEquals(false, AppListStyle.TAP.opensOnLift(3))
+        assertEquals(false, AppListStyle.TAP.showsSelection(3))
+    }
+
+    @Test fun `both highlights and opens only once a step is slid`() {
+        assertEquals(false, AppListStyle.BOTH.opensOnLift(0))
+        assertEquals(false, AppListStyle.BOTH.showsSelection(0))
+        assertEquals(true, AppListStyle.BOTH.opensOnLift(1))
+        assertEquals(true, AppListStyle.BOTH.showsSelection(1))
+        assertEquals(true, AppListStyle.BOTH.opensOnLift(-2))
+    }
 }
