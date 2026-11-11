@@ -141,6 +141,16 @@ class ShortcutDumpTest {
     }
 
     @Test
+    fun `a label with the refusal's words is not a refusal`() {
+        val sample = sample("api36-one-package.txt")
+        val inLabel = sample.replace("shortLabel=Scan QR", "shortLabel=Permission Denial: app-op")
+        val ownLine = sample.replace("shortLabel=Scan QR", "shortLabel=x\nPermission Denial: app-op")
+        assertEquals(DumpDenial.NONE, ShortcutDump.denial(inLabel))
+        assertEquals(DumpDenial.NONE, ShortcutDump.denial(ownLine))
+        assertTrue(ShortcutDump.parse(inLabel).any { it.id == "qr_scanner" })
+    }
+
+    @Test
     fun `disabled, shadow, key-only and cached-only shortcuts are skipped`() {
         val block = sample("api36-one-package.txt")
         val qrFlags = "id=qr_scanner, flags=0x81 [DynStr]"

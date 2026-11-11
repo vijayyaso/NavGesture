@@ -91,11 +91,15 @@ object ShortcutDump {
         return result
     }
 
-    /** The service's refusal, if the text is one: it prints it and returns normally. */
+    /**
+     * The service's refusal, if the text is one: it prints it and returns normally. The refusal is
+     * the whole reply, so only the first line counts; a shortcut label holding the same words sits
+     * further down a real listing and must not read as one.
+     */
     fun denial(text: String): DumpDenial {
-        val refusal = text.lineSequence().firstOrNull { it.contains("Permission Denial") }
-            ?: return DumpDenial.NONE
-        return if (refusal.contains("app-op")) DumpDenial.NO_USAGE_ACCESS else DumpDenial.NO_PERMISSION
+        val first = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+        if (first == null || !first.startsWith("Permission Denial")) return DumpDenial.NONE
+        return if (first.contains("app-op")) DumpDenial.NO_USAGE_ACCESS else DumpDenial.NO_PERMISSION
     }
 
     /** A ShortcutInfo block whose field lines are still being collected. */
