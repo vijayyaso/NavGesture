@@ -76,4 +76,4 @@ in the project's git history.
 
 ## Contact
 
-Vijayyaso — vijayyaso7@gmail.com — https://github.com/vijayyaso/NavGesture
+Vijayyaso — open an issue at https://github.com/vijayyaso/NavGesture/issues
