@@ -87,8 +87,10 @@ android {
             enableUnitTestCoverage = true
             // Test builds reuse the release key when it is available, so any APK this
             // project builds can update the installed app. Without it, Gradle generates a
-            // throwaway debug key in $HOME, which changes with every container build.
-            signingConfig = signingConfigs.findByName("release")
+            // throwaway debug key in $HOME, which changes with every container build. CI has no
+            // release key, so it falls back to that debug key: an unsigned debug APK gets a
+            // different file name (-unsigned) and cannot be installed by the e2e suites.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

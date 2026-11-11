@@ -44,6 +44,7 @@ configure() {
   "${ADB_BIN}" shell settings put global navgesture_left_corner "$1" >/dev/null
   "${ADB_BIN}" shell settings put global navgesture_right_corner "$2" >/dev/null
   "${ADB_BIN}" shell settings put global navgesture_app_list_style "$3" >/dev/null
+  # shellcheck disable=SC2310 # a failed rebind is reported as a failed case, not a script error
   if enable_service; then pass "rebound with corners $1/$2, style $3"; else fail "rebound with corners $1/$2, style $3"; fi
 }
 
