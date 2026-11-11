@@ -334,9 +334,9 @@ ui_nodes() {
   printf '%s\n' "${nodes}"
 }
 
-# string_res <name> - the default-locale text of an app string.
+# string_res <name> [source set] - the default-locale text of an app string (default: main).
 string_res() {
-  sed -n "s/.*name=\"$1\">\(.*\)<\/string>.*/\1/p" app/src/main/res/values/strings.xml
+  sed -n "s/.*name=\"$1\">\(.*\)<\/string>.*/\1/p" "app/src/${2:-main}/res/values/strings.xml"
 }
 
 # scroll_app <up|down> - drags the app's own content, clear of every edge strip.

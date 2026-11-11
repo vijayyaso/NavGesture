@@ -66,6 +66,10 @@ else
   fail "the test app published its four shortcuts"
 fi
 
+# The usage app-op as device.sh left it, put back by cleanup so later suites see no change.
+usage_mode="$("${ADB_BIN}" shell appops get "${PKG}" GET_USAGE_STATS 2>/dev/null | tr -d '\r' |
+  sed -n 's/^GET_USAGE_STATS: \([a-z]*\).*/\1/p')"
+
 grant() {
   "${ADB_BIN}" shell pm grant "${PKG}" android.permission.DUMP >/dev/null
   "${ADB_BIN}" shell pm grant "${PKG}" android.permission.PACKAGE_USAGE_STATS >/dev/null
@@ -108,6 +112,7 @@ reset_stored_corner() {
 cleanup() {
   "${ADB_BIN}" shell settings delete global navgesture_left_corner >/dev/null 2>&1 || true
   grant
+  "${ADB_BIN}" shell appops set "${PKG}" GET_USAGE_STATS "${usage_mode:-default}" >/dev/null 2>&1 || true
   "${ADB_BIN}" uninstall "${FIX}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -138,6 +143,15 @@ if find_id runtime_shortcuts_hint >/dev/null; then
 else
   fail "the picker shows the one-time computer step"
 fi
+if tap_id runtime_shortcuts_copy; then
+  sleep 1
+  copied="$(string_res label_copied github)"
+  if ui_nodes | grep -q "text=\"${copied}\""; then pass "Copy commands copies"; else fail "Copy commands copies"; fi
+else
+  fail "Copy commands copies (no button)"
+fi
+# Android 13 and later show a clipboard preview at the bottom left for a few seconds.
+sleep 5
 if ui_nodes | grep -q "resource-id=\"corner_app_${FIX}\""; then
   fail "the test app has no shortcuts listed without the grant"
 else
