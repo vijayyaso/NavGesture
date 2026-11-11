@@ -35,6 +35,7 @@
     <string name="update_summary_no_apk">%1$s has no APK yet</string>
     <string name="update_summary_nothing_published">No release yet</string>
     <string name="update_summary_unreadable_version">Could not compare versions</string>
+    <string name="update_summary_check_failed">Check failed</string>
     <string name="update_status">Latest release</string>
     <string name="update_not_checked">Not checked yet</string>
     <string name="update_check_now">Check now</string>
@@ -58,6 +59,8 @@
     <string name="update_checksum_mismatch">The download did not match the checksum GitHub published, so it was deleted and nothing was installed.</string>
     <string name="update_blocked_host">The download was redirected to %1$s, which is not a GitHub host, so it was stopped.</string>
     <string name="update_download_failed">The download failed (%1$s). Try again.</string>
+    <string name="update_check_failed">The check failed (%1$s). Try again.</string>
+    <string name="update_unverified">GitHub published no checksum for this APK, so it could not be verified and nothing was installed.</string>
     <string name="update_install_failed">The update did not install (%1$s).</string>
     <string name="update_signature_conflict">Android refused the update, because it is signed with a different key from this copy (%1$s).</string>
     <string name="update_declined">The update was cancelled in the system prompt, and this copy stays as it was.</string>
