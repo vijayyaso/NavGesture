@@ -175,16 +175,24 @@ if ui_nodes | grep -q 'resource-id="runtime_shortcuts_hint"'; then
 else
   pass "the computer step is gone once granted"
 fi
-if tap_id "corner_app_${FIX}"; then pass "the test app is listed under App shortcuts"; else fail "the test app is listed under App shortcuts"; fi
-# The rows come from a dumpsys read off the main thread; a slow CI emulator needs more than
-# a second, so wait for them instead of sleeping a fixed time.
+# On a slow emulator the list is still settling when the first tap lands: the row moves once
+# the run-time shortcuts are read, and the tap opens nothing. So tap again until the rows show.
+# A tap is repeated only when no row showed, so it never closes an opened app.
 listed=''
-list_try=1
-while [ "${list_try}" -le 15 ] && [ -z "${listed}" ]; do
-  sleep 1
-  listed="$(ui_nodes | grep -o "resource-id=\"corner_shortcut_${FIX}/[^\"]*\"" | sed 's/.*\///; s/"$//' | sort | paste -sd, -)"
-  list_try=$((list_try + 1))
+app_seen=''
+tap_try=1
+while [ "${tap_try}" -le 4 ] && [ -z "${listed}" ]; do
+  # shellcheck disable=SC2310 # a missing row is reported after the loop
+  if tap_id "corner_app_${FIX}"; then app_seen='1'; fi
+  wait_try=1
+  while [ "${wait_try}" -le 4 ] && [ -z "${listed}" ]; do
+    sleep 1
+    listed="$(ui_nodes | grep -o "resource-id=\"corner_shortcut_${FIX}/[^\"]*\"" | sed 's/.*\///; s/"$//' | sort | paste -sd, -)"
+    wait_try=$((wait_try + 1))
+  done
+  tap_try=$((tap_try + 1))
 done
+if [ -n "${app_seen}" ]; then pass "the test app is listed under App shortcuts"; else fail "the test app is listed under App shortcuts"; fi
 if [ "${listed}" = "qr_scanner,typed" ]; then
   pass "it lists Scan QR and Typed extras, not the data-URI or private ones"
 else
