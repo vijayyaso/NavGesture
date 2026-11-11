@@ -189,6 +189,10 @@ if [ "${listed}" = "qr_scanner,typed" ]; then
   pass "it lists Scan QR and Typed extras, not the data-URI or private ones"
 else
   fail "it lists Scan QR and Typed extras, not the data-URI or private ones (listed: '${listed}')"
+  # Saved for the CI artifact: what the app read, and what the shortcut service holds.
+  "${ADB_BIN}" logcat -d -s NavGesture >"${LOG_DIR}/app-shortcuts-logcat.txt" 2>&1 || true
+  "${ADB_BIN}" shell dumpsys shortcut >"${LOG_DIR}/app-shortcuts-dump.txt" 2>&1 || true
+  ui_nodes >"${LOG_DIR}/app-shortcuts-screen.xml" 2>&1 || true
 fi
 if tap_id "corner_shortcut_${FIX}/qr_scanner"; then pass "Scan QR can be picked"; else fail "Scan QR can be picked"; fi
 sleep 2

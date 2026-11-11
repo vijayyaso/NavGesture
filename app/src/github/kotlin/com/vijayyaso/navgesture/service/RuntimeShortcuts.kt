@@ -47,8 +47,14 @@ internal object RuntimeShortcuts {
     /** Every usable run-time shortcut of this user, for the picker. Off the main thread. */
     fun readAll(context: Context): RuntimeRead {
         if (!granted(context)) return RuntimeRead(RuntimeAccess.NEEDS_GRANT, emptyMap())
+        val started = System.nanoTime()
         val text = dump(listOf("--user", userId()), ALL_TIMEOUT_SECONDS)
-            ?: return RuntimeRead(RuntimeAccess.UNREADABLE, emptyMap())
+        Log.i(
+            TAG,
+            "RUNTIME_SHORTCUTS_DUMP chars=${text?.length ?: -1} " +
+                "ms=${(System.nanoTime() - started) / 1_000_000}",
+        )
+        if (text == null) return RuntimeRead(RuntimeAccess.UNREADABLE, emptyMap())
         when (ShortcutDump.denial(text)) {
             DumpDenial.NO_PERMISSION -> return RuntimeRead(RuntimeAccess.NEEDS_GRANT, emptyMap())
             DumpDenial.NO_USAGE_ACCESS -> return RuntimeRead(RuntimeAccess.NEEDS_USAGE_ACCESS, emptyMap())
@@ -58,6 +64,7 @@ internal object RuntimeShortcuts {
             ShortcutDump.parse(text).mapNotNull { toEntry(context, it) }.groupBy { it.packageName }
         }.onFailure { Log.w(TAG, "shortcut listing unreadable", it) }.getOrNull()
             ?: return RuntimeRead(RuntimeAccess.UNREADABLE, emptyMap())
+        Log.i(TAG, "RUNTIME_SHORTCUTS_READ packages=${entries.keys.sorted()}")
         return RuntimeRead(RuntimeAccess.READY, entries)
     }
 
