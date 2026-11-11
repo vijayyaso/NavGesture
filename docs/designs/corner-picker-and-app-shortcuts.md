@@ -353,7 +353,8 @@ build after a one-time step from a computer. The play build is unchanged.
 *   **Corner:** `ShortcutCatalog.find` tries the fixed list first; only
     if the id is not there does it run a one-package dump (`-p
     '^\Q<package>\E$'`, 3 s limit). That is on the service's main thread,
-    as the fixed lookup already is; the dump measured well under 0.1 s.
+    as the fixed lookup already is. A whole dump (35 KB) took 0.025 s through
+    `adb shell` on the emulator; the in-app time was not measured.
 *   **Hint row** (`RuntimeAccess` from the read): `NEEDS_GRANT` shows "More
     app shortcuts", the step (wording as `hide_gesture_bar_needs_grant`),
     both commands, and a **Copy commands** button that puts them on the
@@ -457,7 +458,8 @@ Paths under `app/src/`. Each phase ends with a container build
 ### Phase 2 — reading and running
 
 3.  `main/kotlin/com/vijayyaso/navgesture/service/StaticShortcuts.kt` (new,
-    GPL header) — parsing, export check, launch, icon.
+    GPL header) — parsing. Export check, launch and icon moved to
+    `ShortcutCatalog.kt` on 2026-11-12 (run-time shortcuts).
 4.  `main/kotlin/com/vijayyaso/navgesture/service/GestureActionPerformer.kt`
     — `AppShortcut` branch with its log line.
 
