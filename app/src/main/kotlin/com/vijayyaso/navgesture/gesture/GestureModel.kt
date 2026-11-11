@@ -251,6 +251,22 @@ data class GestureConfiguration(
         } else {
             circleToSearchHoldMs
         }
+
+    /**
+     * Takes from [source] only the gesture tunings the Gesture settings screen shows, for its
+     * reset and undo. The gesture bar is a system setting the user chose, so it stays.
+     */
+    fun withGestureSettingsOf(source: GestureConfiguration): GestureConfiguration = copy(
+        edgeWidthDp = source.edgeWidthDp,
+        leftEdgeBackEnabled = source.leftEdgeBackEnabled,
+        rightEdgeBackEnabled = source.rightEdgeBackEnabled,
+        landscapeConfirmEnabled = source.landscapeConfirmEnabled,
+        sideMinimumSwipeDistanceDp = source.sideMinimumSwipeDistanceDp,
+        bottomMinimumSwipeDistanceDp = source.bottomMinimumSwipeDistanceDp,
+        recentsLinePercent = source.recentsLinePercent,
+        maximumArmDurationMs = source.maximumArmDurationMs,
+        hapticFeedbackEnabled = source.hapticFeedbackEnabled,
+    )
 }
 
 /** Launcher3's numbers for a long press on the navigation handle, at AOSP's defaults. */

@@ -129,11 +129,10 @@ internal class AppModel(
     /** Reset has no confirmation, so the snackbar offers the old values back instead. */
     fun resetGestureSettings(message: String, undoLabel: String) {
         val previous = configuration
-        // The gesture bar is a system setting the user chose, not a gesture tuning, so it stays.
-        update { GestureConfiguration(hideGestureBar = it.hideGestureBar) }
+        update { it.withGestureSettingsOf(GestureConfiguration()) }
         scope.launch {
             val result = snackbar.showSnackbar(message, actionLabel = undoLabel, withDismissAction = true)
-            if (result == SnackbarResult.ActionPerformed) update { previous }
+            if (result == SnackbarResult.ActionPerformed) update { it.withGestureSettingsOf(previous) }
         }
     }
 
