@@ -62,4 +62,4 @@ Circle to Search starts the way [MiCTS](https://github.com/parallelcc/MiCTS) and
 
 ## License
 
-GPL-3.0-or-later, see [LICENSE](LICENSE). Copyright (C) 2026 Henrique Almeida and the contributors above. NavGesture starts from [HyperGesture](https://github.com/h3nc4/HyperGesture) by Henrique Almeida; the changes are in the git history.
+GPL-3.0-or-later, see [LICENSE](LICENSE). Copyright (C) 2026 Henrique Almeida and the contributors above. NavGesture is a modified version of [HyperGesture](https://github.com/h3nc4/HyperGesture) by Henrique Almeida. It was forked from HyperGesture commit `0ee6831` (2026-10-23) and has been changed by the NavGesture contributors since then.
