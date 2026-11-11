@@ -25,6 +25,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.provider.Settings
 import android.util.Log
+import androidx.core.content.edit
 
 /**
  * Hides the small gesture bar HyperOS draws at the bottom under a third-party launcher.
@@ -38,6 +39,10 @@ import android.util.Log
  *
  * HyperOS resets the mode when the launcher changes, so while the user wants it hidden the
  * service watches both settings and writes them back.
+ *
+ * A bar this app hid is marked on disk before the write, so a kill that skips the service's
+ * unbind - a force stop or a crash - still leaves a trace. [restoreIfStopped] then gives the
+ * phone its bar back, so it is never left with neither the bar nor the gestures.
  */
 class GestureBarHider(private val context: Context, private val handler: Handler) {
 
@@ -66,6 +71,8 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         if (!canWrite()) return
         // Only undo what this app did, so a bar the user never asked to hide is left alone.
         if (hide && !isHidden()) write(hidden = true)
+        // A bar hidden before the mark existed is still this app's to give back.
+        if (hide && isHidden()) markHidden(context, hidden = true)
         if (!hide && changed) show(context)
     }
 
@@ -110,9 +117,44 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         /** Gives the phone its own gesture bar back. Needs [canWrite]. */
         fun show(context: Context) {
             if (global(context, FORCE_FSG) == 1) write(context, hidden = false)
+            if (!isHidden(context)) markHidden(context, hidden = false)
         }
 
+        /**
+         * Only a bar this app hid, and only with the gestures really gone: not running, and not
+         * switched on either, which is the system about to bind the service. A bank pause has
+         * shown the bar already, so it leaves nothing marked.
+         */
+        fun shouldRestore(hidByUs: Boolean, serviceRunning: Boolean, switchedOn: Boolean): Boolean =
+            hidByUs && !serviceRunning && !switchedOn
+
+        /** Shows a bar this app left hidden when the service died without its unbind. */
+        fun restoreIfStopped(
+            context: Context,
+            serviceRunning: Boolean,
+            switchedOn: Boolean,
+        ): Boolean {
+            if (!shouldRestore(hiddenByUs(context), serviceRunning, switchedOn)) return false
+            if (!canWrite(context)) return false
+            show(context)
+            return !isHidden(context)
+        }
+
+        private fun hiddenByUs(context: Context): Boolean =
+            prefs(context).getBoolean(KEY_HIDDEN_BY_US, false)
+
+        // commit, not apply: the process can die right after the settings write.
+        private fun markHidden(context: Context, hidden: Boolean) {
+            if (hiddenByUs(context) == hidden) return
+            prefs(context).edit(commit = true) { putBoolean(KEY_HIDDEN_BY_US, hidden) }
+        }
+
+        private fun prefs(context: Context) =
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
         private fun write(context: Context, hidden: Boolean) {
+            // Recorded before the write, so a kill straight after still leaves the trace.
+            if (hidden) markHidden(context, hidden = true)
             runCatching {
                 val resolver = context.contentResolver
                 if (hidden) Settings.Global.putInt(resolver, HIDE_LINE, 1)
@@ -127,6 +169,8 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         const val GRANT_COMMAND =
             "adb shell pm grant com.vijayyaso.navgesture android.permission.WRITE_SECURE_SETTINGS"
 
+        private const val PREFS = "gesture_bar"
+        private const val KEY_HIDDEN_BY_US = "hidden_by_us"
         private const val FORCE_FSG = "force_fsg_nav_bar"
         private const val HIDE_LINE = "hide_gesture_line"
         private const val TAG = "NavGesture"

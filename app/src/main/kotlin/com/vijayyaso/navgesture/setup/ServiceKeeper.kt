@@ -64,8 +64,21 @@ object ServiceKeeper {
     fun canTurnOn(context: Context): Boolean =
         !BuildConfig.IS_PLAY && GestureBarHider.canWrite(context)
 
-    /** Reads small files, so call it off the main thread. */
+    /**
+     * Reads small files, so call it off the main thread. When the service stays off, a bar
+     * [GestureBarHider] hid comes back, in the Play build too.
+     */
     fun check(context: Context, from: String) {
+        heal(context, from)
+        val restored = GestureBarHider.restoreIfStopped(
+            context,
+            serviceRunning = NavGestureAccessibilityService.isRunning(),
+            switchedOn = DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context),
+        )
+        if (restored) ServiceLog.add(context, "$from: gestures gone, the phone's own bar shown again")
+    }
+
+    private fun heal(context: Context, from: String) {
         if (BuildConfig.IS_PLAY) return
         if (NavGestureAccessibilityService.isRunning()) return
         val pause = BankPause.paused(context)
