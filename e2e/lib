@@ -478,7 +478,9 @@ open_screen() {
 bottom_strip_frame() {
   "${ADB_BIN}" shell dumpsys window windows 2>/dev/null | tr -d '\r' | awk -v pkg="u0 ${PKG}}" '
     /^  Window #/ { mine = index($0, pkg) > 0; bottom = 0 }
-    mine && /ty=ACCESSIBILITY_OVERLAY/ && /gr=BOTTOM CENTER/ { bottom = 1 }
+    # The touch strip is the visible bottom overlay. NavGesture places it BOTTOM LEFT (it leaves
+    # room for the corner zones), and its hidden panels and bubbles carry alpha=0.0.
+    mine && /ty=ACCESSIBILITY_OVERLAY/ && /gr=BOTTOM / && !/alpha=0\.0/ { bottom = 1 }
     mine && bottom && / frame=\[/ {
       f = $0
       sub(/.* frame=\[/, "", f)
