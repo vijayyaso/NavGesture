@@ -497,9 +497,11 @@ server.
 ### Self-enable gating
 
 *   `setup/ServiceKeeper.kt` — `canTurnOn(context)` =
-    `!BuildConfig.IS_PLAY && GestureBarHider.canWrite(context)`. `check`
-    returns early when `BuildConfig.IS_PLAY` (so its "adb permission is gone"
-    log still runs in `github`); `turnOn` returns `false` when `!canTurnOn`.
+    `!BuildConfig.IS_PLAY && GestureBarHider.canWrite(context)`. In `check`,
+    the turn-back-on part (`heal`) returns early when `BuildConfig.IS_PLAY`
+    (so its "adb permission is gone" log still runs in `github`); the
+    gesture-bar restore (`GestureBarHider.restoreIfStopped`) runs in both
+    builds. `turnOn` returns `false` when `!canTurnOn`.
 *   `setup/GestureTileService.kt` — calls
     `tileTap(serviceEnabled = TileFace.of(bound).target == TileTarget.APP,
     disclosureAccepted, canTurnOn = ServiceKeeper.canTurnOn(this) &&
