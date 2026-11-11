@@ -20,41 +20,22 @@ package com.vijayyaso.navgesture.service
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Resources
-import android.graphics.drawable.Drawable
 import android.util.Log
 import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 
-/** One fixed shortcut of an app, ready to start. [iconRes] is 0 when it has none. */
-data class StaticShortcut(
-    val packageName: String,
-    val id: String,
-    val label: String,
-    val iconRes: Int,
-    val intents: List<Intent>,
-)
-
 /**
  * Reads the fixed ("static") shortcuts apps declare in their manifest, the ones a long press on
- * the app icon shows. Only the home app may read the run-time (dynamic) shortcuts, so these are
- * all another app can offer. The XML is read the way Android's own ShortcutParser does, so a
- * shortcut is listed here exactly when the home screen would list it.
- *
- * Starting one from the service is a background start, allowed for the same reason as
- * [AppSwitcher.launch]: the edge strips are visible at that moment.
+ * the app icon shows. They need no permission. The XML is read the way Android's own
+ * ShortcutParser does, so a shortcut is listed here exactly when the home screen would list it.
+ * The run-time (dynamic) ones come from [RuntimeShortcuts]; [ShortcutCatalog] merges both.
  */
 object StaticShortcuts {
 
-    /** Why the last [launch] failed, for the diagnostics panel. */
-    @Volatile
-    var lastFailure: String? = null
-        private set
-
     /** Every usable shortcut of [packageName]; empty if the app has none or cannot be read. */
-    fun forPackage(context: Context, packageName: String): List<StaticShortcut> {
+    fun forPackage(context: Context, packageName: String): List<ShortcutEntry> {
         val manager = context.packageManager
         val launcherActivities = runCatching {
             manager.queryIntentActivities(
@@ -62,47 +43,23 @@ object StaticShortcuts {
                 PackageManager.GET_META_DATA,
             )
         }.getOrDefault(emptyList())
-        val found = LinkedHashMap<String, StaticShortcut>()
+        val found = LinkedHashMap<String, ShortcutEntry>()
         launcherActivities.mapNotNull { it.activityInfo }.forEach { activity ->
             val xmlRes = activity.metaData?.getInt(META_DATA, 0) ?: 0
             if (xmlRes == 0) return@forEach
             runCatching {
                 val resources = manager.getResourcesForApplication(activity.applicationInfo)
                 parse(resources, xmlRes, packageName)
-                    .filter { usable(manager, it) }
+                    .filter { ShortcutCatalog.usable(manager, it) }
                     .forEach { found.putIfAbsent(it.id, it) }
             }.onFailure { Log.w(TAG, "shortcuts of $packageName unreadable", it) }
         }
         return found.values.toList()
     }
 
-    /** The shortcut a corner stored, read again so an app update is followed; null if gone. */
-    fun find(context: Context, packageName: String, shortcutId: String): StaticShortcut? =
-        forPackage(context, packageName).firstOrNull { it.id == shortcutId }
-
-    fun launch(context: Context, shortcut: StaticShortcut): Boolean = runCatching {
-        // A fresh copy, so the stored intents keep their flags for the next launch.
-        val intents = shortcut.intents.map { Intent(it) }.toTypedArray()
-        context.startActivities(intents)
-    }.onFailure { throwable ->
-        lastFailure = "${shortcut.id}: ${throwable.javaClass.name}"
-        Log.w(TAG, "starting shortcut ${shortcut.packageName}/${shortcut.id} threw", throwable)
-    }.onSuccess {
-        lastFailure = null
-    }.isSuccess
-
-    /** The shortcut's own icon, for the picker; null when it has none. */
-    fun icon(context: Context, shortcut: StaticShortcut): Drawable? {
-        if (shortcut.iconRes == 0) return null
-        return runCatching {
-            context.packageManager.getResourcesForApplication(shortcut.packageName)
-                .getDrawable(shortcut.iconRes, null)
-        }.getOrNull()
-    }
-
     /** One shortcuts XML, with the rules of AOSP ShortcutParser.parseShortcutsOneFile. */
-    private fun parse(resources: Resources, xmlRes: Int, packageName: String): List<StaticShortcut> {
-        val result = ArrayList<StaticShortcut>()
+    private fun parse(resources: Resources, xmlRes: Int, packageName: String): List<ShortcutEntry> {
+        val result = ArrayList<ShortcutEntry>()
         val parser = resources.getXml(xmlRes)
         try {
             val attrs = Xml.asAttributeSet(parser)
@@ -134,25 +91,6 @@ object StaticShortcuts {
         return result
     }
 
-    /** Listed only if every intent reaches an exported, enabled activity of the app itself. */
-    private fun usable(manager: PackageManager, shortcut: StaticShortcut): Boolean =
-        shortcut.intents.all { intent ->
-            val info = activityFor(manager, intent) ?: return@all false
-            info.exported && info.enabled && info.permission == null &&
-                info.packageName == shortcut.packageName
-        }
-
-    private fun activityFor(manager: PackageManager, intent: Intent): ActivityInfo? {
-        val component = intent.component
-        return runCatching {
-            if (component != null) {
-                manager.getActivityInfo(component, 0)
-            } else {
-                manager.resolveActivity(intent, 0)?.activityInfo
-            }
-        }.getOrNull()
-    }
-
     /** A <shortcut> whose intents are still being read. */
     private class Pending(
         val id: String,
@@ -162,7 +100,7 @@ object StaticShortcuts {
     ) {
         val intents = ArrayList<Intent>()
 
-        fun finish(packageName: String): StaticShortcut? {
+        fun finish(packageName: String): ShortcutEntry? {
             if (!enabled || intents.isEmpty()) return null
             intents.forEach { intent ->
                 // A target class with no package names nothing; Android aims it at the app.
@@ -173,7 +111,7 @@ object StaticShortcuts {
                 Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or
                     Intent.FLAG_ACTIVITY_TASK_ON_HOME,
             )
-            return StaticShortcut(packageName, id, label, iconRes, intents.toList())
+            return ShortcutEntry(packageName, id, label, iconRes, intents.toList())
         }
 
         companion object {

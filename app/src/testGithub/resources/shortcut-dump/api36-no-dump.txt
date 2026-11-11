@@ -1,0 +1,1 @@
+Permission Denial: can't dump ShortcutService from from pid=5937, uid=10219 due to missing android.permission.DUMP permission

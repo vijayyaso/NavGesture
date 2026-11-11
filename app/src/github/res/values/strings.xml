@@ -74,4 +74,12 @@
     <string name="bank_pause_resume_now">Resume now</string>
     <string name="bank_pause_failed_title">Gestures could not come back</string>
     <string name="bank_pause_failed_text">NavGesture could not switch itself back on. Tap to open it and turn gestures on again.</string>
+    <!-- App shortcuts in the corner picker: this build can also list the shortcuts apps add while
+         running, after a one-time grant from a computer. -->
+    <string name="corner_app_shortcuts_body">The actions an app offers when you long-press its icon. Apps that keep a shortcut private cannot be shown here.</string>
+    <string name="runtime_shortcuts_title">More app shortcuts</string>
+    <string name="runtime_shortcuts_needs_grant">Shortcuts that apps add while running, like GPay \"Scan any QR code\", show here after a one-time step. Turn on USB debugging (Security settings) in Developer options, then run from a computer:\n%1$s</string>
+    <string name="runtime_shortcuts_needs_usage">Shortcuts that apps add while running also need Usage access for NavGesture.</string>
+    <string name="action_copy_commands">Copy commands</string>
+    <string name="label_copied">Copied</string>
 </resources>

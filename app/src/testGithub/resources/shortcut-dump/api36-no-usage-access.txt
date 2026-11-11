@@ -1,0 +1,1 @@
+Permission Denial: can't dump ShortcutService from from pid=5950, uid=10219 due to android:get_usage_stats app-op not allowed

@@ -69,8 +69,9 @@ import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.CornerShortcut
-import com.vijayyaso.navgesture.service.StaticShortcut
-import com.vijayyaso.navgesture.service.StaticShortcuts
+import com.vijayyaso.navgesture.service.RuntimeAccess
+import com.vijayyaso.navgesture.service.ShortcutCatalog
+import com.vijayyaso.navgesture.service.ShortcutEntry
 import com.vijayyaso.navgesture.ui.theme.IconTint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -140,7 +141,7 @@ private fun appShortcutLabel(shortcut: CornerShortcut.AppShortcut): String {
     // Null while loading; an empty list when the app no longer offers the shortcut.
     val names by produceState<List<String>?>(initialValue = null, shortcut.id) {
         value = withContext(Dispatchers.IO) {
-            val found = StaticShortcuts.find(context, shortcut.packageName, shortcut.shortcutId)
+            val found = ShortcutCatalog.find(context, shortcut.packageName, shortcut.shortcutId)
             if (found == null) emptyList() else listOf(appLabel(context, shortcut.packageName), found.label)
         }
     }
@@ -262,8 +263,11 @@ private fun PickRow(
     )
 }
 
-/** An app with its usable fixed shortcuts and their icons, loaded once for the page. */
-private class AppShortcuts(val app: LaunchableApp, val shortcuts: List<Pair<StaticShortcut, ImageBitmap?>>)
+/** An app with its usable shortcuts and their icons, loaded once for the page. */
+private class AppShortcuts(val app: LaunchableApp, val shortcuts: List<Pair<ShortcutEntry, ImageBitmap?>>)
+
+/** Every app's shortcuts, and whether the run-time ones could be read (github build). */
+private class ShortcutPage(val access: RuntimeAccess, val apps: List<AppShortcuts>)
 
 @Composable
 private fun AppShortcutsGroup(
@@ -274,20 +278,21 @@ private fun AppShortcutsGroup(
 ) {
     val context = LocalContext.current
     val iconPx = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-    val all by produceState<List<AppShortcuts>?>(initialValue = null, apps) {
+    val page by produceState<ShortcutPage?>(initialValue = null, apps) {
         val loaded = apps ?: return@produceState
         value = withContext(Dispatchers.IO) {
-            loaded.mapNotNull { app ->
-                val shortcuts = StaticShortcuts.forPackage(context, app.packageName)
-                if (shortcuts.isEmpty()) return@mapNotNull null
+            val (access, byPackage) = ShortcutCatalog.forPackages(context, loaded.map { it.packageName })
+            val entries = loaded.mapNotNull { app ->
+                val shortcuts = byPackage[app.packageName] ?: return@mapNotNull null
                 AppShortcuts(
                     app,
                     shortcuts.map { shortcut ->
                         // A drawable that throws while drawing must not take the page down.
-                        shortcut to runCatching { StaticShortcuts.icon(context, shortcut)?.toIconBitmap(iconPx) }.getOrNull()
+                        shortcut to runCatching { ShortcutCatalog.icon(context, shortcut)?.toIconBitmap(iconPx) }.getOrNull()
                     },
                 )
             }
+            ShortcutPage(access, entries)
         }
     }
     val chosenPackage = (current as? CornerShortcut.AppShortcut)?.packageName
@@ -299,12 +304,14 @@ private fun AppShortcutsGroup(
         title = stringResource(R.string.corner_section_app_shortcuts),
         footer = stringResource(R.string.corner_app_shortcuts_body),
     ) {
-        val loaded = all
+        val loaded = page
         if (loaded == null) {
             FootNote(stringResource(R.string.switcher_loading))
             return@SettingsGroup
         }
-        loaded.forEach { entry ->
+        // github build only: how to unlock the run-time shortcuts, when they are locked.
+        RuntimeShortcutsHint(loaded.access)
+        loaded.apps.forEach { entry ->
             val appMatches = entry.app.label.contains(query, ignoreCase = true)
             val shown = if (query.isEmpty() || appMatches) {
                 entry.shortcuts
@@ -317,7 +324,7 @@ private fun AppShortcutsGroup(
             val expanded = if (searching) name !in closedInSearch else name in open
             // One child per app, so the card draws its lines between apps, not inside one.
             Column {
-                AppHeaderRow(entry.app, expanded) {
+                AppHeaderRow(entry.app, expanded, TestTags.cornerApp(name)) {
                     if (searching) {
                         closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
                     } else {
@@ -329,7 +336,9 @@ private fun AppShortcutsGroup(
                         PickRow(
                             title = shortcut.label,
                             selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
-                            modifier = Modifier.padding(start = 40.dp),
+                            modifier = Modifier
+                                .padding(start = 40.dp)
+                                .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
                             leading = { AppIconImage(icon ?: entry.app.icon) },
                         ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
                     }
@@ -341,7 +350,7 @@ private fun AppShortcutsGroup(
 
 /** Opens or closes an app's shortcut list; it picks nothing itself. */
 @Composable
-private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, onToggle: () -> Unit) {
+private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, tag: String, onToggle: () -> Unit) {
     val state = stringResource(if (expanded) R.string.corner_expanded else R.string.corner_collapsed)
     ListItem(
         leadingContent = { AppIconImage(app.icon) },
@@ -355,6 +364,7 @@ private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, onToggle: () -> 
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
+            .testTag(tag)
             .clickable(role = Role.Button, onClick = onToggle)
             .semantics { stateDescription = state },
     )

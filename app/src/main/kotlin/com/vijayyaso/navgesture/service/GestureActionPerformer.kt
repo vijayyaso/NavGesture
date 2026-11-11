@@ -80,14 +80,14 @@ class GestureActionPerformer(private val service: AccessibilityService) {
     /** Read again on every use, so an app update that moved the shortcut is followed. */
     private fun appShortcut(shortcut: CornerShortcut.AppShortcut): Boolean {
         Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
-        val found = StaticShortcuts.find(service, shortcut.packageName, shortcut.shortcutId)
+        val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
         if (found == null) {
             lastFailure = "corner ${shortcut.id}: shortcut not found"
             Log.w(TAG, lastFailure.orEmpty())
             return false
         }
-        val launched = StaticShortcuts.launch(service, found)
-        if (!launched) lastFailure = "corner ${shortcut.id}: ${StaticShortcuts.lastFailure}"
+        val launched = ShortcutCatalog.launch(service, found)
+        if (!launched) lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
         return launched
     }
 

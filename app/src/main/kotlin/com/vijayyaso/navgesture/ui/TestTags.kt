@@ -50,7 +50,16 @@ internal object TestTags {
     const val UPDATE_CHECK_NOW = "update_check_now"
     const val UPDATE_INSTALL = "update_install"
     const val UPDATE_ALLOW_INSTALLS = "update_allow_installs"
+    const val RUNTIME_SHORTCUTS_HINT = "runtime_shortcuts_hint"
+    const val RUNTIME_SHORTCUTS_COPY = "runtime_shortcuts_copy"
 
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"
+
+    /** An app's header in the corner picker's App shortcuts card. */
+    fun cornerApp(packageName: String): String = "corner_app_$packageName"
+
+    /** One app shortcut row in the corner picker. */
+    fun cornerShortcut(packageName: String, shortcutId: String): String =
+        "corner_shortcut_$packageName/$shortcutId"
 }
