@@ -42,6 +42,7 @@ import com.vijayyaso.navgesture.gesture.GestureTracker
 import com.vijayyaso.navgesture.gesture.HapticGate
 import com.vijayyaso.navgesture.gesture.LandscapeConfirm
 import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.TouchRecording
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
 
@@ -425,7 +426,7 @@ internal class EdgeTouchOverlay(
         // The overlay's token for the touch in progress, so it can tell a stale callback apart.
         private var stream = 0L
 
-        private val samples = ArrayList<TouchSample>(MAX_SAMPLES)
+        private val samples = TouchRecording(MAX_SAMPLES)
         private var abandoned = false
         private var switching = false
         private val haptics = HapticGate()
@@ -434,7 +435,7 @@ internal class EdgeTouchOverlay(
         private val holdRunnable = Runnable {
             val action = tracker.onHoldElapsed(SystemClock.uptimeMillis())
             // The bottom bubble swaps to the Recents icon on the poll that primes it.
-            samples.lastOrNull()?.let { bubble?.follow(action, it.xPx, it.yPx) }
+            samples.last?.let { bubble?.follow(action, it.xPx, it.yPx) }
             handle(action, replayable = false)
         }
 
@@ -463,7 +464,7 @@ internal class EdgeTouchOverlay(
                     abandoned = false
                     switching = false
                     haptics.reset()
-                    samples += sample
+                    samples.add(sample)
                     Log.d(TAG, "$edge DOWN at ${sample.xPx.toInt()},${sample.yPx.toInt()}")
                     stream = onStreamStart()
                     track(tracker.onDown(sample), sample, replayable = false)
@@ -471,7 +472,7 @@ internal class EdgeTouchOverlay(
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!abandoned) {
-                        if (samples.size < MAX_SAMPLES) samples += sample
+                        samples.add(sample)
                         if (switching) controller?.move(sample) else
                             track(tracker.onMove(sample), sample, replayable = false)
                     }
@@ -507,7 +508,7 @@ internal class EdgeTouchOverlay(
                     val releaseDeferred = if (abandoned) {
                         false
                     } else {
-                        if (samples.size < MAX_SAMPLES) samples += sample
+                        samples.add(sample)
                         track(tracker.onUp(sample), sample, replayable = true)
                     }
                     samples.clear()
@@ -552,7 +553,7 @@ internal class EdgeTouchOverlay(
                     bubble?.hide()
                     switching = true
                     controller?.open(action)
-                    samples.lastOrNull()?.let { controller?.move(it) }
+                    samples.last?.let { controller?.move(it) }
                 }
                 is TrackerAction.CornerReady -> {
                     // The diagonal is a shortcut now, not a Home swipe: the drop goes away.
@@ -592,8 +593,8 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.Unused -> {
                     cancelHold()
                     Log.d(TAG, "$edge unused (${action.reason})")
-                    if (replayable && samples.isNotEmpty()) {
-                        onUnused(stream, samples.toList())
+                    if (replayable && !samples.isEmpty()) {
+                        onUnused(stream, samples.snapshot())
                         return true
                     }
                 }
