@@ -61,7 +61,7 @@ Works on Android 11 and newer.
 | App or game | App |
 | Category | Tools |
 | Tags | Launcher & home screen tools, Productivity |
-| Email | (support email still to be chosen; Play Console needs one before release) |
+| Email | vijayyaso7@gmail.com |
 | Website | https://github.com/vijayyaso/NavGesture |
 | Privacy policy | https://github.com/vijayyaso/NavGesture/blob/main/docs/privacy-policy.md |
 
