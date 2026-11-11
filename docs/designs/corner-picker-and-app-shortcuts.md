@@ -115,7 +115,8 @@ Two changes to the corner shortcuts on the App switching screen:
 ## Non-goals
 
 *   Dynamic or pinned shortcuts in the play build (needs the home-app role,
-    root, Shizuku or the DUMP grant the github build uses).
+    root, Shizuku or the DUMP and PACKAGE_USAGE_STATS grants the github
+    build uses).
 *   github build: run-time shortcuts with a data URI, clip data, a selector
     or array / nested extras (the debug text cannot carry them); shortcuts
     of other users or a work profile (only the app's own user is read);
@@ -291,7 +292,7 @@ shortcut.
     existing gesture-bar grant (`hide_gesture_bar_needs_grant`) does;
     Shizuku's privileged server has to be started by adb or root and kept
     running (`docs/hyperos-navigation.md`). Whether the grants survive turning
-    Developer options off again was not checked.
+    Developer options off again: source not recorded in this doc.
 *   **Become the default home app for a moment** (as Tasker's workaround
     does). Needs adb or root to switch the home app; visible flicker.
 *   **Keep the dialog, add a third list.** The dialog already nests a second
@@ -356,7 +357,7 @@ else, and the fixed shortcuts work as before.
 *   **Same safety rule as fixed shortcuts:** every intent must reach an
     exported, enabled activity of the publishing app itself that needs no
     permission (`ShortcutCatalog.usable`). GPay's `LauncherActivity` is
-    exported (not yet checked on the phone). A shortcut aimed
+    exported (source not recorded in this doc). A shortcut aimed
     at another app, or at a private activity, is not listed.
 *   **Fixed wins a clash.** The dump also lists manifest shortcuts, without
     their data URIs; the XML reader keeps them exact, so a run-time entry
@@ -464,7 +465,7 @@ lines, from the API 36 emulator with the test app installed:
     Android 13 and later; Android 11 printed `fixture://open/item?id=7`
     whole, but http, tel and mail URIs are cut there too, so every `dat=`
     is skipped the same way), `clip={`, `sel=`, `org={`, `(has extras)`
-    (a `Bundle` on the intent itself, which the text does not print).
+    (the text marks extras it does not print).
     **Also skipped, as invalid:** an intent with no action, and a block with
     an empty or `null` label.
 *   **Extras** are the intent's `PersistableBundle` printed as
@@ -499,8 +500,8 @@ lines, from the API 36 emulator with the test app installed:
     `true` is sent as an Int or Boolean; the target then typically reads its
     default.
     A String value containing `, k=` is split wrongly. Flutter's
-    `quick_actions` (GPay) puts a String key and value (read from the
-    plugin, not yet from GPay's own dump), so it should not be affected.
+    `quick_actions` (GPay) puts a String key and value (source not
+    recorded in this doc), so it should not be affected.
 *   **Spoofed lines.** Any installed app chooses its own shortcut labels,
     and a label with a newline could fake lines, even a `Package:` header,
     in the full dump. So the full dump is for display only: a forged entry
@@ -648,6 +649,6 @@ its Code table is the file list. Order, so that each step builds:
     APK is debuggable and asks for DUMP.
 14. Verify: the container build compiled both flavours
     (`compilePlayDebugKotlin`, `assemblePlayRelease`, `testGithubDebugUnitTest`,
-    `testPlayDebugUnitTest`, `lintPlayDebug`; `/tmp/ngbuild2.log`); then the
+    `testPlayDebugUnitTest`, `lintPlayDebug`); then the
     `app-shortcuts` suite on `ng36` and `ng30` (results under Verification
     above). Still open: GPay on the POCO, with the in-app dump time.

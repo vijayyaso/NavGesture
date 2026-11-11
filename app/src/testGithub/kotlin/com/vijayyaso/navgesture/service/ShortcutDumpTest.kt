@@ -142,9 +142,9 @@ class ShortcutDumpTest {
 
     @Test
     fun `a label with the refusal's words is not a refusal`() {
-        val sample = sample("api36-one-package.txt")
-        val inLabel = sample.replace("shortLabel=Scan QR", "shortLabel=Permission Denial: app-op")
-        val ownLine = sample.replace("shortLabel=Scan QR", "shortLabel=x\nPermission Denial: app-op")
+        val listing = sample("api36-one-package.txt")
+        val inLabel = listing.replace("shortLabel=Scan QR", "shortLabel=Permission Denial: app-op")
+        val ownLine = listing.replace("shortLabel=Scan QR", "shortLabel=x\nPermission Denial: app-op")
         assertEquals(DumpDenial.NONE, ShortcutDump.denial(inLabel))
         assertEquals(DumpDenial.NONE, ShortcutDump.denial(ownLine))
         assertTrue(ShortcutDump.parse(inLabel).any { it.id == "qr_scanner" })
