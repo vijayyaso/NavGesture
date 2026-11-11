@@ -28,7 +28,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
@@ -37,13 +36,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 internal val Context.gestureDataStore: DataStore<Preferences> by
-    preferencesDataStore(name = "gesture_configuration")
+    resettingPreferencesDataStore("gesture_configuration")
 
 /** Defaults are never duplicated here: a missing key falls back to [GestureConfiguration]. */
-class GestureSettingsRepository(private val context: Context) {
+class GestureSettingsRepository(
+    private val context: Context,
+    private val store: DataStore<Preferences> = context.gestureDataStore,
+) {
 
-    val configuration: Flow<GestureConfiguration> =
-        context.gestureDataStore.data.map(::toConfiguration)
+    val configuration: Flow<GestureConfiguration> = store.data.map(::toConfiguration)
 
     suspend fun read(): GestureConfiguration = configuration.first()
 
@@ -52,7 +53,7 @@ class GestureSettingsRepository(private val context: Context) {
      * quick changes both start from the old values, so the second write puts the first one back.
      */
     suspend fun update(transform: (GestureConfiguration) -> GestureConfiguration) {
-        context.gestureDataStore.edit { preferences ->
+        store.edit { preferences ->
             val updated = transform(toConfiguration(preferences))
             preferences[EDGE_WIDTH_DP] = updated.edgeWidthDp
             preferences[SIDE_MIN_DISTANCE_DP] = updated.sideMinimumSwipeDistanceDp
