@@ -58,16 +58,6 @@ configure notifications recents_list TAP
 geometry
 warm_input
 
-# corner_swipe <x0> <dx-sign> - a 45-degree diagonal from a bottom corner, in three events.
-corner_swipe() {
-  x0="$1" sign="$2"
-  "${ADB_BIN}" shell input motionevent DOWN "${x0}" "${BOTTOM_Y}" >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE $((x0 + sign * 60)) $((BOTTOM_Y - 60)) >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE $((x0 + sign * 180)) $((BOTTOM_Y - 180)) >/dev/null
-  "${ADB_BIN}" shell input motionevent UP $((x0 + sign * 180)) $((BOTTOM_Y - 180)) >/dev/null
-  sleep 2
-}
-
 # swipe_up_drag <x> <dx> - the app-list trigger: a short rise, then a sideways drag, then lift.
 swipe_up_drag() {
   x="$1" dx="$2" top=$((BOTTOM_Y - 120))

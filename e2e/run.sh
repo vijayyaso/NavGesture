@@ -62,7 +62,7 @@ done
 shift $((OPTIND - 1))
 
 # disclosure clears the app's data, so it stays last.
-all_suites='navigation app-switch corner back-revert status-refresh circle-to-search landscape-confirm bank-pause disclosure'
+all_suites='navigation app-switch corner app-shortcuts back-revert status-refresh circle-to-search landscape-confirm bank-pause disclosure'
 suites="${all_suites}"
 if [ "$#" -gt 0 ]; then
   suites="$*"
