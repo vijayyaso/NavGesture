@@ -1,0 +1,73 @@
+
+  Package: com.vijayyaso.navgesture.fixture.shortcuts  UID: 10169
+    Calls: 0
+    Last known FG: 392041
+    Last reset: [1794422332898] 2026-11-12 00:08:52
+
+    PackageInfo:
+      IsShadow: false (installed)
+      Version: 1
+      Backup Allowed: true
+      Last package update time: 1794426996742
+
+    Shortcuts:
+      ShortcutInfo {id=qr_scanner, flags=0x81 [DynStr]
+        packageName=com.vijayyaso.navgesture.fixture.shortcuts
+        activity=ComponentInfo{com.vijayyaso.navgesture.fixture.shortcuts/com.vijayyaso.navgesture.fixture.shortcuts.LauncherActivity}
+        shortLabel=Scan QR, resId=0[null]
+        longLabel=null, resId=0[null]
+        disabledMessage=null, resId=0[null]
+        disabledReason=[Not disabled]
+        categories=null
+        persons=null
+        icon=null
+        rank=0, timestamp=1794426998329
+        intents=[Intent { act=RUN flg=0x14000000 cmp=com.vijayyaso.navgesture.fixture.shortcuts/.LauncherActivity }/PersistableBundle[{some unique action key=QR_SCANNER}]]
+        extras=null
+        iconRes=0[null], bitmapPath=null, iconUri=null}
+      ShortcutInfo {id=private, flags=0x81 [DynStr]
+        packageName=com.vijayyaso.navgesture.fixture.shortcuts
+        activity=ComponentInfo{com.vijayyaso.navgesture.fixture.shortcuts/com.vijayyaso.navgesture.fixture.shortcuts.LauncherActivity}
+        shortLabel=Private, resId=0[null]
+        longLabel=null, resId=0[null]
+        disabledMessage=null, resId=0[null]
+        disabledReason=[Not disabled]
+        categories=null
+        persons=null
+        icon=null
+        rank=3, timestamp=1794426998329
+        intents=[Intent { act=RUN cmp=com.vijayyaso.navgesture.fixture.shortcuts/.PrivateActivity }/null]
+        extras=null
+        iconRes=0[null], bitmapPath=null, iconUri=null}
+      ShortcutInfo {id=typed, flags=0x81 [DynStr]
+        packageName=com.vijayyaso.navgesture.fixture.shortcuts
+        activity=ComponentInfo{com.vijayyaso.navgesture.fixture.shortcuts/com.vijayyaso.navgesture.fixture.shortcuts.LauncherActivity}
+        shortLabel=Typed extras, resId=0[null]
+        longLabel=null, resId=0[null]
+        disabledMessage=null, resId=0[null]
+        disabledReason=[Not disabled]
+        categories=null
+        persons=null
+        icon=null
+        rank=1, timestamp=1794426998329
+        intents=[Intent { act=RUN cmp=com.vijayyaso.navgesture.fixture.shortcuts/.LauncherActivity }/PersistableBundle[{on=true, big=9999999999, note=a, b, pair=x=y, count=3}]]
+        extras=null
+        iconRes=0[null], bitmapPath=null, iconUri=null}
+      ShortcutInfo {id=with_data, flags=0x81 [DynStr]
+        packageName=com.vijayyaso.navgesture.fixture.shortcuts
+        activity=ComponentInfo{com.vijayyaso.navgesture.fixture.shortcuts/com.vijayyaso.navgesture.fixture.shortcuts.LauncherActivity}
+        shortLabel=With data, resId=0[null]
+        longLabel=null, resId=0[null]
+        disabledMessage=null, resId=0[null]
+        disabledReason=[Not disabled]
+        categories=null
+        persons=null
+        icon=null
+        rank=2, timestamp=1794426998329
+        intents=[Intent { act=android.intent.action.VIEW dat=fixture://open/item?id=7 cmp=com.vijayyaso.navgesture.fixture.shortcuts/.LauncherActivity }/null]
+        extras=null
+        iconRes=0[null], bitmapPath=null, iconUri=null}
+    Total bitmap size: 0 (0 B)
+
+
+

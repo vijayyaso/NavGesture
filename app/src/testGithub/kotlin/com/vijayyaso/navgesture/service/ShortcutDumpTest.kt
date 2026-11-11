@@ -24,7 +24,7 @@ import org.junit.Test
 
 /**
  * The samples are real `dumpsys shortcut` output, read as the app's own uid (run-as) on the
- * API 36 emulator with the shortcut test app from e2e/fixtures/shortcut-app installed.
+ * API 36 and API 30 emulators with the shortcut test app from e2e/fixtures/shortcut-app installed.
  */
 class ShortcutDumpTest {
 
@@ -121,6 +121,12 @@ class ShortcutDumpTest {
         val one = ShortcutDump.parse(sample("api36-one-package.txt"))
         assertEquals(all.filter { it.packageName == FIXTURE }.toSet(), one.toSet())
         assertEquals(setOf("qr_scanner", "typed", "private"), one.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `Android 11 prints the same layout, so the same shortcuts read the same way`() {
+        val api30 = ShortcutDump.parse(sample("api30-one-package.txt"))
+        assertEquals(all.filter { it.packageName == FIXTURE }.toSet(), api30.toSet())
     }
 
     @Test
