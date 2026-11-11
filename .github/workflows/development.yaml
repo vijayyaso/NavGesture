@@ -80,6 +80,9 @@ jobs:
   sonarqube:
     name: SonarQube Scan
     needs: [checks]
+    # NavGesture has no SonarQube server yet; set the SONAR_HOST_URL variable (and the
+    # SONAR_TOKEN secret) in the repository settings to turn the scan on.
+    if: ${{ vars.SONAR_HOST_URL != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Run actions/checkout

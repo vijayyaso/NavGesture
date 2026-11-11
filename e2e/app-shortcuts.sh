@@ -176,8 +176,15 @@ else
   pass "the computer step is gone once granted"
 fi
 if tap_id "corner_app_${FIX}"; then pass "the test app is listed under App shortcuts"; else fail "the test app is listed under App shortcuts"; fi
-sleep 1
-listed="$(ui_nodes | grep -o "resource-id=\"corner_shortcut_${FIX}/[^\"]*\"" | sed 's/.*\///; s/"$//' | sort | paste -sd, -)"
+# The rows come from a dumpsys read off the main thread; a slow CI emulator needs more than
+# a second, so wait for them instead of sleeping a fixed time.
+listed=''
+list_try=1
+while [ "${list_try}" -le 15 ] && [ -z "${listed}" ]; do
+  sleep 1
+  listed="$(ui_nodes | grep -o "resource-id=\"corner_shortcut_${FIX}/[^\"]*\"" | sed 's/.*\///; s/"$//' | sort | paste -sd, -)"
+  list_try=$((list_try + 1))
+done
 if [ "${listed}" = "qr_scanner,typed" ]; then
   pass "it lists Scan QR and Typed extras, not the data-URI or private ones"
 else
