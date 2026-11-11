@@ -35,6 +35,11 @@ class GestureActionPerformer(private val service: AccessibilityService) {
 
     val switcher = AppSwitcher(service)
 
+    /** One at a time, so two quick corner swipes start their shortcuts in order. */
+    private val shortcutThread = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
+        Thread(task, "NavGesture-shortcut").apply { isDaemon = true }
+    }
+
     private val assistantTag: String? by lazy {
         NavigationIntegrationFactory.create(service).assistantAttributionTag
     }
@@ -77,18 +82,26 @@ class GestureActionPerformer(private val service: AccessibilityService) {
         return global(shortcut.id, globalAction)
     }
 
-    /** Read again on every use, so an app update that moved the shortcut is followed. */
+    /**
+     * Read again on every use, so an app update that moved the shortcut is followed. The read
+     * can run `dumpsys` for up to a few seconds (run-time shortcuts, github build), so it runs
+     * on [shortcutThread], never on the main thread that handles touches. The caller ignores
+     * the result, so this returns true once the work is queued.
+     */
     private fun appShortcut(shortcut: CornerShortcut.AppShortcut): Boolean {
         Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
-        val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
-        if (found == null) {
-            lastFailure = "corner ${shortcut.id}: shortcut not found"
-            Log.w(TAG, lastFailure.orEmpty())
-            return false
+        shortcutThread.execute {
+            val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
+            if (found == null) {
+                lastFailure = "corner ${shortcut.id}: shortcut not found"
+                Log.w(TAG, lastFailure.orEmpty())
+                return@execute
+            }
+            if (!ShortcutCatalog.launch(service, found)) {
+                lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
+            }
         }
-        val launched = ShortcutCatalog.launch(service, found)
-        if (!launched) lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
-        return launched
+        return true
     }
 
     private fun global(name: String, globalAction: Int): Boolean {

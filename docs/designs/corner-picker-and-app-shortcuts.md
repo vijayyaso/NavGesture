@@ -173,8 +173,9 @@ object ShortcutCatalog {          // merges fixed + run-time, starts them
 *   `launch` calls `context.startActivities(intents)`. On an exception it
     sets `lastFailure` to `"<id>: <exception class>"` and returns false.
 *   The corner looks the shortcut up again with `find` on every use, so an
-    app update that changes the intent is followed. It runs on the
-    service's main thread, as the current app launch does.
+    app update that changes the intent is followed. `GestureActionPerformer`
+    runs the lookup and the launch on one background thread
+    (`NavGesture-shortcut`), not on the main thread that handles touches.
 *   The UI turns `icon()` into a bitmap with the existing
     `Drawable.toIconBitmap` in `AppPicker.kt` (made `internal`), and shows
     it with the existing `AppIconImage`.
@@ -396,7 +397,8 @@ else, and the fixed shortcuts work as before.
 *   **Corner:** `ShortcutCatalog.find` tries the fixed list first; only
     if the id is not there does it run a one-package dump (`--user <n> -p
     ^\Q<package>\E$`, passed as `ProcessBuilder` arguments, so no shell
-    quotes; 3 s limit). That runs on the service's main thread. Unlike the
+    quotes; 3 s limit). That runs on the `NavGesture-shortcut` background
+    thread, so the edge strips keep reacting. Unlike the
     fixed lookup (an in-process XML read), it starts a process, and a
     run-time shortcut such as GPay's takes this path on every swipe. A
     whole dump (35 KB) took 0.025 s through `adb shell` on the emulator; the
@@ -487,11 +489,12 @@ lines, from the API 36 emulator with the test app installed:
     only fixed shortcuts and the corner reports "shortcut not found" as for
     a removed app. Unit tests pin the API 36 and API 30 text
     (`app/src/testGithub/resources/shortcut-dump/`).
-*   **A dump on the service's main thread.** A corner swipe on a run-time
-    shortcut waits for `dumpsys` (limit 3 s) before it starts the app; the
-    edge strips do not react meanwhile. Not measured in the app or on the
-    POCO. Open item: measure it there; if slow, take one of the options
-    under "Not chosen in this change".
+*   **A dump before a run-time shortcut starts.** A corner swipe on a
+    run-time shortcut waits for `dumpsys` (limit 3 s) on the
+    `NavGesture-shortcut` background thread before it starts the app; the
+    edge strips keep reacting meanwhile. The delay is not measured in the
+    app or on the POCO. Open item: measure it there; if slow, take one of
+    the options under "Not chosen in this change".
 *   **Failures look alike.** A missing grant, a refusal, a time-out and a
     format change all end as "shortcut not found" on the corner and "App
     shortcut not found" on App switching, the same as a removed app. Only

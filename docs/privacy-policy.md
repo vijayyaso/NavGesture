@@ -1,6 +1,6 @@
 # NavGesture privacy policy
 
-*Last updated: 2026-11-01*
+*Last updated: 2026-11-12*
 
 NavGesture is a free, open-source gesture app by Vijayyaso. This policy covers
 both builds: the one on Google Play and the one on GitHub Releases.
@@ -45,6 +45,21 @@ leaves your phone. The Google Play build has no bank pause.
 If you grant Usage access, NavGesture reads **which apps you opened
 recently** so the app switcher can list them. This list stays on your phone
 and is not stored after it is shown.
+
+### App shortcuts (optional)
+
+When you pick a corner shortcut, NavGesture lists the shortcuts your apps
+offer (for example YouTube "Search"). It reads their names and the screen each
+one opens, from the apps installed on your phone.
+
+**GitHub build only:** if you give it the two extra permissions from a
+computer (DUMP and usage stats), it also reads the shortcuts apps add while
+running, like GPay "Scan any QR code". It gets these from Android's shortcut
+list, which holds the shortcut names and target screens of **all** your apps.
+NavGesture keeps only the ones you can start, shows them in the picker, and
+stores only the one you choose. Nothing from this list leaves your phone. The
+Google Play build does not ask for these permissions and cannot read this
+list.
 
 ### Settings you choose
 
