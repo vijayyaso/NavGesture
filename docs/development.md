@@ -123,6 +123,8 @@ Every bug found on a real device so far was in the Android integration, not the 
 
 None of that is reachable from a JVM test.
 
+The strips can still be left held by a touch stream that never ends. `service/StreamHold.kt` releases them after 5065 ms without a touch event, the longest replay hold plus one second, and holds them again if the same touch moves after that. Every hold carries a token, so a late replay callback cannot free a newer touch's strips. Each such release adds one line to the service history in Troubleshooting. It records only the time, never where the finger was.
+
 ## Releasing
 
 Signing material lives outside git:

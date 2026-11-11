@@ -32,6 +32,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.ConfirmVerdict
 import com.vijayyaso.navgesture.gesture.CornerShortcut
@@ -81,7 +82,9 @@ internal class EdgeTouchOverlay(
     private var switcherPanel: SwitcherPanelOverlay? = null
     private var switcherController: EdgeSwitcherController? = null
 
-    private var streamHeld = false
+    private val hold = StreamHold(StreamHold.STUCK_STREAM_MS)
+
+    private var heldEdge: ScreenEdge? = null
 
     // Owned here rather than by a strip, so a pending pill is kept across a reinstall.
     private val confirmation = LandscapeConfirm()
@@ -94,9 +97,7 @@ internal class EdgeTouchOverlay(
 
     private val pillExpiry = Runnable(::onPillTimeout)
 
-    // A touch that ends without ACTION_UP or ACTION_CANCEL would leave the strips inert
-    // forever, since an inert strip can no longer receive the event that releases it.
-    private val streamWatchdog = Runnable(::onStreamWatchdog)
+    private val stuckCheck = Runnable(::onStuckCheck)
 
     fun install(configuration: GestureConfiguration, geometry: ScreenGeometry) {
         remove()
@@ -156,13 +157,14 @@ internal class EdgeTouchOverlay(
         bubbles.values.forEach(FluidBubbleOverlay::remove)
         bubbles.clear()
         handler.removeCallbacks(pillExpiry)
-        handler.removeCallbacks(streamWatchdog)
+        handler.removeCallbacks(stuckCheck)
         pill?.remove()
         pill = null
         pillVisible = false
-        // Detaching kills any in-flight stream, so its UP never arrives to release the
-        // hold; without this reset, freshly installed strips start out inert.
-        streamHeld = false
+        // Detaching kills any in-flight stream and its UP. The new token also keeps a replay
+        // still in flight from freeing the next install's strips mid-touch.
+        hold.reset()
+        heldEdge = null
     }
 
     private fun addStrip(
@@ -187,24 +189,17 @@ internal class EdgeTouchOverlay(
             controller = switcherController,
             dragListEnabled = configuration.edgeAppListEnabled,
             onStreamStart = { onStreamStart(edge) },
-            onStreamActivity = ::armStreamWatchdog,
-            admit = { action -> admit(action, edge) },
-            onFire = { action -> onFire(action, edge) },
-            onUnused = { samples -> onUnused(edge, samples) },
-            onStreamEnd = { endStream(edge) },
+            onActivity = ::onActivity,
+            admit = { stream, action -> hold.isCurrent(stream) && admit(action, edge) },
+            onFire = { stream, action -> if (hold.isCurrent(stream)) onFire(action, edge) },
+            onUnused = { stream, samples -> onUnused(edge, stream, samples) },
+            onStreamEnd = { stream -> endStream(edge, stream) },
         )
         val params = paramsFor(edge, configuration, geometry)
         runCatching {
             windowManager.addView(view, params)
             strips[edge] = view
             Log.i(TAG, "strip $edge installed ${params.width}x${params.height} geometry=$geometry")
-            // Keep the platform's own back gesture off these pixels.
-            view.post {
-                if (view.width > 0 && view.height > 0) {
-                    view.systemGestureExclusionRects =
-                        listOf(Rect(0, 0, view.width, view.height))
-                }
-            }
         }.onFailure { Log.e(TAG, "Could not add $edge strip", it) }
     }
 
@@ -266,14 +261,25 @@ internal class EdgeTouchOverlay(
         return left to right
     }
 
-    private fun onStreamStart(edge: ScreenEdge) {
+    private fun onStreamStart(edge: ScreenEdge): Long {
         switcherController?.onStreamStart()
         bubbles.values.forEach(FluidBubbleOverlay::hide)
-        confirmation.onDown(edge, SystemClock.uptimeMillis())
+        val now = SystemClock.uptimeMillis()
+        confirmation.onDown(edge, now)
         syncPill()
-        streamHeld = true
+        val stream = hold.start(now)
+        heldEdge = edge
         applyInteractivity()
-        armStreamWatchdog()
+        scheduleStuckCheck()
+        return stream
+    }
+
+    private fun onActivity(stream: Long) {
+        if (!hold.activity(stream, SystemClock.uptimeMillis())) return
+        // The finger was only still, and its replay would be routed back into touchable strips.
+        Log.w(TAG, "STREAM_HELD_AGAIN a touch event followed the stuck release")
+        applyInteractivity()
+        scheduleStuckCheck()
     }
 
     /** False when the gesture is held back behind the pill instead. */
@@ -303,19 +309,24 @@ internal class EdgeTouchOverlay(
         }
     }
 
-    private fun onUnused(edge: ScreenEdge, samples: List<TouchSample>) {
+    private fun onUnused(edge: ScreenEdge, stream: Long, samples: List<TouchSample>) {
+        if (!hold.isCurrent(stream)) return
+        if (!hold.mayReplay(stream)) {
+            Log.d(TAG, "replay skipped, the strips were given back during this touch")
+            endStream(edge, stream)
+            return
+        }
         confirmation.onReplayed(edge)
         syncPill(immediate = true)
-        // The replay has its own timeout (3 s stroke at most), well inside the watchdog.
-        armStreamWatchdog()
-        val dispatched = replayer.replay(samples) { releaseStream() }
-        if (!dispatched) releaseStream()
+        val dispatched = replayer.replay(samples) { releaseStream(stream, "replay done") }
+        if (!dispatched) releaseStream(stream, "replay refused")
     }
 
-    private fun endStream(edge: ScreenEdge) {
+    private fun endStream(edge: ScreenEdge, stream: Long) {
+        if (!hold.isCurrent(stream)) return
         confirmation.onStreamEnd(edge, SystemClock.uptimeMillis())
         syncPill()
-        releaseStream()
+        releaseStream(stream, "stream ended")
     }
 
     private fun onPillTimeout() {
@@ -341,29 +352,43 @@ internal class EdgeTouchOverlay(
         if (immediate) overlay?.hide() else overlay?.fadeOut()
     }
 
-    /** Restarts the idle timer. Does nothing when no stream is held. */
-    private fun armStreamWatchdog() {
-        if (!streamHeld) return
-        handler.removeCallbacks(streamWatchdog)
-        handler.postDelayed(streamWatchdog, STREAM_IDLE_LIMIT_MS)
-    }
-
-    private fun onStreamWatchdog() {
-        if (!streamHeld) return
-        Log.w(TAG, "STREAM_WATCHDOG no touch event for ${STREAM_IDLE_LIMIT_MS}ms; forcing strips interactive")
-        releaseStream()
-    }
-
-    private fun releaseStream() {
-        handler.removeCallbacks(streamWatchdog)
-        streamHeld = false
+    private fun releaseStream(stream: Long, reason: String) {
+        if (!hold.release(stream)) {
+            Log.d(TAG, "release ignored, stream no longer held ($reason)")
+            return
+        }
+        handler.removeCallbacks(stuckCheck)
         applyInteractivity()
-        Log.d(TAG, "stream released; strips interactive again")
+        Log.d(TAG, "stream released ($reason), strips interactive again")
+    }
+
+    private fun scheduleStuckCheck() {
+        handler.removeCallbacks(stuckCheck)
+        hold.deadlineMs?.let { handler.postAtTime(stuckCheck, it) }
+    }
+
+    // A stream the system ends without UP or CANCEL leaves every strip inert, since an inert
+    // strip can no longer receive the event that releases it. Seen upstream on the Redmi 14
+    // with all three strips held and no finger down.
+    private fun onStuckCheck() {
+        val now = SystemClock.uptimeMillis()
+        if (!hold.expire(now)) {
+            scheduleStuckCheck()
+            return
+        }
+        // Edge and timing only: touch positions never leave memory.
+        val event = "touch strips freed after ${StreamHold.STUCK_STREAM_MS} ms without a touch event"
+        Log.w(TAG, "STREAM_STUCK $event, held by ${heldEdge ?: "none"}")
+        ServiceLog.add(context, event)
+        bubbles.values.forEach(FluidBubbleOverlay::hide)
+        heldEdge?.let { confirmation.onStreamEnd(it, now) }
+        syncPill()
+        applyInteractivity()
     }
 
     /** See the class comment for why this is alpha 0 as well as non-touchable. */
     private fun applyInteractivity() {
-        val interactive = !streamHeld
+        val interactive = !hold.held
         strips.values.forEach { view ->
             val params = view.layoutParams as? WindowManager.LayoutParams ?: return@forEach
             val flags = if (interactive) {
@@ -389,13 +414,16 @@ internal class EdgeTouchOverlay(
         private val bubble: FluidBubbleOverlay?,
         private val controller: EdgeSwitcherController?,
         private val dragListEnabled: Boolean,
-        private val onStreamStart: () -> Unit,
-        private val onStreamActivity: () -> Unit,
-        private val admit: (GestureAction) -> Boolean,
-        private val onFire: (GestureAction) -> Unit,
-        private val onUnused: (List<TouchSample>) -> Unit,
-        private val onStreamEnd: () -> Unit,
+        private val onStreamStart: () -> Long,
+        private val onActivity: (Long) -> Unit,
+        private val admit: (Long, GestureAction) -> Boolean,
+        private val onFire: (Long, GestureAction) -> Unit,
+        private val onUnused: (Long, List<TouchSample>) -> Unit,
+        private val onStreamEnd: (Long) -> Unit,
     ) : View(context) {
+
+        // The overlay's token for the touch in progress, so it can tell a stale callback apart.
+        private var stream = 0L
 
         private val samples = ArrayList<TouchSample>(MAX_SAMPLES)
         private var abandoned = false
@@ -417,11 +445,18 @@ internal class EdgeTouchOverlay(
             setBackgroundColor(Color.TRANSPARENT)
         }
 
+        // Keep the platform's own back gesture off these pixels.
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            if (w > 0 && h > 0) systemGestureExclusionRects = listOf(Rect(0, 0, w, h))
+        }
+
         // Nothing here to click: a real tap is replayed to the app underneath instead.
         @SuppressLint("ClickableViewAccessibility")
         override fun onTouchEvent(event: MotionEvent): Boolean {
             // rawX/rawY are display coordinates, which is what the replay path expects.
             val sample = TouchSample(event.rawX, event.rawY, event.eventTime)
+            if (event.actionMasked != MotionEvent.ACTION_DOWN) onActivity(stream)
             return when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     samples.clear()
@@ -430,12 +465,11 @@ internal class EdgeTouchOverlay(
                     haptics.reset()
                     samples += sample
                     Log.d(TAG, "$edge DOWN at ${sample.xPx.toInt()},${sample.yPx.toInt()}")
-                    onStreamStart()
+                    stream = onStreamStart()
                     track(tracker.onDown(sample), sample, replayable = false)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    onStreamActivity()
                     if (!abandoned) {
                         if (samples.size < MAX_SAMPLES) samples += sample
                         if (switching) controller?.move(sample) else
@@ -447,7 +481,6 @@ internal class EdgeTouchOverlay(
                     // Never a navigation gesture, and replaying a partial pinch would be
                     // worse than dropping it.
                     Log.d(TAG, "$edge ABANDONED second pointer went down")
-                    onStreamActivity()
                     abandoned = true
                     switching = false
                     controller?.cancel()
@@ -464,7 +497,7 @@ internal class EdgeTouchOverlay(
                         samples.clear()
                         // HyperOS needs a visible accessibility strip to allow the launch.
                         // Restore it before release hides the panel and starts the activity.
-                        onStreamEnd()
+                        onStreamEnd(stream)
                         controller?.release(sample)
                         return true
                     }
@@ -478,7 +511,7 @@ internal class EdgeTouchOverlay(
                         track(tracker.onUp(sample), sample, replayable = true)
                     }
                     samples.clear()
-                    if (!releaseDeferred) onStreamEnd()
+                    if (!releaseDeferred) onStreamEnd(stream)
                     true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -491,7 +524,7 @@ internal class EdgeTouchOverlay(
                     cancelHold()
                     tracker.onCancel()
                     samples.clear()
-                    onStreamEnd()
+                    onStreamEnd(stream)
                     true
                 }
                 else -> false
@@ -503,7 +536,7 @@ internal class EdgeTouchOverlay(
          * while the finger is still down. Returns true when the release was deferred.
          */
         private fun handle(action: TrackerAction, replayable: Boolean): Boolean {
-            val admitted = action !is TrackerAction.Fire || admit(action.action)
+            val admitted = action !is TrackerAction.Fire || admit(stream, action.action)
             val buzz = haptics.shouldTick(action)
             // One buzz per gesture.
             when {
@@ -550,7 +583,7 @@ internal class EdgeTouchOverlay(
                     if (admitted) {
                         // action.id, not ::class.simpleName - R8 obfuscates class names.
                         Log.i(TAG, "GESTURE_FIRED $edge ${action.action.id}")
-                        onFire(action.action)
+                        onFire(stream, action.action)
                     }
                 }
                 is TrackerAction.Disarmed -> Log.d(TAG, "$edge disarmed, pulled back inside the trigger")
@@ -560,7 +593,7 @@ internal class EdgeTouchOverlay(
                     cancelHold()
                     Log.d(TAG, "$edge unused (${action.reason})")
                     if (replayable && samples.isNotEmpty()) {
-                        onUnused(samples.toList())
+                        onUnused(stream, samples.toList())
                         return true
                     }
                 }
@@ -623,13 +656,6 @@ internal class EdgeTouchOverlay(
 
     private companion object {
         const val TAG = "NavGesture"
-
-        /**
-         * Longest a held stream may stay silent before the strips are forced back. Past a
-         * resting finger's usual hold, and past the replay's own timeout (3 s stroke plus
-         * a 1 s grace). Releasing early is harmless: a touch keeps its original window.
-         */
-        const val STREAM_IDLE_LIMIT_MS = 10_000L
 
         /**
          * Wait before a corner shortcut runs: the strips' return to visible is an async
