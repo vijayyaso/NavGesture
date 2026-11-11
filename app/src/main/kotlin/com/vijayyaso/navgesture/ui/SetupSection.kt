@@ -24,7 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -40,12 +40,14 @@ import com.vijayyaso.navgesture.setup.TileAddOutcome
 @Composable
 internal fun SetupRows(items: List<SetupItem>, model: AppModel) {
     // Outcomes are held rather than their messages, so a locale change re-resolves them.
-    var tileOutcome by remember {
+    var tileOutcome by rememberSaveable(stateSaver = TileOutcomeSaver) {
         mutableStateOf<TileAddOutcome?>(
             TileAddOutcome.Unsupported.takeUnless { TileAddOutcome.promptAvailable(Build.VERSION.SDK_INT) },
         )
     }
-    var navigationOutcome by remember { mutableStateOf<EnableRequestOutcome?>(null) }
+    var navigationOutcome by rememberSaveable(stateSaver = EnableOutcomeSaver) {
+        mutableStateOf<EnableRequestOutcome?>(null)
+    }
     val context = LocalContext.current
     items.forEach { item ->
         when (item.step) {

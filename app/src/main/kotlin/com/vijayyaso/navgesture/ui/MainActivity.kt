@@ -47,7 +47,6 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -126,11 +125,6 @@ internal enum class Screen(@param:StringRes val title: Int) {
     DISCLOSURE(R.string.disclosure_title),
 }
 
-private val BackStackSaver = Saver<List<Screen>, ArrayList<String>>(
-    save = { stack -> ArrayList(stack.map { it.name }) },
-    restore = { names -> names.map(Screen::valueOf) },
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
@@ -152,7 +146,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
     if (model.disclosureRequested) {
         LaunchedEffect(Unit) {
-            if (stack.last() != Screen.DISCLOSURE) stack = stack + Screen.DISCLOSURE
+            stack = stack.opening(Screen.DISCLOSURE)
             model.disclosureRequested = false
         }
     }
@@ -192,16 +186,18 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                     .padding(bottom = 24.dp),
             ) {
                 when (screen) {
-                    Screen.HOME -> HomeScreen(model) { stack = stack + it }
+                    Screen.HOME -> HomeScreen(model) { stack = stack.opening(it) }
                     Screen.SETUP -> SetupScreen(model)
                     Screen.APP_SWITCHING -> AppSwitchingScreen(
                         model = model,
-                        onOpenFavourites = { stack = stack + Screen.FAVOURITE_APPS },
+                        onOpenFavourites = { stack = stack.opening(Screen.FAVOURITE_APPS) },
                         onOpenCorner = { corner ->
-                            stack = stack + when (corner) {
-                                BottomCorner.LEFT -> Screen.LEFT_CORNER
-                                BottomCorner.RIGHT -> Screen.RIGHT_CORNER
-                            }
+                            stack = stack.opening(
+                                when (corner) {
+                                    BottomCorner.LEFT -> Screen.LEFT_CORNER
+                                    BottomCorner.RIGHT -> Screen.RIGHT_CORNER
+                                },
+                            )
                         },
                     )
                     Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = back)

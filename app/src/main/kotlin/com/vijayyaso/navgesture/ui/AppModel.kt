@@ -46,9 +46,12 @@ import com.vijayyaso.navgesture.setup.SetupRecord
 import com.vijayyaso.navgesture.setup.SetupStateRepository
 import com.vijayyaso.navgesture.setup.setupState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Everything the screens show, read once per resume and kept current by the two flows. */
 @Stable
@@ -98,13 +101,19 @@ internal class AppModel(
             ),
         )
 
+    private var collecting: Job? = null
+
     fun refresh() {
-        diagnostics = DiagnosticsCollector.collect(context)
         usageAccess = hasUsageAccess(context)
         assistant = readAssistant(context)
         batteryUnrestricted = batteryUnrestricted(context)
-        if (status != ServiceStatus.OFF && !record.serviceEverEnabled) {
-            setFlag(SetupFlag.SERVICE_EVER_ENABLED, true)
+        // The collection reads log files, so it runs off the main thread. A newer refresh cancels an older one.
+        collecting?.cancel()
+        collecting = scope.launch {
+            diagnostics = withContext(Dispatchers.IO) { DiagnosticsCollector.collect(context) }
+            if (status != ServiceStatus.OFF && !record.serviceEverEnabled) {
+                setFlag(SetupFlag.SERVICE_EVER_ENABLED, true)
+            }
         }
     }
 
