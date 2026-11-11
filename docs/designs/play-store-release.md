@@ -183,7 +183,10 @@ A Gradle flavor dimension `store` with two flavors:
 *   **One flag for the remaining shared behaviour.** `BuildConfig.IS_PLAY` gates the two behaviours
     left in `main`: `ServiceKeeper` (auto turn-back-on and one-tap tile,
     through `ServiceKeeper.canTurnOn`) and the gesture-bar section rule in
-    C1. It is a compile-time constant.
+    C1. It is a compile-time constant. Not gated: `ServiceKeeper.check` also
+    shows the phone's own bar again when this app hid it and the service died
+    without its unbind (upstream #134). That needs the adb grant, so in `play`
+    it runs only for a user who gave it.
 *   **Boot receiver goes to `github`.** With self-enable off it only logs the
     navigation mode after boot, a diagnostic line nobody reads in a Play
     install, so `play` drops it and `RECEIVE_BOOT_COMPLETED`.

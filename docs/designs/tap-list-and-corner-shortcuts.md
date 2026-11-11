@@ -194,7 +194,8 @@ list (today's cancel).
 | `right_corner_shortcut` | string (shortcut id) | `none` |
 
 A missing key falls back to the default, so existing installs move from 56 dp
-to 72 dp. "Reset to defaults" resets all four. Debug builds also read the
+to 72 dp. "Reset to defaults" on Gesture settings leaves all four alone: it
+resets only the values that screen shows (upstream #123). Debug builds also read the
 global settings `navgesture_app_list_style`, `navgesture_left_corner` and
 `navgesture_right_corner`, for the e2e suite.
 
