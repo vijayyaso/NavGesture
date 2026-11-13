@@ -28,7 +28,7 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -131,23 +131,17 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     val model = rememberAppModel()
     val context = LocalContext.current
     Store.Bind()
-    var stack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(listOf(Screen.HOME)) }
-    val screen = stack.last()
-    val back = { stack = stack.dropLast(1) }
-    BackHandler(enabled = stack.size > 1, onBack = back)
+    var stack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(BackStack.of(Screen.HOME)) }
+    val entry = stack.top
+    val screen = entry.screen
+    val back = { stack = stack.back() }
+    BackHandler(enabled = stack.canGoBack, onBack = back)
 
     // From the tile: home with the disclosure on top, whatever was showing before.
     if (openDisclosure.value) {
         LaunchedEffect(Unit) {
-            stack = listOf(Screen.HOME, Screen.DISCLOSURE)
+            stack = stack.replacedBy(Screen.HOME, Screen.DISCLOSURE)
             openDisclosure.value = false
-        }
-    }
-    // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
-    if (model.disclosureRequested) {
-        LaunchedEffect(Unit) {
-            stack = stack.opening(Screen.DISCLOSURE)
-            model.disclosureRequested = false
         }
     }
 
@@ -176,21 +170,31 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(model.snackbar) },
     ) { padding ->
-        // Keyed by screen. Each one opens at its top rather than at the previous scroll.
-        key(screen) {
+        // Keyed by stack entry: a screen opened forward starts at its top, and Back finds the
+        // one underneath where it was left. The live scroll also survives a rotation.
+        key(entry.id) {
+            val scroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(entry.scroll) }
+            val open: (Screen) -> Unit = { stack = stack.open(it, scroll.value) }
+            // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
+            if (model.disclosureRequested) {
+                LaunchedEffect(Unit) {
+                    open(Screen.DISCLOSURE)
+                    model.disclosureRequested = false
+                }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scroll)
                     .padding(bottom = 24.dp),
             ) {
                 when (screen) {
-                    Screen.HOME -> HomeScreen(model) { stack = stack.opening(it) }
+                    Screen.HOME -> HomeScreen(model, onOpen = open)
                     Screen.SETUP -> SetupScreen(model)
                     Screen.APP_SWITCHING -> AppSwitchingScreen(
                         model = model,
-                        onOpenFavourites = { stack = stack.opening(Screen.FAVOURITE_APPS) },
+                        onOpenFavourites = { open(Screen.FAVOURITE_APPS) },
                     )
                     Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = back)
                     Screen.RIGHT_CORNER -> CornerPickerScreen(BottomCorner.RIGHT, model, onDone = back)
@@ -201,7 +205,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                     Screen.GESTURE_SETTINGS -> GestureSettingsScreen(
                         model = model,
                         onOpenCorner = { corner ->
-                            stack = stack.opening(
+                            open(
                                 when (corner) {
                                     BottomCorner.LEFT -> Screen.LEFT_CORNER
                                     BottomCorner.RIGHT -> Screen.RIGHT_CORNER

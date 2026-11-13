@@ -222,6 +222,25 @@ its rows.
     scroll behaviour is needed.
 *   The scaffold background is the page colour.
 
+### Motion (`ui/Motion.kt`, added 2026-11-13)
+
+Motion is short and quiet. `Motion.kt` holds the only numbers the screens
+use: the `EaseOutStrong` curve (`CubicBezierEasing(0.23, 1, 0.32, 1)`), fade
+in 150 ms, expand 200 ms, fade out 100 ms, shrink 150 ms, screen change
+200 ms, and `BlockEnter`/`BlockExit` for a block that opens under a switch
+(fade in + expand; fade out + shrink). Compose scales every one by the
+phone's animator duration scale, so "Remove animations" turns them off. No
+screen times anything with `delay()`.
+
+*   **Back keeps its place.** A screen opened forward starts at its top.
+    Back shows the screen underneath at the scroll it was left at. The back
+    stack (`BackStack.kt`) is a list of entries; each holds its screen, an
+    id that is new for every opening, and the scroll it had when it was
+    covered. `BackStackSaver` keeps all three, so a rotation keeps them; the
+    screen on top keeps its live scroll through `rememberSaveable`. Back
+    never pops the last screen, so two Backs before one redraw cannot empty
+    the stack. Unit tested in `BackStackTest`.
+
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 
 Legend: `[x]` = icon square, `(●)` = switch on, `(○)` = switch off.
