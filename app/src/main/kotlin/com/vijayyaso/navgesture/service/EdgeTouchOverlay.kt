@@ -107,7 +107,7 @@ internal class EdgeTouchOverlay(
         if (configuration.landscapeConfirmEnabled && geometry.landscape) {
             pill = ConfirmPillOverlay(context, windowManager, geometry).also { it.install() }
         }
-        syncPill()
+        syncPill(restored = true)
 
         val listShortcut = listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut)
             .any { it == CornerShortcut.RecentsList || it == CornerShortcut.FavouritesList }
@@ -348,11 +348,12 @@ internal class EdgeTouchOverlay(
     }
 
     // Brings the pill window and its expiry timer in line with the model.
-    private fun syncPill(immediate: Boolean = false) {
+    // [restored] marks a pill put back after a reinstall: it was already up, so it does not fade in.
+    private fun syncPill(immediate: Boolean = false, restored: Boolean = false) {
         val expiresAt = confirmation.expiresAtMs
         val overlay = pill
         if (expiresAt != null && overlay != null) {
-            if (!pillVisible) overlay.show()
+            if (!pillVisible) overlay.show(fade = !restored)
             pillVisible = true
             handler.removeCallbacks(pillExpiry)
             // No timer under a confirming touch: one already due would run again at once.
@@ -573,7 +574,8 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.OpenSwitcher -> {
                     cancelHold()
                     if (admitted) {
-                        bubble?.hide()
+                        // No replay follows a list open, so the drop may sink back into its edge.
+                        bubble?.release()
                         switching = true
                         controller?.open(action)
                         samples.last?.let { controller?.move(it) }
