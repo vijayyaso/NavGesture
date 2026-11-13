@@ -496,12 +496,18 @@ server.
     internal object Store {
         /** Activity-scoped hook: owns the update view model and its resume check. */
         @Composable fun Bind()
-        /** The Updates row on home; draws nothing in play. */
-        @Composable fun HomeRow(onOpen: () -> Unit)
+        /** The Updates tile on home; null in play. */
+        @Composable fun homeTile(onOpen: () -> Unit): HomeTile?
         /** The Updates screen body; draws nothing in play. */
         @Composable fun UpdatesScreen()
+        /** The Buy me a coffee row in About; draws nothing in play. */
+        @Composable fun SupportRow()
     }
     ```
+
+    The Play build shows no Buy me a coffee row, because Google Play's
+    payments policy forbids sending users to pay outside Play. The github
+    build shows it last in About › Help and feedback.
 
     The `github` copy calls `viewModel<UpdateViewModel>()` in each function;
     inside one activity that returns the same instance. `Bind()` moves the
