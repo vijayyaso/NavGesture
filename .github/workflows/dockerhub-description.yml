@@ -27,6 +27,8 @@ on:
 
 jobs:
   update-desc:
+    # A repository with no Docker Hub account set has nothing to update.
+    if: vars.DOCKERHUB_USERNAME != ''
     runs-on: ubuntu-latest
     steps:
       - name: Run actions/checkout
