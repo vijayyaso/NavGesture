@@ -32,6 +32,7 @@ import android.view.Choreographer
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.vijayyaso.navgesture.gesture.ActionIcon
 import com.vijayyaso.navgesture.gesture.BubbleMotion
 import com.vijayyaso.navgesture.gesture.FluidBubble
 import com.vijayyaso.navgesture.gesture.ScreenEdge
@@ -40,8 +41,8 @@ import kotlin.math.ceil
 
 /**
  * The bubble that rises from an edge under the finger, in the manner of Fluid Navigation
- * Gestures: from the bottom it carries the Home icon and swaps to Recents when the pause
- * primes it; from a side it carries the Back arrow. It follows the finger along the edge,
+ * Gestures: it carries the icon of the action a release would run, so the bottom shows Home
+ * and swaps to Recents when the pause primes it, and a side shows the Back arrow. It follows the finger along the edge,
  * grows as the finger travels in, and springs back into the edge on release while the
  * action fires alongside.
  *
@@ -100,8 +101,11 @@ internal class FluidBubbleOverlay(
     /** Applies one tracker verdict, with the finger at raw [x],[y]. */
     fun follow(action: TrackerAction, x: Float, y: Float) {
         when (action) {
-            is TrackerAction.Armed -> show(x, y)
-            is TrackerAction.RecentsPrimed -> view.primeRecents()
+            is TrackerAction.Armed -> {
+                show(x, y)
+                view.setIcon(action.pending.icon)
+            }
+            is TrackerAction.Pending -> view.setIcon(action.action.icon)
             is TrackerAction.Fire, is TrackerAction.Reverted -> release()
             is TrackerAction.Unused -> hide()
             else -> if (shown) view.moveTo(along(x, y), risePx(x, y))
@@ -162,7 +166,7 @@ internal class FluidBubbleOverlay(
 
         private val motion = BubbleMotion()
 
-        private var recents = false
+        private var glyph = ActionIcon.NONE
         private var running = false
         private var lastFrameNanos = 0L
         private var onSettled: (() -> Unit)? = null
@@ -187,7 +191,6 @@ internal class FluidBubbleOverlay(
 
         fun start(at: Float) {
             onSettled = null
-            recents = false
             // Read per touch, so a change to "Remove animations" applies to the next swipe.
             motion.start(at, animate = ValueAnimator.areAnimatorsEnabled())
             runSprings()
@@ -199,8 +202,8 @@ internal class FluidBubbleOverlay(
             runSprings()
         }
 
-        fun primeRecents() {
-            recents = true
+        fun setIcon(icon: ActionIcon) {
+            glyph = icon
             invalidate()
         }
 
@@ -302,15 +305,16 @@ internal class FluidBubbleOverlay(
             if (radius < density * 2 || alpha <= 0f) return
             icon.alpha = (alpha * 255).toInt()
             iconPath.rewind()
-            when {
-                edge != ScreenEdge.BOTTOM -> {
+            when (glyph) {
+                ActionIcon.NONE -> return
+                ActionIcon.BACK -> {
                     // A chevron pointing in from the edge.
                     val dir = if (edge == ScreenEdge.LEFT) 1f else -1f
                     iconPath.moveTo(cx + dir * radius * 0.35f, cy - radius * 0.7f)
                     iconPath.lineTo(cx - dir * radius * 0.35f, cy)
                     iconPath.lineTo(cx + dir * radius * 0.35f, cy + radius * 0.7f)
                 }
-                recents -> {
+                ActionIcon.RECENTS -> {
                     // Two stacked cards.
                     val w = radius * 1.1f
                     val h = radius * 1.3f
@@ -320,7 +324,12 @@ internal class FluidBubbleOverlay(
                     iconPath.lineTo(cx + w * 0.75f, cy - h * 0.8f)
                     iconPath.lineTo(cx + w * 0.75f, cy + h * 0.4f)
                 }
-                else -> {
+                ActionIcon.GENERIC -> {
+                    // A dot in a ring.
+                    iconPath.addCircle(cx, cy, radius * 0.85f, Path.Direction.CW)
+                    iconPath.addCircle(cx, cy, radius * 0.15f, Path.Direction.CW)
+                }
+                ActionIcon.HOME -> {
                     // A house: roof and walls.
                     iconPath.moveTo(cx - radius, cy - radius * 0.05f)
                     iconPath.lineTo(cx, cy - radius)

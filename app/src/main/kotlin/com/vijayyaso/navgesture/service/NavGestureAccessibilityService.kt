@@ -146,7 +146,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             onGestureAction = ::onGestureAction,
             switcher = performer.switcher,
             favourites = { favourites },
-            onShortcut = { performer.performShortcut(it) },
+            onAction = { performer.perform(it) },
         )
 
         (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
@@ -383,8 +383,11 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     }
 
     private fun onGestureAction(action: GestureAction, edge: ScreenEdge) {
-        Log.v(TAG, "Gesture from $edge -> $action")
-        performer.perform(action)
+        Log.v(TAG, "Gesture from $edge -> ${action.id}")
+        when (action) {
+            GestureAction.CircleToSearch -> performer.circleToSearch()
+            is GestureAction.Run -> performer.perform(action.action)
+        }
     }
 
     /**

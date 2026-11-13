@@ -33,15 +33,15 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
-import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.ConfirmVerdict
-import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.GestureTracker
 import com.vijayyaso.navgesture.gesture.HapticGate
 import com.vijayyaso.navgesture.gesture.LandscapeConfirm
 import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.TouchRecording
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
@@ -69,8 +69,8 @@ internal class EdgeTouchOverlay(
     private val onGestureAction: (GestureAction, ScreenEdge) -> Unit,
     private val switcher: AppSwitcher,
     private val favourites: () -> List<String>,
-    /** Runs a corner shortcut that is not an app list: a system action or an app. */
-    private val onShortcut: (CornerShortcut) -> Unit,
+    /** Runs an action that waited for the settle delay and is not an app list. */
+    private val onAction: (SwipeAction) -> Unit,
     private val layout: OverlayLayout = OverlayLayout(),
 ) {
 
@@ -110,7 +110,7 @@ internal class EdgeTouchOverlay(
         syncPill(restored = true)
 
         val listShortcut = listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut)
-            .any { it == CornerShortcut.RecentsList || it == CornerShortcut.FavouritesList }
+            .any { it.needsListPanel }
         if (configuration.edgeAppListEnabled || listShortcut) {
             val stripPx = (configuration.edgeWidthDp * geometry.density).toInt() + geometry.navBottomPx
             val panel = SwitcherPanelOverlay(context, windowManager, geometry, stripPx).also { it.install() }
@@ -256,8 +256,8 @@ internal class EdgeTouchOverlay(
      */
     private fun bottomSpan(configuration: GestureConfiguration, geometry: ScreenGeometry): Pair<Int, Int> {
         val margin = geometry.widthPx * (100 - layout.bottomLengthPercent) / 200
-        val left = if (configuration.leftCornerShortcut != CornerShortcut.None) 0 else margin
-        val right = if (configuration.rightCornerShortcut != CornerShortcut.None) {
+        val left = if (configuration.leftCornerShortcut != SwipeAction.None) 0 else margin
+        val right = if (configuration.rightCornerShortcut != SwipeAction.None) {
             geometry.widthPx
         } else {
             geometry.widthPx - margin
@@ -303,21 +303,21 @@ internal class EdgeTouchOverlay(
     }
 
     private fun onFire(action: GestureAction, edge: ScreenEdge) {
-        if (action is GestureAction.Corner) {
-            // After the stream ends and the window update settles: the strips are visible again,
-            // which HyperOS needs to allow an app launch, and a screenshot misses the bubble.
-            handler.postDelayed({ runCorner(action.side) }, CORNER_SETTLE_MS)
+        // Every corner action waits, as does any action that settles: the strips must be visible
+        // again (HyperOS allows an app launch only then) and a screenshot must miss the bubble.
+        if (action is GestureAction.Run && (action.slot is SlotId.Corner || action.action.settles)) {
+            handler.postDelayed({ run(action.action) }, SETTLE_MS)
             return
         }
         onGestureAction(action, edge)
     }
 
-    private fun runCorner(side: BottomCorner) {
-        when (val shortcut = configuration.shortcutFor(side)) {
-            CornerShortcut.None -> Unit
-            CornerShortcut.RecentsList -> switcherController?.openForTouch(recents = true)
-            CornerShortcut.FavouritesList -> switcherController?.openForTouch(recents = false)
-            else -> onShortcut(shortcut)
+    private fun run(action: SwipeAction) {
+        when (action) {
+            SwipeAction.None -> Unit
+            SwipeAction.RecentsList -> switcherController?.openForTouch(recents = true)
+            SwipeAction.FavouritesList -> switcherController?.openForTouch(recents = false)
+            else -> onAction(action)
         }
     }
 
@@ -610,7 +610,7 @@ internal class EdgeTouchOverlay(
                     postDelayed(holdRunnable, action.delayMs)
                 }
                 // The release now means Recents; the haptic gate ticks for it.
-                is TrackerAction.RecentsPrimed -> Log.d(TAG, "$edge RECENTS_PRIMED")
+                is TrackerAction.Pending -> Log.d(TAG, "$edge RECENTS_PRIMED")
                 is TrackerAction.Fire -> {
                     cancelHold()
                     if (admitted) {
@@ -691,9 +691,9 @@ internal class EdgeTouchOverlay(
         const val TAG = "NavGesture"
 
         /**
-         * Wait before a corner shortcut runs: the strips' return to visible is an async
+         * Wait before a settling action runs: the strips' return to visible is an async
          * window update, and an app launch is allowed only once a visible overlay is back.
          */
-        const val CORNER_SETTLE_MS = 80L
+        const val SETTLE_MS = 80L
     }
 }

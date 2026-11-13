@@ -82,7 +82,7 @@ reset_log
 corner_swipe 30 1
 assert_log "the diagonal is a corner" "CORNER_READY LEFT"
 assert_log "the release fires the corner" "GESTURE_FIRED BOTTOM CornerLEFT"
-assert_log "the shortcut runs" "CORNER_SHORTCUT notifications"
+assert_log "the shortcut runs" "SWIPE_ACTION notifications"
 assert_no_log "the diagonal is not Home" "GESTURE_FIRED BOTTOM Home"
 assert_no_log "the diagonal is not replayed" "REPLAY_DISPATCHED"
 "${ADB_BIN}" shell cmd statusbar collapse >/dev/null 2>&1 || true

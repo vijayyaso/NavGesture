@@ -118,13 +118,13 @@ class HapticGateTest {
         run.down(540f, 2395f)
         // 300px up is past the 250px Recents line.
         run.move(540f, 2095f)
-        assertEquals(TrackerAction.RecentsPrimed, run.hold())
+        assertEquals(RECENTS_PENDING, run.hold())
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             run.up(540f, 2095f),
         )
         assertEquals(1, run.ticks.size)
-        assertEquals(TrackerAction.RecentsPrimed, run.ticks.single())
+        assertEquals(RECENTS_PENDING, run.ticks.single())
     }
 
     @Test

@@ -103,7 +103,7 @@ class CircleToSearchGestureTest {
         assertTrue(t.onMove(sample(540f, 2295f, 50L)) is TrackerAction.Armed)
         assertEquals(TrackerAction.None, t.onLongPressElapsed())
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2295f, 70L)),
         )
     }
@@ -120,7 +120,7 @@ class CircleToSearchGestureTest {
         assertTrue(t.onMove(sample(540f, 2380f, 50L)) is TrackerAction.Armed)
         assertEquals(TrackerAction.None, t.onLongPressElapsed())
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2380f, 70L)),
         )
     }
@@ -131,10 +131,10 @@ class CircleToSearchGestureTest {
         t.onDown(sample(540f, 2395f, 0L))
         // 300px up is past the 250px Recents line.
         t.onMove(sample(540f, 2095f, 50L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(TrackerAction.None, t.onLongPressElapsed())
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2095f, 450L)),
         )
     }

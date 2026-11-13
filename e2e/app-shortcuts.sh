@@ -161,7 +161,7 @@ fi
 open_test_app
 reset_log
 corner_swipe 30 1
-assert_log "the corner runs the stored shortcut" "CORNER_SHORTCUT shortcut:${FIX}/qr_scanner"
+assert_log "the corner runs the stored shortcut" "SWIPE_ACTION shortcut:${FIX}/qr_scanner"
 assert_log "it is reported as not found" "shortcut:${FIX}/qr_scanner: shortcut not found"
 assert_no_fixture "the test app was not started" "FIXTURE_LAUNCH"
 
@@ -216,7 +216,7 @@ fi
 open_test_app
 reset_log
 corner_swipe 30 1
-assert_log "the corner runs the picked shortcut" "CORNER_SHORTCUT shortcut:${FIX}/qr_scanner"
+assert_log "the corner runs the picked shortcut" "SWIPE_ACTION shortcut:${FIX}/qr_scanner"
 assert_no_log "nothing failed" "shortcut not found"
 assert_fixture "the test app opened with action RUN" "FIXTURE_LAUNCH action=RUN"
 assert_fixture "the GPay-style string extra arrived" "FIXTURE_EXTRA some unique action key|String|QR_SCANNER"

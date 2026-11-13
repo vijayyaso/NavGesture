@@ -118,11 +118,18 @@ class GestureTracker(
             ScreenEdge.BOTTOM -> true
         }
 
-    private val shortAction: GestureAction =
-        if (edge == ScreenEdge.BOTTOM) GestureAction.Home else GestureAction.Back
+    // Fixed for now: a side swipe is Back, a bottom swipe is Home, and its pause is Recents.
+    private val shortAction: GestureAction.Run = GestureAction.Run(
+        SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT),
+        if (edge == ScreenEdge.BOTTOM) SwipeAction.Home else SwipeAction.Back,
+    )
 
-    private val holdAction: GestureAction? =
-        if (edge == ScreenEdge.BOTTOM) GestureAction.Recents else null
+    private val pauseRun: GestureAction.Run = GestureAction.Run(
+        SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE),
+        SwipeAction.Recents,
+    )
+
+    private val holdAction: GestureAction.Run? = if (edge == ScreenEdge.BOTTOM) pauseRun else null
 
     private val longPressAction: GestureAction? =
         if (edge == ScreenEdge.BOTTOM && configuration.circleToSearchEnabled) {
@@ -218,7 +225,10 @@ class GestureTracker(
         if (!backEnabled || !hasArmed(origin, sample)) return TrackerAction.None
 
         arm = Arm.Rising
-        return TrackerAction.Armed(scheduleHoldMs = if (holdAction != null) FRAME_MS else null)
+        return TrackerAction.Armed(
+            scheduleHoldMs = if (holdAction != null) FRAME_MS else null,
+            pending = shortAction.action,
+        )
     }
 
     private fun whileArmed(origin: TouchSample, state: Arm, sample: TouchSample): TrackerAction {
@@ -254,7 +264,7 @@ class GestureTracker(
         val past = isPastTrigger(origin, sample)
         if (retracted && past) {
             arm = Arm.Rising
-            return TrackerAction.Armed(scheduleHoldMs = null)
+            return TrackerAction.Armed(scheduleHoldMs = null, pending = shortAction.action)
         }
         if (!retracted && !past) {
             arm = Arm.Retracted
@@ -276,7 +286,7 @@ class GestureTracker(
         val slow = speedDpPerMs(nowMs) < HOLD_MAX_DP_PER_MS
         if (pastLine && slow && tailDistance(sample) < tailGapPx) {
             arm = Arm.Primed
-            return TrackerAction.RecentsPrimed
+            return TrackerAction.Pending(pauseRun.action, SwipeKind.PAUSE)
         }
         return TrackerAction.RearmHold(FRAME_MS)
     }
@@ -297,14 +307,14 @@ class GestureTracker(
         tracked = null
         longPressPending = false
 
-        if (state is Arm.Corner) return TrackerAction.Fire(GestureAction.Corner(state.side), edge)
+        if (state is Arm.Corner) return TrackerAction.Fire(cornerRun(state.side), edge)
         if (state == Arm.Switcher || state is Arm.Fired) return TrackerAction.None
         if (origin == null) return TrackerAction.Unused(rejectionFor(start, sample))
         remember(sample)
         // A DOWN then UP with no MOVE between can still be a whole corner diagonal.
         val side = corner
         if (side != null && (state == null || state == Arm.Rising) && isCornerSwipe(side, origin, sample)) {
-            return TrackerAction.Fire(GestureAction.Corner(side), edge)
+            return TrackerAction.Fire(cornerRun(side), edge)
         }
         if (state != null) {
             // The release point decides, so a swipe brought back to the edge in one batched
@@ -313,7 +323,7 @@ class GestureTracker(
             if (holdAction != null && isPulledBack(origin, sample)) return TrackerAction.Reverted
             if (state == Arm.Primed) {
                 val flick = upwardDpPerMs(sample.timestampMs) > configuration.homeFlickDpPerMs
-                return TrackerAction.Fire(if (flick) shortAction else GestureAction.Recents, edge)
+                return TrackerAction.Fire(if (flick) shortAction else pauseRun, edge)
             }
             return TrackerAction.Fire(shortAction, edge)
         }
@@ -339,6 +349,9 @@ class GestureTracker(
         recent.clear()
     }
 
+    private fun cornerRun(side: BottomCorner): GestureAction.Run =
+        GestureAction.Run(SlotId.Corner(side), configuration.shortcutFor(side))
+
     /** The bottom corner [sample] starts in, if that corner has a shortcut. */
     private fun cornerAt(sample: TouchSample): BottomCorner? {
         if (edge != ScreenEdge.BOTTOM) return null
@@ -350,7 +363,7 @@ class GestureTracker(
             sample.xPx >= width - zone -> BottomCorner.RIGHT
             else -> return null
         }
-        return side.takeIf { configuration.shortcutFor(it) != CornerShortcut.None }
+        return side.takeIf { configuration.shortcutFor(it) != SwipeAction.None }
     }
 
     /** Up and inward, long enough, and between [CORNER_MIN_DEGREES] and [CORNER_MAX_DEGREES]. */

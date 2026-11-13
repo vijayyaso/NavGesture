@@ -369,7 +369,9 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
 
 `GESTURE_FIRED <EDGE> <id>` keeps its form. `SWIPE_ACTION <id>` replaces
 `CORNER_SHORTCUT <id>` for every action, and `e2e/corner.sh` and
-`e2e/app-shortcuts.sh` move to it in the same commit.
+`e2e/app-shortcuts.sh` move to it in the same commit. Phase 0a logs it only
+for the actions that logged `CORNER_SHORTCUT` before (not Back, Home,
+Recents or an opened app), so that phase adds no log line.
 
 ## Alternatives considered
 

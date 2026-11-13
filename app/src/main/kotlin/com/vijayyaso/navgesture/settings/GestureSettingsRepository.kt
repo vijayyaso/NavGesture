@@ -29,8 +29,8 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.vijayyaso.navgesture.gesture.AppListStyle
-import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -101,9 +101,9 @@ class GestureSettingsRepository(
             switcherStepDp = preferences[SWITCHER_STEP_DP] ?: defaults.switcherStepDp,
             switcherAdaptiveSpeed = preferences[SWITCHER_ADAPTIVE_SPEED] ?: defaults.switcherAdaptiveSpeed,
             leftCornerShortcut = (debugOverride(LEFT_CORNER_OVERRIDE) ?: preferences[LEFT_CORNER])
-                ?.let(CornerShortcut::decode) ?: defaults.leftCornerShortcut,
+                ?.let(SwipeAction::decode) ?: defaults.leftCornerShortcut,
             rightCornerShortcut = (debugOverride(RIGHT_CORNER_OVERRIDE) ?: preferences[RIGHT_CORNER])
-                ?.let(CornerShortcut::decode) ?: defaults.rightCornerShortcut,
+                ?.let(SwipeAction::decode) ?: defaults.rightCornerShortcut,
             leftEdgeBackEnabled = preferences[LEFT_EDGE_BACK] ?: defaults.leftEdgeBackEnabled,
             rightEdgeBackEnabled = preferences[RIGHT_EDGE_BACK] ?: defaults.rightEdgeBackEnabled,
             hapticFeedbackEnabled = preferences[HAPTIC_FEEDBACK] ?: defaults.hapticFeedbackEnabled,

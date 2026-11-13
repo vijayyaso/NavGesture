@@ -71,7 +71,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.BottomCorner
-import com.vijayyaso.navgesture.gesture.CornerShortcut
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.service.RuntimeAccess
 import com.vijayyaso.navgesture.service.ShortcutCatalog
 import com.vijayyaso.navgesture.service.ShortcutEntry
@@ -104,7 +104,7 @@ internal fun AppListStyleChoice(selected: AppListStyle, onChange: (AppListStyle)
 @Composable
 internal fun CornerShortcutRow(
     title: String,
-    shortcut: CornerShortcut,
+    shortcut: SwipeAction,
     tag: String,
     onOpen: () -> Unit,
 ) {
@@ -118,28 +118,32 @@ internal fun CornerShortcutRow(
 
 /** The name a shortcut is shown by; an app or app shortcut shows its own name once loaded. */
 @Composable
-internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
-    CornerShortcut.None -> stringResource(R.string.corner_none)
-    CornerShortcut.RecentsList -> stringResource(R.string.corner_recents_list)
-    CornerShortcut.FavouritesList -> stringResource(R.string.corner_favourites_list)
-    CornerShortcut.Notifications -> stringResource(R.string.corner_notifications)
-    CornerShortcut.QuickSettings -> stringResource(R.string.corner_quick_settings)
-    CornerShortcut.Screenshot -> stringResource(R.string.corner_screenshot)
-    CornerShortcut.LockScreen -> stringResource(R.string.corner_lock_screen)
-    CornerShortcut.PowerMenu -> stringResource(R.string.corner_power_menu)
-    CornerShortcut.SplitScreen -> stringResource(R.string.corner_split_screen)
-    is CornerShortcut.OpenApp -> {
+internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
+    SwipeAction.None -> stringResource(R.string.corner_none)
+    SwipeAction.RecentsList -> stringResource(R.string.corner_recents_list)
+    SwipeAction.FavouritesList -> stringResource(R.string.corner_favourites_list)
+    SwipeAction.Notifications -> stringResource(R.string.corner_notifications)
+    SwipeAction.QuickSettings -> stringResource(R.string.corner_quick_settings)
+    SwipeAction.Screenshot -> stringResource(R.string.corner_screenshot)
+    SwipeAction.LockScreen -> stringResource(R.string.corner_lock_screen)
+    SwipeAction.PowerMenu -> stringResource(R.string.corner_power_menu)
+    SwipeAction.SplitScreen -> stringResource(R.string.corner_split_screen)
+    is SwipeAction.OpenApp -> {
         val apps by rememberLaunchableApps(waitForScreen = false)
         val label = apps?.firstOrNull { it.packageName == shortcut.packageName }?.label
             ?: shortcut.packageName
         stringResource(R.string.corner_open_named_app, label)
     }
-    is CornerShortcut.AppShortcut -> appShortcutLabel(shortcut)
+    is SwipeAction.AppShortcut -> appShortcutLabel(shortcut)
+    // Not in the picker yet, so never shown. They read as their stored id.
+    SwipeAction.Back, SwipeAction.Home, SwipeAction.Recents,
+    SwipeAction.PreviousApp, SwipeAction.Torch,
+    -> shortcut.id
 }
 
 /** "App: Shortcut", read off the main thread; says so when the app no longer offers it. */
 @Composable
-private fun appShortcutLabel(shortcut: CornerShortcut.AppShortcut): String {
+private fun appShortcutLabel(shortcut: SwipeAction.AppShortcut): String {
     val context = LocalContext.current
     // Null while loading; an empty list when the app no longer offers the shortcut.
     val names by produceState<List<String>?>(initialValue = null, shortcut.id) {
@@ -165,7 +169,7 @@ private fun appLabel(context: Context, packageName: String): String = runCatchin
 @Composable
 internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: () -> Unit) {
     val current = model.configuration.shortcutFor(corner)
-    val pick: (CornerShortcut) -> Unit = { picked ->
+    val pick: (SwipeAction) -> Unit = { picked ->
         model.update {
             when (corner) {
                 BottomCorner.LEFT -> it.copy(leftCornerShortcut = picked)
@@ -175,8 +179,8 @@ internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: (
         onDone()
     }
 
-    // The fixed choices keep the order of CornerShortcut.fixed, split into three cards.
-    val fixed = CornerShortcut.fixed.groupBy(::fixedSection)
+    // The fixed choices keep the order of SwipeAction.fixed, split into three cards.
+    val fixed = SwipeAction.fixed.groupBy(::fixedSection)
     FixedGroup(null, fixed[FixedSection.NOTHING].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_app_lists), fixed[FixedSection.LISTS].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_phone_actions), fixed[FixedSection.ACTIONS].orEmpty(), current, pick)
@@ -191,18 +195,18 @@ internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: (
 
 private enum class FixedSection { NOTHING, LISTS, ACTIONS }
 
-private fun fixedSection(shortcut: CornerShortcut): FixedSection = when (shortcut) {
-    CornerShortcut.None -> FixedSection.NOTHING
-    CornerShortcut.RecentsList, CornerShortcut.FavouritesList -> FixedSection.LISTS
+private fun fixedSection(shortcut: SwipeAction): FixedSection = when (shortcut) {
+    SwipeAction.None -> FixedSection.NOTHING
+    SwipeAction.RecentsList, SwipeAction.FavouritesList -> FixedSection.LISTS
     else -> FixedSection.ACTIONS
 }
 
 @Composable
 private fun FixedGroup(
     title: String?,
-    choices: List<CornerShortcut>,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    choices: List<SwipeAction>,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     if (choices.isEmpty()) return
     SettingsGroup(title = title) {
@@ -216,17 +220,20 @@ private fun FixedGroup(
     }
 }
 
-private fun fixedIcon(shortcut: CornerShortcut): GroupIcon? = when (shortcut) {
-    CornerShortcut.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
-    CornerShortcut.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
-    CornerShortcut.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)
-    CornerShortcut.Notifications -> GroupIcon(Icons.Filled.Notifications, IconTint.RED)
-    CornerShortcut.QuickSettings -> GroupIcon(Icons.Filled.Settings, IconTint.GREY)
-    CornerShortcut.Screenshot -> GroupIcon(ScreenshotGlyph, IconTint.TEAL)
-    CornerShortcut.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
-    CornerShortcut.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
-    CornerShortcut.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
-    is CornerShortcut.OpenApp, is CornerShortcut.AppShortcut -> null
+private fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
+    SwipeAction.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
+    SwipeAction.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
+    SwipeAction.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)
+    SwipeAction.Notifications -> GroupIcon(Icons.Filled.Notifications, IconTint.RED)
+    SwipeAction.QuickSettings -> GroupIcon(Icons.Filled.Settings, IconTint.GREY)
+    SwipeAction.Screenshot -> GroupIcon(ScreenshotGlyph, IconTint.TEAL)
+    SwipeAction.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
+    SwipeAction.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
+    SwipeAction.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
+    is SwipeAction.OpenApp, is SwipeAction.AppShortcut -> null
+    SwipeAction.Back, SwipeAction.Home, SwipeAction.Recents,
+    SwipeAction.PreviousApp, SwipeAction.Torch,
+    -> null
 }
 
 /** A row that picks: a check mark marks the current choice, and it reads as a radio button. */
@@ -261,8 +268,8 @@ private class ShortcutPage(val access: RuntimeAccess, val apps: List<AppShortcut
 private fun AppShortcutsGroup(
     apps: List<LaunchableApp>?,
     query: String,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     val context = LocalContext.current
     val iconPx = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
@@ -292,7 +299,7 @@ private fun AppShortcutsGroup(
             ShortcutPage(access, entries)
         }
     }
-    val chosenPackage = (current as? CornerShortcut.AppShortcut)?.packageName
+    val chosenPackage = (current as? SwipeAction.AppShortcut)?.packageName
     // The app holding the current choice starts open (keyed, as the settings load late); a
     // search opens every match, and those can still be closed one by one.
     var open by remember(chosenPackage) { mutableStateOf(setOfNotNull(chosenPackage)) }
@@ -336,12 +343,12 @@ private fun AppShortcutsGroup(
                             shown.forEach { (shortcut, icon) ->
                                 PickRow(
                                     title = shortcut.label,
-                                    selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
+                                    selected = current == SwipeAction.AppShortcut(shortcut.packageName, shortcut.id),
                                     modifier = Modifier
                                         .padding(start = 40.dp)
                                         .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
                                     leading = { AppIconImage(icon ?: entry.app.icon) },
-                                ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
+                                ) { pick(SwipeAction.AppShortcut(shortcut.packageName, shortcut.id)) }
                             }
                         }
                     }
@@ -382,8 +389,8 @@ private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, tag: String, onT
 private fun OpenAppGroup(
     apps: List<LaunchableApp>?,
     query: String,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     SettingsGroup(title = stringResource(R.string.corner_open_app)) {
         if (apps == null) {
@@ -393,9 +400,9 @@ private fun OpenAppGroup(
         apps.filter { query.isEmpty() || it.label.contains(query, ignoreCase = true) }.forEach { app ->
             PickRow(
                 title = app.label,
-                selected = current == CornerShortcut.OpenApp(app.packageName),
+                selected = current == SwipeAction.OpenApp(app.packageName),
                 leading = { AppIconImage(app.icon) },
-            ) { pick(CornerShortcut.OpenApp(app.packageName)) }
+            ) { pick(SwipeAction.OpenApp(app.packageName)) }
         }
     }
 }

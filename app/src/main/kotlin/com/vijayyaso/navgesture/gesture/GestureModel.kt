@@ -25,28 +25,40 @@ package com.vijayyaso.navgesture.gesture
 sealed interface GestureAction {
     val id: String
 
-    data object Back : GestureAction {
-        override val id: String = "Back"
-    }
-
-    data object Home : GestureAction {
-        override val id: String = "Home"
-    }
-
-    data object Recents : GestureAction {
-        override val id: String = "Recents"
-    }
-
     /** Google's Circle to Search, as a long press on the system gesture handle starts it. */
     data object CircleToSearch : GestureAction {
         override val id: String = "CircleToSearch"
     }
 
-    /** A swipe up and inward from a bottom corner; the corner's shortcut says what it does. */
-    data class Corner(val side: BottomCorner) : GestureAction {
-        override val id: String = "Corner${side.name}"
+    /** Runs [action] for a swipe that ended in [slot]. */
+    data class Run(val slot: SlotId, val action: SwipeAction) : GestureAction {
+        // A corner is named by its side, Back, Home and Recents keep their capitals, and any
+        // other action reads as its stored id. The log and the e2e suites read this.
+        override val id: String = when {
+            slot is SlotId.Corner -> "Corner${slot.side.name}"
+            action == SwipeAction.Back -> "Back"
+            action == SwipeAction.Home -> "Home"
+            action == SwipeAction.Recents -> "Recents"
+            else -> action.id
+        }
     }
 }
+
+/** Where a swipe's action is kept: a side or bottom swipe of one kind, or a bottom corner. */
+sealed interface SlotId {
+    data class Edge(val edge: ScreenEdge, val zone: SwipeZone, val kind: SwipeKind) : SlotId
+
+    data class Corner(val side: BottomCorner) : SlotId
+}
+
+/** The part of a side edge a touch starts in. */
+enum class SwipeZone { WHOLE, TOP_HALF, BOTTOM_HALF }
+
+/** How a swipe ends. PAUSE is the bottom swipe that stops past the Recents line. */
+enum class SwipeKind { SHORT, LONG, WAIT, PAUSE }
+
+/** The glyph the bubble draws for an action. */
+enum class ActionIcon { BACK, HOME, RECENTS, GENERIC, NONE }
 
 enum class ScreenEdge { LEFT, RIGHT, BOTTOM }
 
@@ -93,52 +105,96 @@ enum class AppListStyle {
     }
 }
 
-/** What a corner swipe does. [id] is what settings store. */
-sealed interface CornerShortcut {
+/** What a swipe does. [id] is what settings store. */
+sealed interface SwipeAction {
     val id: String
 
-    data object None : CornerShortcut {
+    /** The action waits 80 ms before it runs, so the strips are back on screen first. */
+    val settles: Boolean
+        get() = when (this) {
+            is OpenApp, is AppShortcut, PreviousApp, Screenshot -> true
+            else -> false
+        }
+
+    /** The action opens the app list panel, which the overlay builds only when it is needed. */
+    val needsListPanel: Boolean
+        get() = this == RecentsList || this == FavouritesList
+
+    /** A stray swipe in a landscape game is as unwanted as Home, so the bottom edge asks twice. */
+    val guardedInLandscape: Boolean
+        get() = this != None
+
+    val icon: ActionIcon
+        get() = when (this) {
+            Back -> ActionIcon.BACK
+            Home -> ActionIcon.HOME
+            Recents -> ActionIcon.RECENTS
+            None -> ActionIcon.NONE
+            else -> ActionIcon.GENERIC
+        }
+
+    data object None : SwipeAction {
         override val id: String = "none"
     }
 
-    data object RecentsList : CornerShortcut {
+    data object RecentsList : SwipeAction {
         override val id: String = "recents_list"
     }
 
-    data object FavouritesList : CornerShortcut {
+    data object FavouritesList : SwipeAction {
         override val id: String = "favourites_list"
     }
 
-    data object Notifications : CornerShortcut {
+    data object Notifications : SwipeAction {
         override val id: String = "notifications"
     }
 
-    data object QuickSettings : CornerShortcut {
+    data object QuickSettings : SwipeAction {
         override val id: String = "quick_settings"
     }
 
-    data object Screenshot : CornerShortcut {
+    data object Screenshot : SwipeAction {
         override val id: String = "screenshot"
     }
 
-    data object LockScreen : CornerShortcut {
+    data object LockScreen : SwipeAction {
         override val id: String = "lock_screen"
     }
 
-    data object PowerMenu : CornerShortcut {
+    data object PowerMenu : SwipeAction {
         override val id: String = "power_menu"
     }
 
-    data object SplitScreen : CornerShortcut {
+    data object SplitScreen : SwipeAction {
         override val id: String = "split_screen"
     }
 
-    data class OpenApp(val packageName: String) : CornerShortcut {
+    data object Back : SwipeAction {
+        override val id: String = "back"
+    }
+
+    data object Home : SwipeAction {
+        override val id: String = "home"
+    }
+
+    data object Recents : SwipeAction {
+        override val id: String = "recents"
+    }
+
+    data object PreviousApp : SwipeAction {
+        override val id: String = "previous_app"
+    }
+
+    data object Torch : SwipeAction {
+        override val id: String = "torch"
+    }
+
+    data class OpenApp(val packageName: String) : SwipeAction {
         override val id: String = APP_PREFIX + packageName
     }
 
     /** One of an app's fixed shortcuts (the actions its icon offers on a long press). */
-    data class AppShortcut(val packageName: String, val shortcutId: String) : CornerShortcut {
+    data class AppShortcut(val packageName: String, val shortcutId: String) : SwipeAction {
         override val id: String = SHORTCUT_PREFIX + packageName + "/" + shortcutId
     }
 
@@ -146,21 +202,31 @@ sealed interface CornerShortcut {
         private const val APP_PREFIX = "app:"
         private const val SHORTCUT_PREFIX = "shortcut:"
 
+        // Both lists are lazy: the interface has default members, so a first entry such as
+        // [None] starts this companion, which would read that entry while it is still null.
+
         /** Every choice that is not an app, in the order the picker lists them. */
-        val fixed: List<CornerShortcut> = listOf(
-            None,
-            RecentsList,
-            FavouritesList,
-            Notifications,
-            QuickSettings,
-            Screenshot,
-            LockScreen,
-            PowerMenu,
-            SplitScreen,
-        )
+        val fixed: List<SwipeAction> by lazy {
+            listOf(
+                None,
+                RecentsList,
+                FavouritesList,
+                Notifications,
+                QuickSettings,
+                Screenshot,
+                LockScreen,
+                PowerMenu,
+                SplitScreen,
+            )
+        }
+
+        // Read from storage but not offered by the picker yet.
+        private val extra: List<SwipeAction> by lazy {
+            listOf(Back, Home, Recents, PreviousApp, Torch)
+        }
 
         /** An unknown or empty id is [None], so a downgrade never leaves a broken corner. */
-        fun decode(stored: String?): CornerShortcut {
+        fun decode(stored: String?): SwipeAction {
             if (stored == null) return None
             if (stored.startsWith(APP_PREFIX)) {
                 val packageName = stored.removePrefix(APP_PREFIX)
@@ -175,7 +241,7 @@ sealed interface CornerShortcut {
                 val shortcutId = rest.substring(slash + 1)
                 return if (packageName.isBlank() || shortcutId.isBlank()) None else AppShortcut(packageName, shortcutId)
             }
-            return fixed.firstOrNull { it.id == stored } ?: None
+            return (fixed + extra).firstOrNull { it.id == stored } ?: None
         }
     }
 }
@@ -219,9 +285,9 @@ data class GestureConfiguration(
     /** A fast slide moves through more apps than a slow one, like a laptop trackpad. */
     val switcherAdaptiveSpeed: Boolean = true,
     /** What a swipe up and inward from the bottom-left corner does. */
-    val leftCornerShortcut: CornerShortcut = CornerShortcut.None,
+    val leftCornerShortcut: SwipeAction = SwipeAction.None,
     /** What a swipe up and inward from the bottom-right corner does. */
-    val rightCornerShortcut: CornerShortcut = CornerShortcut.None,
+    val rightCornerShortcut: SwipeAction = SwipeAction.None,
     val leftEdgeBackEnabled: Boolean = true,
     val rightEdgeBackEnabled: Boolean = true,
     val hapticFeedbackEnabled: Boolean = true,
@@ -238,7 +304,7 @@ data class GestureConfiguration(
     /** Read from the device at runtime and never persisted. */
     val platform: PlatformDefaults = PlatformDefaults(),
 ) {
-    fun shortcutFor(corner: BottomCorner): CornerShortcut = when (corner) {
+    fun shortcutFor(corner: BottomCorner): SwipeAction = when (corner) {
         BottomCorner.LEFT -> leftCornerShortcut
         BottomCorner.RIGHT -> rightCornerShortcut
     }
@@ -295,14 +361,16 @@ enum class RejectionReason {
 sealed interface TrackerAction {
     data object None : TrackerAction
 
-    data class Armed(val scheduleHoldMs: Long?) : TrackerAction
+    /** [pending] is the action a release would run now. */
+    data class Armed(val scheduleHoldMs: Long?, val pending: SwipeAction) : TrackerAction
 
     data class RearmHold(val delayMs: Long) : TrackerAction
 
     /**
-     * A bottom swipe paused past the Recents line; the release means Recents.
+     * What a release would run changed after arming: a bottom swipe paused past the Recents
+     * line, so the release means Recents.
      */
-    data object RecentsPrimed : TrackerAction
+    data class Pending(val action: SwipeAction, val kind: SwipeKind) : TrackerAction
 
     /** Starts the long-press timer, whose expiry is reported through `onLongPressElapsed`. */
     data class ScheduleLongPress(val delayMs: Long) : TrackerAction
@@ -319,7 +387,7 @@ sealed interface TrackerAction {
 
     /**
      * A corner diagonal passed its trigger. Nothing runs yet: the release fires
-     * [GestureAction.Corner], so a cancel or a second finger can still drop it.
+     * the corner's [GestureAction.Run], so a cancel or a second finger can still drop it.
      */
     data class CornerReady(val corner: BottomCorner) : TrackerAction
 
