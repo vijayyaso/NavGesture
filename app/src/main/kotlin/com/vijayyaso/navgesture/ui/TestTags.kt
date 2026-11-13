@@ -24,6 +24,7 @@ internal object TestTags {
     const val ROW_SETUP = "row_setup"
     const val ROW_APP_SWITCHING = "row_app_switching"
     const val ROW_FAVOURITE_APPS = "row_favourite_apps"
+    const val APP_SEARCH = "app_search"
     const val ROW_LEFT_CORNER = "row_left_corner"
     const val ROW_RIGHT_CORNER = "row_right_corner"
     const val ROW_BANK_APPS = "row_bank_apps"

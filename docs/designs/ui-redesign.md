@@ -368,10 +368,20 @@ group with no title is written as **(no title)**.
     speed switch. **Needs**: usage access row; *footer: usage access explainer*.
     **Gestures it adds**: switch-apps info row, last problem row.
 *   **Favourite apps** — **Favourites**: picked apps with move/remove buttons,
-    or the empty text inside the card. **All apps**: the checklist.
+    or the empty text inside the card. Then the app search box (`app_search`,
+    between the cards), then **All apps**: the checklist.
 *   **Bank apps** — the two intro texts as plain footnotes above everything.
     **Needs**: adb grant, usage access, notifications rows. **Picked**: the
-    picked apps or the empty text. **All apps**: the checklist.
+    picked apps or the empty text. Then the app search box, then **All
+    apps**: the checklist.
+*   **App search** (both pickers, `AppChecklist` in `AppPicker.kt`, added
+    2026-11-13): the corner picker's search box, moved to `Components.kt` as
+    `SearchField` and shared. Typing hides the checklist rows whose label or
+    package name does not hold the text (any case, spaces around it
+    ignored; `filterApps`, unit tested). It never changes what is picked;
+    the picked apps stay in their own card above. When nothing is left the
+    card says "No apps match". The text survives a rotation
+    (`rememberSaveable`).
 *   **Circle to Search** — **(no title)**: the switch; *footer: feature body*.
     If on: **Timing**: system-timing switch, hold slider. **Needs**:
     assistant row, last problem row.

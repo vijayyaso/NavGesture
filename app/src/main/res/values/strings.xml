@@ -173,6 +173,7 @@
     </plurals>
     <string name="section_favourites">Favourites</string>
     <string name="section_all_apps">All apps</string>
+    <string name="apps_no_match">No apps match</string>
     <string name="favourites_empty">No favourite apps yet. Tick apps below to add them.</string>
     <string name="favourites_limit">Favourites stop at %1$d, so the tap list can show them all. Remove one to add another.</string>
     <string name="action_move_up">Move up</string>

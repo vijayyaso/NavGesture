@@ -144,9 +144,7 @@ internal fun BankAppsScreen(model: AppModel) {
             )
         }
     }
-    SettingsGroup(title = stringResource(R.string.section_all_apps)) {
-        AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
-    }
+    AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
 }
 
 /** The home row's supporting text: what is picked, or what the pause still needs. */

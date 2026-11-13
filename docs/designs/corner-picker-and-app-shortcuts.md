@@ -259,7 +259,9 @@ existing `label_left_corner` / `label_right_corner`.
     `Settings`/GREY, Screenshot (code vector)/TEAL, Lock screen
     `Lock`/GREY, Power menu (code vector)/RED, Split screen (code
     vector)/PURPLE.
-*   Search: one `OutlinedTextField` above both app groups. It filters app
+*   Search: one `OutlinedTextField` above both app groups (since 2026-11-13
+    the shared `SearchField` in `Components.kt`, which the Favourite apps
+    and Bank apps checklists also use). It filters app
     names (case-insensitive contains) in both groups, and shortcut labels in
     App shortcuts. Empty search shows all.
 *   App list: the existing `rememberLaunchableApps()` (labels and icons,

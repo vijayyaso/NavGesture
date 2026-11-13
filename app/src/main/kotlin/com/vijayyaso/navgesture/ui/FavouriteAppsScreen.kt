@@ -102,10 +102,8 @@ internal fun FavouriteAppsScreen() {
             )
         }
     }
-    SettingsGroup(title = stringResource(R.string.section_all_apps)) {
-        AppChecklist(apps, chosen) { packageName ->
-            // A full list ignores the tick; the footer above says why.
-            save(FavouriteList.toggle(chosen, packageName, FavouriteList.MAX_FAVOURITES))
-        }
+    AppChecklist(apps, chosen) { packageName ->
+        // A full list ignores the tick; the footer above says why.
+        save(FavouriteList.toggle(chosen, packageName, FavouriteList.MAX_FAVOURITES))
     }
 }

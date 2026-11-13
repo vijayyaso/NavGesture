@@ -33,7 +33,12 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -55,30 +60,52 @@ internal fun rememberLaunchableApps(): State<List<LaunchableApp>?> {
     }
 }
 
-/** Every installed app with a tick box; [onToggle] gets the package that was tapped. */
+/**
+ * A search box, then the All apps card: every installed app with a tick box. The search only
+ * hides rows, never what is picked; [onToggle] gets the package that was tapped.
+ */
 @Composable
 internal fun AppChecklist(apps: List<LaunchableApp>?, chosen: List<String>, onToggle: (String) -> Unit) {
-    if (apps == null) {
-        FootNote(stringResource(R.string.switcher_loading))
-        return
-    }
-    apps.forEach { app ->
-        val checked = app.packageName in chosen
-        ListItem(
-            leadingContent = { AppIconImage(app.icon) },
-            headlineContent = { Text(app.label) },
-            trailingContent = {
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = null,
-                    modifier = Modifier.padding(end = 8.dp),
+    var query by rememberSaveable { mutableStateOf("") }
+    SearchField(query, stringResource(R.string.corner_search_apps), TestTags.APP_SEARCH) { query = it }
+    SettingsGroup(title = stringResource(R.string.section_all_apps)) {
+        if (apps == null) {
+            FootNote(stringResource(R.string.switcher_loading))
+            return@SettingsGroup
+        }
+        val shown = filterApps(apps, query)
+        if (shown.isEmpty() && query.isNotBlank()) FootNote(stringResource(R.string.apps_no_match))
+        shown.forEach { app ->
+            key(app.packageName) {
+                ListItem(
+                    leadingContent = { AppIconImage(app.icon) },
+                    headlineContent = { Text(app.label) },
+                    trailingContent = {
+                        Checkbox(
+                            checked = app.packageName in chosen,
+                            onCheckedChange = null,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { onToggle(app.packageName) },
                 )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            modifier = Modifier.clickable { onToggle(app.packageName) },
-        )
+            }
+        }
     }
 }
+
+/** The pickers' search rule: the label or package name holds the trimmed query, in any case. */
+internal fun appMatches(label: String, packageName: String, query: String): Boolean {
+    val needle = query.trim()
+    return needle.isEmpty() ||
+        label.contains(needle, ignoreCase = true) ||
+        packageName.contains(needle, ignoreCase = true)
+}
+
+/** The apps a search shows, in their list order. */
+internal fun filterApps(apps: List<LaunchableApp>, query: String): List<LaunchableApp> =
+    apps.filter { appMatches(it.label, it.packageName, query) }
 
 internal data class LaunchableApp(
     val packageName: String,
