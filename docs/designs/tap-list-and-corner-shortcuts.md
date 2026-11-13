@@ -110,7 +110,19 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     "No recent apps".
 *   **Smooth row.** The panel animates a float position toward the step count
     (`ValueAnimator`, 160 ms, `DecelerateInterpolator`, a new target restarts
-    from the current value). Slot pitch stays 56 dp, at most 6 slots.
+    from the current value). Slot pitch stays 56 dp, at most 6 slots. A move
+    of the finger that changes neither the step nor the selection draws
+    nothing.
+*   **The drop on open.** When the list opens, the drop under the finger
+    sinks back into its edge on its springs (about 0.2 s) and its window
+    hides when it has settled. No touch is replayed after a list open, so
+    the window does not need to vanish at once.
+*   **Remove animations.** The row slide and the pill fades are
+    `ValueAnimator`s, so they follow the phone's animator duration scale
+    without extra code. The drop is stepped by hand, so it reads
+    `ValueAnimator.areAnimatorsEnabled()` at each touch-down
+    (`BubbleMotion.start`): with animations removed it sits exactly under
+    the finger, shows its icon at once, and is gone the moment it is let go.
     *   **Fits** (apps ≤ slots): the row stands still and the highlight slides.
     *   **Ring** (more apps): the apps form a ring, the highlight is fixed in the centre slot, and the
         ring position is the unbounded step count, so a loop keeps moving the
@@ -265,7 +277,8 @@ the screen that asks for a second swipe.
     ends without doing either (a cancel, a second finger, a swipe pulled
     back before it fired) drops it only if the 2 s have passed. Inside the
     2 s the pill stays and the original window runs on; no new 2 s start.
-    A rotation drops the pill.
+    A rotation drops the pill. A pill put back after the overlays were
+    rebuilt in the same orientation shows at once, with no second fade-in.
 
 ### Settings
 
