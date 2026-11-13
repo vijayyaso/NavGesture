@@ -34,8 +34,8 @@ android {
         // edge overlays need to be positioned correctly.
         minSdk = 30
         targetSdk = 37
-        versionCode = 11
-        versionName = "1.2.0"
+        versionCode = 12
+        versionName = "1.3.0"
     }
 
     // Two builds from one codebase: github ships the self-updater, play does not.
