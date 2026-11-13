@@ -18,6 +18,8 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +64,7 @@ internal fun StatusBlock(
     configuration: GestureConfiguration,
     restrictedSettingsApply: Boolean,
     barStuck: Boolean,
+    switchPending: Boolean?,
     onOpenNavigation: () -> String?,
     onSwitch: (Boolean) -> Unit,
     onTurnOn: () -> Unit,
@@ -87,6 +90,9 @@ internal fun StatusBlock(
             .fillMaxWidth()
             .clip(TileShape)
             .background(MaterialTheme.colorScheme.surface)
+            // After the clip and background, so the rounded card itself grows and shrinks, and
+            // the tiles below slide with it.
+            .animateContentSize(tween(EXPAND_MS, easing = EaseOutStrong))
             .padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -112,11 +118,13 @@ internal fun StatusBlock(
                     .padding(start = 14.dp)
                     .testTag(TestTags.SERVICE_STATUS),
             )
-            // The quick way out when another app refuses to work while the gestures run.
+            // The quick way out when another app refuses to work while the gestures run. While a
+            // tap is in flight the thumb holds it, dimmed, and the text above keeps the real state.
             val switchLabel = stringResource(R.string.status_switch)
             Switch(
-                checked = working,
+                checked = switchChecked(switchPending, working),
                 onCheckedChange = onSwitch,
+                enabled = switchPending == null,
                 modifier = Modifier
                     .semantics { contentDescription = switchLabel }
                     .testTag(TestTags.STATUS_SWITCH),

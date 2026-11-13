@@ -52,6 +52,7 @@ import com.vijayyaso.navgesture.setup.TileTap
 import com.vijayyaso.navgesture.setup.setupState
 import com.vijayyaso.navgesture.setup.tileTap
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -87,6 +88,10 @@ internal class AppModel(
     /** Set by a Turn on tap without consent; the screen stack shows the disclosure and clears it. */
     var disclosureRequested by mutableStateOf(false)
 
+    /** Where a Home switch tap put the switch while its request is in flight; null otherwise. */
+    var pendingSwitch by mutableStateOf<Boolean?>(null)
+        private set
+
     val status: ServiceStatus get() = diagnostics.serviceStatus
 
     /** Fixed for the life of the install, so it is read once. */
@@ -120,6 +125,7 @@ internal class AppModel(
         collecting?.cancel()
         collecting = scope.launch {
             diagnostics = withContext(Dispatchers.IO) { DiagnosticsCollector.collect(context) }
+            pendingSwitch = pendingAfterRefresh(pendingSwitch, working = status == ServiceStatus.WORKING)
             if (status != ServiceStatus.OFF && !record.serviceEverEnabled) {
                 setFlag(SetupFlag.SERVICE_EVER_ENABLED, true)
             }
@@ -147,21 +153,47 @@ internal class AppModel(
      * On follows the tile's rules: one tap with the adb grant, else the Accessibility screen.
      */
     fun switchService(context: Context, on: Boolean) {
-        if (!on) {
-            scope.launch {
-                withContext(Dispatchers.IO) { ServiceKeeper.turnOff(this@AppModel.context, "Home switch") }
-                delay(SWITCH_SETTLE_MS)
-                refresh()
-            }
+        // The switch is disabled while a request is in flight; this also stops a tap already queued.
+        if (pendingSwitch != null) return
+        val inFlight = switchSendsRequest(on) {
+            val canTurnOn = ServiceKeeper.canTurnOn(context) &&
+                !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)
+            val tap = tileTap(serviceEnabled = false, record.disclosureAccepted, canTurnOn)
+            tap == TileTap.TURN_ON && ServiceKeeper.turnOn(context)
+        }
+        if (!inFlight) {
+            requestAccessibility(context)
             return
         }
-        val canTurnOn = ServiceKeeper.canTurnOn(context) &&
-            !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)
-        val tap = tileTap(serviceEnabled = false, record.disclosureAccepted, canTurnOn)
-        if (tap == TileTap.TURN_ON && ServiceKeeper.turnOn(context)) {
-            scope.launch(Dispatchers.IO) { ServiceLog.add(this@AppModel.context, "Home switch: turned on") }
-        } else {
-            requestAccessibility(context)
+        // Undispatched, so the thumb holds the tap from this very frame.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            runSwitchRequest(
+                target = on,
+                setPending = { pendingSwitch = it },
+                request = {
+                    withContext(Dispatchers.IO) {
+                        if (on) {
+                            ServiceLog.add(this@AppModel.context, "Home switch: turned on")
+                        } else {
+                            ServiceKeeper.turnOff(this@AppModel.context, "Home switch")
+                        }
+                    }
+                },
+                settle = {
+                    delay(SWITCH_SETTLE_MS)
+                    refreshAndWait()
+                },
+            )
+        }
+    }
+
+    /** A newer refresh cancels an older one, so this waits for whichever one is the latest. */
+    private suspend fun refreshAndWait() {
+        refresh()
+        while (true) {
+            val job = collecting ?: return
+            job.join()
+            if (job === collecting) return
         }
     }
 

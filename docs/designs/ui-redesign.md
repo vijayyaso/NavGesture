@@ -240,6 +240,17 @@ screen times anything with `delay()`.
     screen on top keeps its live scroll through `rememberSaveable`. Back
     never pops the last screen, so two Backs before one redraw cannot empty
     the stack. Unit tested in `BackStackTest`.
+*   **The Home switch answers at once.** A tap moves the thumb in the same
+    frame and holds it there, dimmed and disabled, while the request is in
+    flight (`AppModel.pendingSwitch`). The status text, icon and card colour
+    keep the real state and change only when it does. The hold ends when a
+    refresh finds the real state at the tap, and always once the refresh
+    after the 800 ms settle finishes, so a refused switch-off falls back to
+    "on". A switch-on that needs the Accessibility screen or the disclosure
+    holds nothing. The rules live in `HomeSwitch.kt`, unit tested in
+    `HomeSwitchTest`. The status card grows and shrinks over 200 ms
+    (`animateContentSize`), so the Turn on button and hints do not jump
+    the tiles below.
 
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 
