@@ -18,6 +18,8 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -74,7 +76,15 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     ) {
         model.requestAccessibility(context)
     }
-    SetupGroup(model)
+    // Shown at once (no enter motion), and only once the saved record is read, so a cold start
+    // never shows a card that then folds. Confirming the last step folds it away.
+    AnimatedVisibility(
+        visible = model.recordLoaded && !model.checklist.essentialsDone,
+        enter = EnterTransition.None,
+        exit = CardFoldExit,
+    ) {
+        SetupGroup(model)
+    }
 
     val bankApps by remember(context) { PackageListStore.bankApps(context).packages }
         .collectAsState(initial = emptyList())
@@ -188,11 +198,13 @@ private fun TileGrid(tiles: List<HomeTile>) {
     }
 }
 
-/** The required steps stay on home, in their own card, until gestures can run unattended. */
+/**
+ * The required steps stay on home, in their own card, until gestures can run unattended. While
+ * it folds away it still draws the live list: every step reads Done, and Accessibility is always one.
+ */
 @Composable
 private fun SetupGroup(model: AppModel) {
     val checklist = model.checklist
-    if (checklist.essentialsDone) return
     SettingsGroup(
         title = pluralStringResource(
             R.plurals.setup_progress,

@@ -75,6 +75,10 @@ internal class AppModel(
         private set
     var record by mutableStateOf(SetupRecord())
         private set
+
+    /** False until the saved record is read; before that, steps confirmed by hand look undone. */
+    var recordLoaded by mutableStateOf(false)
+        private set
     var diagnostics: Diagnostics by mutableStateOf(DiagnosticsCollector.collect(context))
         private set
     var usageAccess by mutableStateOf(hasUsageAccess(context))
@@ -215,7 +219,12 @@ internal class AppModel(
 
     internal suspend fun observe() {
         scope.launch { settings.configuration.collect { configuration = it } }
-        scope.launch { setupState.record.collect { record = it } }
+        scope.launch {
+            setupState.record.collect {
+                record = it
+                recordLoaded = true
+            }
+        }
         // UiAutomation, which uiautomator and screen readers use, unbinds the service for a moment.
         // So a stop shows only once it outlasts that, and a return shows at once.
         NavGestureAccessibilityService.running.collectLatest { running ->

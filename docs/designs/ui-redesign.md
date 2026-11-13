@@ -251,6 +251,12 @@ screen times anything with `delay()`.
     `HomeSwitchTest`. The status card grows and shrinks over 200 ms
     (`animateContentSize`), so the Turn on button and hints do not jump
     the tiles below.
+*   **The setup card folds away.** Confirming the last Required step fades
+    the card out over 150 ms while its space closes over 250 ms
+    (`CardFoldExit`); it draws its live rows while it goes, all reading
+    Done. It appears without motion, and only once the saved setup record
+    is read (`AppModel.recordLoaded`): before that, steps confirmed by hand
+    look undone, and the card would show and then fold on every cold start.
 
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 
@@ -302,7 +308,8 @@ Legend: `[x]` = icon square, `(●)` = switch on, `(○)` = switch off.
 *   **Setup**: unchanged logic. "Essentials" means every Required checklist
     step is done (`checklist.essentialsDone`). Until then the Required steps
     show in a `SettingsGroup` titled with the existing `setup_progress`
-    plural ("Setup, 1 of 2 done"). After that, Setup becomes a tile
+    plural ("Setup, 1 of 2 done"); the card waits for the saved setup record
+    and folds away when the last step is done (see Motion). After that, Setup becomes a tile
     (`row_setup`) whose state line is the existing `chip_done` text or the
     `setup_recommended_left` plural (`checklist.recommendedLeft`).
 *   **Feature tiles**: built from a list of `HomeTile` specs, laid out two per

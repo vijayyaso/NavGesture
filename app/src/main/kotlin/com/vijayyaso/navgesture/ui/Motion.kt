@@ -38,6 +38,10 @@ internal const val FADE_OUT_MS = 100
 internal const val SHRINK_MS = 150
 internal const val SCREEN_CHANGE_MS = 200
 
+/** A whole card leaving: slower than a block, as it moves more of the page. */
+internal const val CARD_FADE_OUT_MS = 150
+internal const val CARD_FOLD_MS = 250
+
 /** A block that opens below a switch: it fades in while its space grows. */
 internal val BlockEnter: EnterTransition =
     fadeIn(tween(FADE_IN_MS, easing = EaseOutStrong)) + expandVertically(tween(EXPAND_MS, easing = EaseOutStrong))
@@ -45,3 +49,7 @@ internal val BlockEnter: EnterTransition =
 /** The same block closing: it fades a little faster than its space closes. */
 internal val BlockExit: ExitTransition =
     fadeOut(tween(FADE_OUT_MS)) + shrinkVertically(tween(SHRINK_MS, easing = EaseOutStrong))
+
+/** A finished card folding away, drawing its last content while it goes. */
+internal val CardFoldExit: ExitTransition =
+    fadeOut(tween(CARD_FADE_OUT_MS)) + shrinkVertically(tween(CARD_FOLD_MS, easing = EaseOutStrong))
