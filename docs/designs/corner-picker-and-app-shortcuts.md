@@ -176,6 +176,9 @@ object ShortcutCatalog {          // merges fixed + run-time, starts them
     app update that changes the intent is followed. `GestureActionPerformer`
     runs the lookup and the launch on one background thread
     (`NavGesture-shortcut`), not on the main thread that handles touches.
+    When the service stops, `close()` ends that thread; a shortcut still
+    queued then starts nothing, and a swipe that races the stop is dropped
+    with a log line.
 *   The UI turns `icon()` into a bitmap with the existing
     `Drawable.toIconBitmap` in `AppPicker.kt` (made `internal`), and shows
     it with the existing `AppIconImage`.

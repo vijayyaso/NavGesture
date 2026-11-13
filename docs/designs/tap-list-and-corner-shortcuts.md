@@ -3,6 +3,10 @@
 *   **Author:** vijayyaso
 *   **Status:** Implemented (emulator tested; phone test pending)
 *   **Date:** 2026-11-09
+*   **Revised:** 2026-11-13. Fixes: the cancel distance near the screen
+    edge (section 2), grid rows and the 24-favourite limit (Touch mode), the
+    wider recents window (section 1). One behaviour change: in landscape the
+    app list now waits for a second swipe (section 4).
 
 --------------------------------------------------------------------------------
 
@@ -33,7 +37,9 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     no change; unit tested).
 *   Looping from the last app to the first never makes the row jump back.
 *   A user who cannot hold one continuous swipe can still switch apps with a
-    short swipe and a touch.
+    short swipe and a touch. In landscape with "Confirm in landscape" on,
+    the first swipe is held back and a second within 2 s opens the list
+    (section 4).
 *   A corner diagonal never fires Home, Back or Recents, and a normal Home
     swipe from the middle never fires a corner shortcut.
 
@@ -41,7 +47,8 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
 
 *   Animating the panel in and out.
 *   Corner shortcuts on the side edges.
-*   Changing the app-list trigger (below).
+*   Changing the shape of the app-list trigger (see Current system). The one
+    exception is the landscape hold-back (section 4).
 *   Screen-reader support for the touch panel (see Risks).
 
 ## Current system, in brief
@@ -54,11 +61,15 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
 *   A touch on a strip is one **stream** (DOWN … UP/CANCEL). A per-edge
     `GestureTracker` (`gesture/GestureTracker.kt`, Android-free, JVM tested)
     turns it into actions. A stream that is no gesture is replayed to the app.
-*   **App-list trigger** (unchanged): a bottom stream first **arms** Home when
-    it rises 10 dp inside a 45° cone; then, while still rising, a MOVE whose
-    sideways travel from DOWN is ≥ 40 dp and larger than the rise opens the
-    list. Right = recent apps, left = favourites. Before arming, a stream older
-    than 1000 ms is given up (`maximumArmDurationMs`).
+*   **App-list trigger** (shape unchanged). A bottom stream first **arms**
+    Home when it rises by the "Home swipe distance" setting (default 10 dp)
+    inside a 45° cone. Then, while still rising, a MOVE whose sideways
+    travel from DOWN is ≥ 40 dp and larger than the rise opens the list: a
+    drag to the right opens recent apps, a drag to the left opens
+    favourites. When "Bottom app switcher" is on, arming gives one light
+    tick to say that a sideways drag can now open the list; when it is off
+    there is no arm tick. Before arming, a stream older than 1000 ms is
+    given up (`maximumArmDurationMs`).
 
 ## Design
 
@@ -82,6 +93,21 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
 *   The selected app is `SwitcherSelection.indexFor(steps, count)`
     = `floorMod(steps, count)`. The app in front now is left out of the
     recents list, so every app shown can be picked.
+*   **Recents source** (drag list and grid). Usage events from the last 30
+    minutes: apps that came to the front and whose process is still alive,
+    excluding home screens, this app, MIUI's own scan and install helpers,
+    and apps with no launcher entry. Each app counts once, newest first, at
+    most 8; then the app in front now is left out, so often 7 show. If fewer
+    than 2 apps remain to switch to after that (a long stay in one app,
+    which would leave one app or none), the last 24 hours are read instead,
+    under the same filters and the same limit of 8
+    (`AppSwitcher.recentApps`, `RecentApps.tooFew`). That read is newest
+    first too, so apps from the last 30 minutes still come first and it only
+    adds older apps. If it also gives fewer than 2, the list shows what
+    there is. Both reads run in the list's background load, never on the
+    thread that handles touches. Without Usage access (the Android
+    permission to read usage events) both reads are empty and the panel says
+    "No recent apps".
 *   **Smooth row.** The panel animates a float position toward the step count
     (`ValueAnimator`, 160 ms, `DecelerateInterpolator`, a new target restarts
     from the current value). Slot pitch stays 56 dp, at most 6 slots.
@@ -101,8 +127,26 @@ New setting `appListStyle`: `DRAG` (default), `TAP`, `BOTH`.
 | Tap | grid, no highlight, not yet touchable | grid becomes touchable |
 | Both | row; selection follows the finger | step count ≠ 0: opens it; 0: becomes the touchable grid |
 
-In every style, sliding the finger 32 dp down from the open point closes the
-list (today's cancel).
+In every style, the list closes when the finger slides down from the open
+point by the cancel distance: the distance from the open point to the bottom
+of the screen, minus 4 dp, kept between 12 and 32 dp
+(`SwitcherCancel.distancePx`).
+
+*   With room to spare this is the old fixed 32 dp. But the list can open
+    after a rise of only 10 dp (the default "Home swipe distance"), so the
+    open point can be too close to the bottom of the screen for 32 dp.
+*   The 4 dp margin assumes a finger's reported centre stops a little short
+    of the screen edge. That is an assumption, not a measurement; it is on
+    the pending phone test.
+*   For an open point 16 to 36 dp above the bottom, the cancel line is
+    therefore 4 dp above the bottom of the screen, which a wobble during the
+    sideways drag does not reach by accident. The 12 dp floor keeps the line
+    at least 12 dp below the open point.
+*   An open point under 16 dp above the edge leaves no room for 12 dp, so a
+    slide cannot cancel there. The same check runs on the UP event, so a
+    finger lifted while moving down may still cancel if its UP position is
+    past the line. That is not unit tested (see Testing), and this band is
+    listed in Risks.
 
 **Touch mode** (the panel after the lift in Tap/Both, or from a corner):
 
@@ -114,10 +158,18 @@ list (today's cancel).
     sends `ACTION_OUTSIDE`, which closes the panel.
 *   Grid: cells 72 × 84 dp (48 dp icon, name under it, 11 sp, one line,
     ellipsized), 12 dp padding. Columns = how many cells fit in the window
-    width less 28 dp; at most 3 rows; apps past that are not shown (see
-    Risks). Same list and order as the drag list: recents newest first (the
-    app in front now left out, at most 8), favourites in
-    the user's order.
+    width minus 28 dp. Rows = how many fit between the panel's bottom edge
+    and the status bar, at most 6 (`SwitcherSelection.gridRowsThatFit`).
+*   The Favourite apps screen stops at 24 favourites
+    (`FavouriteList.MAX_FAVOURITES`). That fits as 4 columns × 6 rows in
+    portrait and 8 columns × 3 rows in landscape on a 360 × 640 dp screen with the default strip
+    (calculated from the cell size and unit tested, not measured on a
+    phone). A smaller screen or a taller bottom strip holds fewer cells,
+    and apps past the last cell are not shown (see Risks). A list saved
+    with more than 24 before this limit is kept as it is and can only
+    shrink.
+*   Same list and order as the drag list (see Recents source in section 1);
+    favourites in the user's order.
 *   A DOWN and UP in the same cell opens that app and closes the panel. A
     DOWN and UP inside the window but outside every cell closes it. A DOWN and
     UP in different cells does nothing.
@@ -149,9 +201,10 @@ list (today's cancel).
     the corner wins over the app list, because the list needs 40 dp sideways
     while the corner fires at 32 dp along the diagonal.
 *   **When it runs.** At the trigger the tracker returns
-    `CornerReady(corner)`: one haptic tick, the bubble released. A shallow
-    diagonal that armed Home first also got the arm tick, so two light ticks
-    are possible. The release returns `Fire(GestureAction.Corner(side))`, id
+    `CornerReady(corner)`: one haptic tick, the bubble released. A diagonal
+    that arms Home before it reaches the corner trigger also gives the arm
+    tick when "Bottom app switcher" is on (see App-list trigger), so two
+    light ticks are possible. The release returns `Fire(GestureAction.Corner(side))`, id
     `CornerLEFT` or `CornerRIGHT`. The overlay posts the shortcut **80 ms**
     later, after the strips' return to visible has settled (the launch rule
     needs a visible overlay) and the bubble is gone (screenshot). CANCEL or a
@@ -180,9 +233,39 @@ list (today's cancel).
     the existing failure recording (`lastFailure`, diagnostics panel).
 *   The list shortcuts work even when "Bottom app switcher" is off; the panel
     is then built for them alone.
-*   **Landscape confirm.** `LandscapeConfirm.isGuarded()` is true for Home,
-    Recents and any `Corner`. `admit()` runs before the post, so a held-back
-    first swipe never runs, and the second corner swipe within 2 s runs.
+
+### 4. Landscape confirm
+
+Applies only while "Confirm in landscape" is on (an existing setting, on by
+default, not changed here) and the screen is in landscape. A held-back
+gesture shows the **pill**: a small handle-like bar at the bottom centre of
+the screen that asks for a second swipe.
+
+*   **Guarded gestures.** `LandscapeConfirm.isGuarded()` is true for Home,
+    Recents and every `Corner`. `admit()` runs before the post, so the
+    action of a held-back first swipe is not performed. The corner list
+    shortcuts are a `Corner` fire and pass `admit()` only, never
+    `admitList()`.
+*   **App-list drag.** The sideways drag that opens the app list is guarded
+    too (`LandscapeConfirm.onOpenList`, `admitList()`), in every list style.
+    Why: in Drag style the lift starts another app, which takes the user out
+    of a landscape game as surely as Home does, and a list that pops up over
+    a game is unwanted in the other styles as well. The first drag shows the
+    pill, gives the lighter "held back" buzz and opens nothing. Its lift
+    starts no app, no Home and no replayed tap.
+*   **Confirming touch.** The 2 s window counts from the moment the pill
+    shows. Any bottom touch that starts inside it is the confirming one,
+    whatever raised the pill: a second corner swipe fires, a second drag
+    (to either side) opens the list, and a pill raised by a drag lets the
+    next Home swipe run, as a pill raised by Home lets the next drag open
+    the list.
+*   **Pill lifetime.** The pill never expires under a held confirming touch:
+    no expiry timer runs while that touch is down (`wakeAtMs`). A confirming
+    touch that fires or opens the list drops the pill at once. One that
+    ends without doing either (a cancel, a second finger, a swipe pulled
+    back before it fired) drops it only if the 2 s have passed. Inside the
+    2 s the pill stays and the original window runs on; no new 2 s start.
+    A rotation drops the pill.
 
 ### Settings
 
@@ -227,20 +310,37 @@ an app…" lists apps from `rememberLaunchableApps`.
 | A configured corner's native taps now go through our strip (replayed) | Only the side with a shortcut is widened; the strip is only the bottom edge band |
 | A closed touch panel keeps eating taps | Hide always sets `FLAG_NOT_TOUCHABLE`; one code path |
 | Panel launch refused as a background start | The panel itself is a visible accessibility overlay; corner launches wait 80 ms for the strips |
-| More favourites than the grid holds (about 15) are not shown in Tap style | Accepted; the drag list still reaches all; listed for the phone test |
+| More favourites than the grid holds are not shown in the touch grid (Tap, Both, corner list shortcuts) | The grid grows from the earlier fixed 3 rows to as many as fit, at most 6, and the Favourite apps screen stops at 24 (see Touch mode for where all 24 fit). On a smaller screen the last ones are still not shown; accepted, no scrolling or paging is built |
+| The app list opened under 16 dp above the screen edge cannot be cancelled by sliding down | Reachable by a touch-down close to the edge and a low, flat drag (the default rise is only 10 dp, and the finger may drift back down while it drags sideways). A finger that leaves the screen downward may still cancel through the UP check (section 2). Listed for the phone test |
+| In landscape the app list needs two swipes (behaviour change, on by default) | Same switch as Home ("Confirm in landscape"); turning it off restores one swipe |
 | No TalkBack support in the panel | Out of scope; the feature is for motor difficulty, not low vision |
 | Play declaration lists only Back/Home/Recents | The owner ships GitHub-only; update `docs/play-store/` before any Play upload |
 
-## Testing (done)
+## Testing (phone test pending)
 
 *   Unit (JVM): `SwitcherSelectionTest` (hysteresis, jitter, unbounded index,
     grid), `CornerGestureTest` (16 cases: both corners, slow past 1000 ms,
     batched DOWN/UP, steep, flat, 30–75° bounds, short, zone edge, centre,
     `none`, no width, cancel, beats the app list, haptics),
-    `CornerShortcutTest`, `LandscapeConfirmTest` (corner guarded).
+    `CornerShortcutTest`, `LandscapeConfirmTest` (corner guarded; the app
+    list held back, confirmed, and confirmed by a pill a Home swipe raised;
+    the pill shown again after the window; portrait and setting-off open at
+    once; no timer under a held confirming touch; a confirming touch whose
+    end never arrives does not confirm a swipe made after the window), `SwitcherCancelTest` (cancel distance
+    far above, 40, 25 and 15 dp above the bottom and at the very bottom;
+    a slide shorter than the floor does not cancel), `RecentAppsTest` (a long
+    stay in one app leaves too few, two apps are enough, the wider read only adds older apps),
+    `SwitcherSelectionTest` (rows that fit; 24 favourites fit at 360 × 640
+    dp in both orientations), `FavouriteListTest` (the 24 limit; a longer saved
+    list can still shrink). Not unit tested: the UP check of the cancel in
+    `EdgeSwitcherController`, which has no JVM test.
 *   Lint `NewApi` and the rest for both flavours.
 *   Emulator: `e2e/corner.sh` (corner fires, steep is Home, corner list opens
     and closes on an outside touch, Tap and Both stay open, timeout, no corner
-    without a shortcut) and `e2e/app-switch.sh`.
+    without a shortcut), `e2e/app-switch.sh` and `e2e/landscape-confirm.sh`
+    (first landscape drag shows the pill and opens nothing, second opens the
+    list).
 *   Phone (pending): launching from the grid, the feel of the 72 dp step,
-    screenshot without the bubble.
+    screenshot without the bubble, the cancel distance near the bottom edge
+    (the 4 dp margin), the arm tick and the "held back" buzz, the landscape
+    app list.

@@ -34,7 +34,7 @@ Two builds come from this code. The GitHub release can check GitHub for updates 
 | Swipe up and inward from a bottom corner | That corner's shortcut, once you pick one |
 | Touch and hold the middle of the bottom edge | Circle to Search, once it is on |
 
-In landscape the first bottom swipe only shows a pill, and a second one within 2 seconds goes Home, as HyperOS does in games. Every distance and delay is adjustable in the app's Gesture settings.
+In landscape the first bottom swipe only shows a pill, and a second one within 2 seconds goes Home, as HyperOS does in games. Recents, corner shortcuts and the app list wait for a second swipe there too. The Confirm in landscape switch turns this off. Every distance and delay is adjustable in the app's Gesture settings.
 
 ## Install
 

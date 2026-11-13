@@ -492,7 +492,7 @@ server.
     to `HomeScreen`, and its `UPDATES` branch calls `Store.UpdatesScreen()`.
     The `UPDATES` enum entry stays; `play` never navigates to it.
 *   `ui/HomeScreen.kt` — drops the `UpdateViewModel` parameter and calls
-    `Store.HomeRow { onOpen(Screen.UPDATES) }`.
+    `Store.homeTile { onOpen(Screen.UPDATES) }`.
 
 ### Self-enable gating
 
@@ -501,7 +501,12 @@ server.
     the turn-back-on part (`heal`) returns early when `BuildConfig.IS_PLAY`
     (so its "adb permission is gone" log still runs in `github`); the
     gesture-bar restore (`GestureBarHider.restoreIfStopped`) runs in both
-    builds. `turnOn` returns `false` when `!canTurnOn`.
+    builds. When a bar this app hid is still hidden and the adb permission
+    is gone, it cannot be shown again. The service history says so, from
+    `check` and from the service's own stop (`restoreForShutdown`). Home
+    shows a warning while the gestures are not working, and Gesture settings
+    shows one whenever the bar is stuck, each with a button to the phone's
+    navigation settings. A bar the user brings back by hand clears the mark. `turnOn` returns `false` when `!canTurnOn`.
 *   `setup/GestureTileService.kt` — calls
     `tileTap(serviceEnabled = TileFace.of(bound).target == TileTarget.APP,
     disclosureAccepted, canTurnOn = ServiceKeeper.canTurnOn(this) &&
