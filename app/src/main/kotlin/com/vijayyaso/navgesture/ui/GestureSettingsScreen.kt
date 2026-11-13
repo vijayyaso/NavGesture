@@ -279,5 +279,5 @@ private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState
 /** Copies the one-time computer command; the Play build never shows it (see barState). */
 @Composable
 internal fun CopyGrantButton(tag: String = TestTags.GESTURE_BAR_COPY) {
-    CopyButton(GestureBarHider.GRANT_COMMAND, stringResource(R.string.action_copy_command), tag)
+    CopyButton(GestureBarHider.GRANT_COMMAND, stringResource(R.string.action_copy_command), tag = tag)
 }

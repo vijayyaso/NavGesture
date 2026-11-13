@@ -406,7 +406,7 @@ private fun RowActions(actions: @Composable () -> Unit) {
 
 /** Puts [text] on the clipboard, then reads "Copied" until the text changes. */
 @Composable
-internal fun CopyButton(text: String, label: String, tag: String? = null, modifier: Modifier = Modifier) {
+internal fun CopyButton(text: String, label: String, modifier: Modifier = Modifier, tag: String? = null) {
     val context = LocalContext.current
     var copied by remember(text) { mutableStateOf(false) }
     FilledTonalButton(
