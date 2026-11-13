@@ -62,7 +62,9 @@ internal object BankPause {
     /**
      * Screens that come to the front over a bank app without the user leaving it, so they do
      * not count as away: permission prompts, system UI, installers, and MIUI's security
-     * centre, which scans apps as they open.
+     * centre, which scans apps as they open. Also what a bank opens for its own steps: the file
+     * and photo pickers, the camera, Google's sign-in and SMS sheets, and the call screen. The
+     * last group was read from a POCO F5 on HyperOS 3, plus the AOSP file picker.
      */
     val TRANSIENT = setOf(
         "android",
@@ -75,6 +77,13 @@ internal object BankPause {
         "com.miui.securityadd",
         "com.miui.securitycore",
         "com.lbe.security.miui",
+        "com.android.documentsui",
+        "com.google.android.documentsui",
+        "com.google.android.photopicker",
+        "com.google.android.providers.media.module",
+        "com.android.camera",
+        "com.google.android.gms",
+        "com.android.incallui",
     )
 
     /** Set by the watcher while it runs, in this process. */

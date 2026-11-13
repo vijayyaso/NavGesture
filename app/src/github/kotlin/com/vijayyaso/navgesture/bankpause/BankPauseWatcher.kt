@@ -30,6 +30,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.vijayyaso.navgesture.R
@@ -75,8 +76,17 @@ class BankPauseWatcher : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val saved = BankPause.paused(this)
         // Android requires startForeground soon after every start, even one that stops at once.
-        goForeground(saved)
+        val foreground = goForeground(saved)
         if (saved == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!foreground) {
+            // Without the foreground state Android would kill the watcher, and nothing would end
+            // the pause. So the pause ends here and the gestures come back.
+            ServiceLog.add(this, "bank pause: Android refused the watcher, ending the pause")
+            BankPause.clearPause(this)
+            ServiceKeeper.turnOn(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -156,7 +166,8 @@ class BankPauseWatcher : Service() {
         ServiceLog.add(this, "bank pause: turning back on (try $resumeAttempts, write ok=$written)")
     }
 
-    private fun goForeground(saved: SavedPause?) {
+    /** False when Android refused the foreground state, as it can for a start from the background. */
+    private fun goForeground(saved: SavedPause?): Boolean {
         val manager = getSystemService(NotificationManager::class.java)
         manager?.createNotificationChannel(
             NotificationChannel(
@@ -188,7 +199,9 @@ class BankPauseWatcher : Service() {
         } else {
             0
         }
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+        return runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type) }
+            .onFailure { Log.w("NavGesture", "Could not go foreground", it) }
+            .isSuccess
     }
 
     private fun notifyResumeFailed() {

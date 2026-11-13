@@ -97,6 +97,9 @@ object ServiceKeeper {
             // A live bank pause owns the switch: turning it on now would show the bank app
             // the service it was paused for.
             if (BankPause.watcherRunning) return null
+            // The process died in the middle of a pause, and the bank app may still be in front.
+            // A fresh watcher reads the same history and decides; only a refused start ends it.
+            if (BankPause.startWatcher(context)) return "a bank pause lost its watcher, started it again"
             BankPause.clearPause(context)
             ServiceLog.add(context, "$from: a bank pause outlived its watcher, ending it")
         }
