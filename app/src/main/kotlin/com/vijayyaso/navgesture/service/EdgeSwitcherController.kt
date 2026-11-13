@@ -29,6 +29,7 @@ import com.vijayyaso.navgesture.gesture.FavouriteList
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SwitcherCancel
 import com.vijayyaso.navgesture.gesture.SwitcherSelection
+import com.vijayyaso.navgesture.gesture.SwitcherView
 import com.vijayyaso.navgesture.gesture.SlideTravel
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
@@ -285,16 +286,15 @@ internal class EdgeSwitcherController(
             "SWITCHER_ROWS ${if (recents) "recents" else "favourites"} " +
                 (list?.joinToString(",") { it.packageName } ?: "loading"),
         )
-        // Touch mode and the Tap style show the grid; drag styles show the row while held.
-        val grid = touchMode || style == AppListStyle.TAP
-        when {
-            list == null -> panel.showMessage(context.getString(R.string.switcher_loading), touchMode)
-            list.isEmpty() -> panel.showMessage(context.getString(
+        when (val view = SwitcherView.of(list?.size, touchMode, style, steps)) {
+            SwitcherView.Loading -> panel.showMessage(context.getString(R.string.switcher_loading), touchMode)
+            SwitcherView.Empty -> panel.showMessage(context.getString(
                 if (recents) R.string.switcher_no_recents else R.string.switcher_no_favourites,
             ), touchMode)
-            grid -> panel.showGrid(list, touchMode)
-            else -> {
-                panel.showRow(list, steps)
+            SwitcherView.Grid -> panel.showGrid(list.orEmpty(), touchMode)
+            // The row opens on the step a lift would open, so a list that arrives mid-drag does not jump.
+            is SwitcherView.Row -> {
+                panel.showRow(list.orEmpty(), view.steps)
                 updateSelection()
             }
         }

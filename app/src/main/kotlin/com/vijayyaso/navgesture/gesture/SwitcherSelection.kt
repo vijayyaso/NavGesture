@@ -155,3 +155,25 @@ class SlideTravel(private val adaptive: Boolean) {
         }
     }
 }
+
+/** What the app-list panel shows, decided apart from the windows so it is testable. */
+sealed interface SwitcherView {
+    data object Loading : SwitcherView
+    data object Empty : SwitcherView
+
+    /** The touchable grid: touch mode, and the Tap style while the finger is still down. */
+    data object Grid : SwitcherView
+
+    /** The drag row, centred on the step that a lift would open. */
+    data class Row(val steps: Int) : SwitcherView
+
+    companion object {
+        /** [size] is null while the list is still loading. */
+        fun of(size: Int?, touchMode: Boolean, style: AppListStyle, steps: Int): SwitcherView = when {
+            size == null -> Loading
+            size == 0 -> Empty
+            touchMode || style == AppListStyle.TAP -> Grid
+            else -> Row(style.effectiveSteps(steps))
+        }
+    }
+}

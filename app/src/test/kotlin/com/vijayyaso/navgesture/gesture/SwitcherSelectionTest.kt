@@ -151,4 +151,29 @@ class SwitcherSelectionTest {
         assertTrue(capacity(360f, 640f) >= max)
         assertTrue(capacity(640f, 360f) >= max)
     }
+
+    @Test
+    fun `a list still loading or empty shows a message in every style`() {
+        for (style in AppListStyle.entries) for (touch in listOf(true, false)) {
+            assertEquals(SwitcherView.Loading, SwitcherView.of(size = null, touchMode = touch, style, steps = 2))
+            assertEquals(SwitcherView.Empty, SwitcherView.of(size = 0, touchMode = touch, style, steps = 2))
+        }
+    }
+
+    @Test
+    fun `touch mode and the Tap style show the grid`() {
+        for (style in AppListStyle.entries) {
+            assertEquals(SwitcherView.Grid, SwitcherView.of(size = 5, touchMode = true, style, steps = 0))
+        }
+        assertEquals(SwitcherView.Grid, SwitcherView.of(size = 5, touchMode = false, AppListStyle.TAP, steps = 3))
+    }
+
+    @Test
+    fun `a held drag shows the row on the step a lift would open`() {
+        assertEquals(SwitcherView.Row(2), SwitcherView.of(size = 5, touchMode = false, AppListStyle.DRAG, steps = 2))
+        // Both has no pick at step 0, so its second step is the row's first.
+        assertEquals(SwitcherView.Row(1), SwitcherView.of(size = 5, touchMode = false, AppListStyle.BOTH, steps = 2))
+        assertEquals(SwitcherView.Row(0), SwitcherView.of(size = 5, touchMode = false, AppListStyle.BOTH, steps = 0))
+        assertEquals(SwitcherView.Row(-1), SwitcherView.of(size = 5, touchMode = false, AppListStyle.BOTH, steps = -1))
+    }
 }
