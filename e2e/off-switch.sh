@@ -59,11 +59,14 @@ echo "== the Home switch turns the gestures off at once ==" >&2
 # shellcheck disable=SC2310 # reported below
 service_bound || enable_service || true
 open_home
+# shellcheck disable=SC2310 # an unread status is reported by the check below
 shown="$(text_of_id service_status || true)"
 if [ "${shown}" = "${service_on}" ]; then pass "home reads on"; else fail "home reads on (shows '${shown:-nothing}')"; fi
+# shellcheck disable=SC2310 # a tap that failed is reported by the wait below
 set_toggle_id status_switch false || true
 # shellcheck disable=SC2310 # reported here
 if wait_off; then pass "the switch turned the service off"; else fail "the switch turned the service off"; fi
+# shellcheck disable=SC2310 # an unread status is reported by the check below
 shown="$(text_of_id service_status || true)"
 if [ "${shown}" = "${service_off}" ]; then pass "home reads off"; else fail "home reads off (shows '${shown:-nothing}')"; fi
 
