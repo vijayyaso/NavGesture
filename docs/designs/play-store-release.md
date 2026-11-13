@@ -288,12 +288,30 @@ reachable only after consent:
 
 | Service | Consent | Build | Tile tap |
 | :------ | :------ | :---- | :------- |
-| on | any | any | opens `MainActivity` (unchanged `TileTarget.APP`) |
+| on | any | any | `ServiceKeeper.turnOff`: the service switches itself off at once. Only a service that is listed but not running, without the adb grant, cannot be switched off; the tap then opens `MainActivity` |
 | off | no | any | opens `MainActivity` with `EXTRA_SHOW_DISCLOSURE` |
 | off | yes | `github`, adb grant present, switch not listed | `ServiceKeeper.turnOn` (v1.1.1 one-tap) |
 | off | yes | otherwise | `GestureTileService.accessibilityIntent` (unchanged `TileTarget.ACCESSIBILITY_SETTINGS`) |
 
 The service itself does not check consent (Non-Goals).
+
+**Switching off.** The tile's tap on a running service and the switch on the
+Home status card (`StatusBlock`, tag `status_switch`) both call
+`ServiceKeeper.turnOff`. It exists for apps that refuse to work while an
+accessibility service runs. Both builds have it, since a service may always
+switch itself off (`disableSelf`).
+
+| State when the user switches off | What happens |
+| :------------------------------- | :----------- |
+| Service running | "Wanted" is cleared first, so boot, the tile and the app opening do not heal it back on. A bar this app hid is shown again, then `disableSelf`. The service takes its windows down once it is off the Accessibility list, as a bank pause does |
+| Running, a bank pause just starting | The pause is cleared and its watcher stopped: the user's off wins |
+| Listed but not running | With the adb grant the entry is taken off the list. Without it nothing can be written, so the tile opens the app (Home shows Fix) |
+| Bank-paused (already off) | Unchanged: the tile's tap is Resume now, Home shows Turn on |
+| Android keeps the service listed after `disableSelf` (seven looks, 0.5 s apart) | The switch-off is given up: "wanted" is set again and a hidden bar is hidden again |
+
+The Home switch shows the real state (on only while the service runs).
+Switching it on follows the tile's rules above: disclosure first, then one
+tap with the adb grant, else the Accessibility screen.
 
 **Usage access** is explained separately, where it is requested: a footnote
 row under the existing `usage_access` row on the App switching screen, text in

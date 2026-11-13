@@ -173,10 +173,12 @@ that is missed (same class as Q1).
 
 *   Each second the watcher calls `hasUsageAccess()`; false resumes at once
     (without the app-op, `queryEvents` returns an empty list, not an error).
-*   It queries `queryEvents(startedAt - 1000, now)`, keeps `ACTIVITY_RESUMED`
+*   It queries `queryEvents(startedAt, now)`, keeps `ACTIVITY_RESUMED`
     packages as `FrontApp`s, drops transient system screens
     (`BankPause.TRANSIENT`: permission controllers, system UI, package
-    installers, MIUI security centre), and calls `PauseClock.shouldResume`
+    installers, MIUI security centre, and what a bank opens for its own
+    steps: the file and photo pickers, the camera, Google Play services
+    sheets and the call screen), and calls `PauseClock.shouldResume`
     with the picked set saved at pause time. Reading from `startedAt` each
     time means a restarted watcher (`START_STICKY`, null intent) reads the
     same history. Times are wall clock (`System.currentTimeMillis()`), as
@@ -199,8 +201,16 @@ the hold and pauses.
 
 *   `ServiceKeeper.check` (boot, tile, app open), after its `isRunning`
     return: a saved pause with `BankPause.watcherRunning` true returns (the
-    pause owns it); with it false the pause is stale, so it is cleared and the
-    normal heal runs.
+    pause owns it). With it false the process died in the middle of the
+    pause, and the bank app may still be in front. So the watcher is started
+    again (`BankPause.startWatcher`); it reads the same history and decides.
+    Only when Android refuses that start is the pause cleared and the normal
+    heal run.
+*   The watcher's `onStartCommand`: when Android refuses the foreground
+    state, the pause is cleared, the service is switched back on and the
+    watcher stops, so no pause is left without something to end it.
+*   A switch-off by the user (tile or Home switch, `ServiceKeeper.turnOff`)
+    clears a pause that is starting and stops its watcher.
 *   The tile's tap during a live pause calls `BankPause.resumeNow` instead of
     `ServiceKeeper.turnOn`.
 *   `onServiceConnected`, when a pause is saved, clears it (not the hold) and
@@ -228,7 +238,8 @@ watcher. The screen and the event filter are in `main`, gated by
     to a second slower to pause, and battery use all day.
 *   **Removing the service with a settings write instead of `disableSelf()`.**
     Rejected: `disableSelf()` is the public API. The write stays the re-enable
-    path only.
+    path, and the user's own switch-off of a service that is listed but not
+    running, which has no instance to call `disableSelf()` on.
 
 ## Risks & Mitigations
 
