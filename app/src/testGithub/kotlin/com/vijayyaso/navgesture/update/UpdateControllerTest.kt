@@ -48,6 +48,7 @@ class UpdateControllerTest {
             calls++
             onProgress(50)
             whileDownloading()
+            onProgress(100)
             return answer
         }
     }
@@ -360,5 +361,39 @@ class UpdateControllerTest {
         val thrown = runCatching { controller.onAppOpen() }.exceptionOrNull()
         assertTrue(thrown is CancellationException)
         assertEquals(UpdatePhase.Checking, controller.phase)
+    }
+
+    @Test
+    fun `switching off during a download installs nothing and leaves the screen idle`() = runBlocking {
+        val controller = controller(FakeStore(on = true))
+        controller.onAppOpen()
+        downloader.whileDownloading = { controller.setEnabled(false) }
+        controller.downloadAndInstall()
+        assertTrue(installer.installed.isEmpty())
+        // Not even the progress that arrived after the switch went off shows.
+        assertEquals(UpdateState(enabled = false), controller.state.value)
+    }
+
+    @Test
+    fun `switching off during a check shows no answer and saves none`() = runBlocking {
+        val store = FakeStore(on = true)
+        val controller = controller(store)
+        source.whileFetching = { controller.setEnabled(false) }
+        controller.onAppOpen()
+        assertEquals(UpdateState(enabled = false), controller.state.value)
+        assertNull(store.body)
+    }
+
+    @Test
+    fun `switched off, an install answer from the system still shows nothing busy`() = runBlocking {
+        val controller = controller(FakeStore(on = true))
+        controller.onAppOpen()
+        controller.downloadAndInstall()
+        controller.setEnabled(false)
+        assertFalse(controller.state.value.busy)
+        controller.downloadAndInstall()
+        controller.checkNow()
+        assertEquals(1, downloader.calls)
+        assertEquals(1, source.calls)
     }
 }

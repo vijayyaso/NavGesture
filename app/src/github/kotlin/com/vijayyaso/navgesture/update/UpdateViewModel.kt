@@ -20,8 +20,11 @@ package com.vijayyaso.navgesture.update
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
@@ -30,7 +33,10 @@ import java.io.File
 internal class UpdateViewModel(application: Application) : AndroidViewModel(application) {
 
     private val controller: UpdateController
-    private var work: Job? = null
+
+    // Parent of every check, download and install, so switching off stops all of them at once.
+    private val work = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private val workScope = CoroutineScope(viewModelScope.coroutineContext + work)
 
     val state: StateFlow<UpdateState>
 
@@ -54,8 +60,13 @@ internal class UpdateViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun setEnabled(enabled: Boolean) {
-        if (!enabled) work?.cancel()
-        launchWork { controller.setEnabled(enabled) }
+        if (enabled) {
+            launchWork { controller.setEnabled(true) }
+            return
+        }
+        work.cancelChildren()
+        // Outside the work, so a later switch-off can never cancel this one half way.
+        viewModelScope.launch { controller.setEnabled(false) }
     }
 
     fun checkNow() = launchWork { controller.checkNow() }
@@ -65,6 +76,6 @@ internal class UpdateViewModel(application: Application) : AndroidViewModel(appl
     fun onResume() = launchWork { controller.onResume() }
 
     private fun launchWork(block: suspend () -> Unit) {
-        work = viewModelScope.launch { block() }
+        workScope.launch { block() }
     }
 }

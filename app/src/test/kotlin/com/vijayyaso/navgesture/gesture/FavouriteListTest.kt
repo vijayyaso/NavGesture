@@ -47,6 +47,27 @@ class FavouriteListTest {
     }
 
     @Test
+    fun `a full list takes no more favourites but still lets one go`() {
+        val full = listOf("a", "b")
+        assertEquals(full, FavouriteList.toggle(full, "c", max = 2))
+        assertEquals(listOf("b"), FavouriteList.toggle(full, "a", max = 2))
+        assertEquals(listOf("a", "c"), FavouriteList.toggle(listOf("a"), "c", max = 2))
+    }
+
+    @Test
+    fun `a list saved over the cap can still shrink`() {
+        val over = listOf("a", "b", "c")
+        assertEquals(over, FavouriteList.toggle(over, "d", max = 2))
+        assertEquals(listOf("a", "c"), FavouriteList.toggle(over, "b", max = 2))
+    }
+
+    @Test
+    fun `with no cap given toggle has no limit, as bank apps need`() {
+        val many = (1..100).map { "p$it" }
+        assertEquals(101, FavouriteList.toggle(many, "new").size)
+    }
+
+    @Test
     fun `moveUp swaps with the one above and the first stays put`() {
         val packages = listOf("a", "b", "c")
         assertEquals(listOf("a", "c", "b"), FavouriteList.moveUp(packages, 2))

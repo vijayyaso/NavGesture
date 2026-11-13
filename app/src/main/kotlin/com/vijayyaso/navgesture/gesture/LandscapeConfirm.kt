@@ -52,6 +52,12 @@ class LandscapeConfirm(private val windowMs: Long = ConfirmPill.WINDOW_MS) {
 
     val expiresAtMs: Long? get() = shownAtMs?.plus(windowMs)
 
+    /**
+     * When the expiry timer should next run, or null for no timer. A confirming touch holds the
+     * pill until it ends, so a timer then could only spin; its end runs [expire] instead.
+     */
+    val wakeAtMs: Long? get() = if (confirming) null else expiresAtMs
+
     /** A rotation drops a pill, since it asked about the orientation that is gone. */
     fun configure(enabled: Boolean, landscape: Boolean) {
         if (this.landscape != landscape) dismiss()
@@ -60,15 +66,23 @@ class LandscapeConfirm(private val windowMs: Long = ConfirmPill.WINDOW_MS) {
         if (!required) dismiss()
     }
 
+    /** Any new touch ends the one before, so a flag left by a lost end never carries over. */
     fun onDown(edge: ScreenEdge, nowMs: Long) {
+        confirming = false
         if (edge != ScreenEdge.BOTTOM) return
         expire(nowMs)
         confirming = pillShown
     }
 
     /** Any other gesture drops the pill, so it never confirms a later bottom swipe. */
-    fun onFire(action: GestureAction, edge: ScreenEdge, nowMs: Long): ConfirmVerdict {
-        val guarded = edge == ScreenEdge.BOTTOM && isGuarded(action)
+    fun onFire(action: GestureAction, edge: ScreenEdge, nowMs: Long): ConfirmVerdict =
+        decide(guarded = edge == ScreenEdge.BOTTOM && isGuarded(action), nowMs)
+
+    /** The sideways drag that opens the app list: a game thumb drifts too, and lifting switches app. */
+    fun onOpenList(edge: ScreenEdge, nowMs: Long): ConfirmVerdict =
+        decide(guarded = edge == ScreenEdge.BOTTOM, nowMs)
+
+    private fun decide(guarded: Boolean, nowMs: Long): ConfirmVerdict {
         if (!guarded || !required || confirming) {
             dismiss()
             return ConfirmVerdict.Perform
@@ -86,6 +100,11 @@ class LandscapeConfirm(private val windowMs: Long = ConfirmPill.WINDOW_MS) {
         if (edge != ScreenEdge.BOTTOM) return
         confirming = false
         expire(nowMs)
+    }
+
+    /** The touch in progress was dropped without its end, so the pill goes back to its timer. */
+    fun onTouchLost() {
+        confirming = false
     }
 
     /** A touch that started inside the window keeps the pill until it ends. */

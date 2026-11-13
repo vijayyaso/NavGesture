@@ -33,6 +33,7 @@
     <string name="status_restricted_hint">Switch greyed out? Allow restricted settings in App info first.</string>
     <string name="status_stopped">Gestures stopped</string>
     <string name="status_stopped_body">The switch is on, but the service is not running. Turn it off and on again.</string>
+    <string name="status_bar_stuck_hint">The phone\'s own gesture bar is still hidden, and NavGesture lost the permission to show it. Open navigation settings to bring it back.</string>
     <string name="status_working">Gestures are on</string>
     <string name="status_working_body">Back from the sides, Home and Recents from the bottom.</string>
     <string name="status_working_body_left">Back from the left side, Home and Recents from the bottom.</string>
@@ -172,6 +173,7 @@
     <string name="section_favourites">Favourites</string>
     <string name="section_all_apps">All apps</string>
     <string name="favourites_empty">No favourite apps yet. Tick apps below to add them.</string>
+    <string name="favourites_limit">Favourites stop at %1$d, so the tap list can show them all. Remove one to add another.</string>
     <string name="action_move_up">Move up</string>
     <string name="action_remove_favourite">Remove from favourites</string>
     <string name="label_usage_access">Usage access</string>
@@ -236,6 +238,10 @@
     <string name="label_hide_gesture_bar">Hide the gesture bar</string>
     <string name="hide_gesture_bar_body">Switches HyperOS to its own full-screen gestures with the line hidden, and keeps it so if HyperOS resets it.</string>
     <string name="hide_gesture_bar_needs_grant">Needs a one-time permission. Turn on USB debugging (Security settings) in Developer options, then run from a computer:\n%1$s</string>
+    <string name="hide_gesture_bar_stuck">Still hidden. NavGesture hid the bar, then lost the permission to show it again. It stays hidden even when the gestures are off.</string>
+    <string name="gesture_bar_stuck_title">Bring the bar back yourself</string>
+    <string name="gesture_bar_stuck_body">Open navigation settings, then pick buttons or show the gesture line again.</string>
+    <string name="gesture_bar_stuck_grant">Or give the permission back from a computer:\n%1$s</string>
     <string name="section_feedback">Feedback</string>
     <string name="label_haptics">Vibrate</string>
     <string name="value_dp">%1$d</string>

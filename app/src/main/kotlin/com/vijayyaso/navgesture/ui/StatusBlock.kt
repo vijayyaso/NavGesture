@@ -36,6 +36,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,9 +58,12 @@ internal fun StatusBlock(
     status: ServiceStatus,
     configuration: GestureConfiguration,
     restrictedSettingsApply: Boolean,
+    barStuck: Boolean,
+    onOpenNavigation: () -> String?,
     onTurnOn: () -> Unit,
 ) {
     val context = LocalContext.current
+    var navigationFailure by remember { mutableStateOf<String?>(null) }
     val working = status == ServiceStatus.WORKING
     val title = when (status) {
         ServiceStatus.OFF -> R.string.status_off
@@ -125,6 +132,24 @@ internal fun StatusBlock(
             )
             TextButton(onClick = { openAppInfo(context) }) {
                 Text(stringResource(R.string.action_open_app_info))
+            }
+        }
+        // With the gestures gone, a bar this app hid and can no longer show leaves no navigation.
+        if (!working && barStuck) {
+            Text(
+                text = listOfNotNull(
+                    stringResource(R.string.status_bar_stuck_hint),
+                    navigationFailure?.let { stringResource(R.string.outcome_failed, it) },
+                ).joinToString("\n"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(TestTags.STATUS_BAR_STUCK),
+            )
+            TextButton(
+                onClick = { navigationFailure = onOpenNavigation() },
+                modifier = Modifier.testTag(TestTags.STATUS_OPEN_NAVIGATION),
+            ) {
+                Text(stringResource(R.string.action_open_navigation_settings))
             }
         }
     }

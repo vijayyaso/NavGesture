@@ -166,6 +166,8 @@ internal class EdgeTouchOverlay(
         // still in flight from freeing the next install's strips mid-touch.
         hold.reset()
         heldEdge = null
+        // That stream's end never comes, so a pill it kept up returns to its timer.
+        confirmation.onTouchLost()
     }
 
     private fun addStrip(
@@ -192,6 +194,7 @@ internal class EdgeTouchOverlay(
             onStreamStart = { onStreamStart(edge) },
             onActivity = ::onActivity,
             admit = { stream, action -> hold.isCurrent(stream) && admit(action, edge) },
+            admitList = { stream -> hold.isCurrent(stream) && admitList(edge) },
             onFire = { stream, action -> if (hold.isCurrent(stream)) onFire(action, edge) },
             onUnused = { stream, samples -> onUnused(edge, stream, samples) },
             onStreamEnd = { stream -> endStream(edge, stream) },
@@ -291,6 +294,14 @@ internal class EdgeTouchOverlay(
         return verdict is ConfirmVerdict.Perform
     }
 
+    /** False when the app list is held back behind the pill, like a guarded gesture. */
+    private fun admitList(edge: ScreenEdge): Boolean {
+        val verdict = confirmation.onOpenList(edge, SystemClock.uptimeMillis())
+        syncPill()
+        if (verdict is ConfirmVerdict.ShowPill) Log.i(TAG, "GESTURE_CONFIRM_SHOWN $edge AppList")
+        return verdict is ConfirmVerdict.Perform
+    }
+
     private fun onFire(action: GestureAction, edge: ScreenEdge) {
         if (action is GestureAction.Corner) {
             // After the stream ends and the window update settles: the strips are visible again,
@@ -344,7 +355,8 @@ internal class EdgeTouchOverlay(
             if (!pillVisible) overlay.show()
             pillVisible = true
             handler.removeCallbacks(pillExpiry)
-            handler.postAtTime(pillExpiry, expiresAt)
+            // No timer under a confirming touch: one already due would run again at once.
+            confirmation.wakeAtMs?.let { handler.postAtTime(pillExpiry, it) }
             return
         }
         handler.removeCallbacks(pillExpiry)
@@ -382,6 +394,9 @@ internal class EdgeTouchOverlay(
         Log.w(TAG, "STREAM_STUCK $event, held by ${heldEdge ?: "none"}")
         ServiceLog.add(context, event)
         bubbles.values.forEach(FluidBubbleOverlay::hide)
+        // The touch is over for its strip too: no pause poll, long press or open app list is
+        // left behind, and a finger that was only still finds its later events ignored.
+        heldEdge?.let { (strips[it] as? TouchCaptureView)?.dispose() }
         heldEdge?.let { confirmation.onStreamEnd(it, now) }
         syncPill()
         applyInteractivity()
@@ -418,6 +433,7 @@ internal class EdgeTouchOverlay(
         private val onStreamStart: () -> Long,
         private val onActivity: (Long) -> Unit,
         private val admit: (Long, GestureAction) -> Boolean,
+        private val admitList: (Long) -> Boolean,
         private val onFire: (Long, GestureAction) -> Unit,
         private val onUnused: (Long, List<TouchSample>) -> Unit,
         private val onStreamEnd: (Long) -> Unit,
@@ -537,8 +553,14 @@ internal class EdgeTouchOverlay(
          * while the finger is still down. Returns true when the release was deferred.
          */
         private fun handle(action: TrackerAction, replayable: Boolean): Boolean {
-            val admitted = action !is TrackerAction.Fire || admit(stream, action.action)
-            val buzz = haptics.shouldTick(action)
+            val admitted = when (action) {
+                is TrackerAction.Fire -> admit(stream, action.action)
+                is TrackerAction.OpenSwitcher -> admitList(stream)
+                else -> true
+            }
+            // An open list buzzes from the controller. A refused one buzzes like a refused Home:
+            // nothing on this rise has ticked through the gate yet.
+            val buzz = haptics.shouldTick(action) || (action is TrackerAction.OpenSwitcher && !admitted)
             // One buzz per gesture.
             when {
                 !admitted && buzz -> confirmTick()
@@ -550,10 +572,17 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.None -> Unit
                 is TrackerAction.OpenSwitcher -> {
                     cancelHold()
-                    bubble?.hide()
-                    switching = true
-                    controller?.open(action)
-                    samples.last?.let { controller?.move(it) }
+                    if (admitted) {
+                        bubble?.hide()
+                        switching = true
+                        controller?.open(action)
+                        samples.last?.let { controller?.move(it) }
+                    } else {
+                        // Behind the pill: the tracker owns the rest of the touch and returns
+                        // nothing for it, so the release opens, fires and replays nothing.
+                        bubble?.release()
+                        controller?.cancel()
+                    }
                 }
                 is TrackerAction.CornerReady -> {
                     // The diagonal is a shortcut now, not a Home swipe: the drop goes away.
@@ -570,7 +599,8 @@ internal class EdgeTouchOverlay(
                     removeCallbacks(longPressRunnable)
                     Log.d(TAG, "$edge armed (pause poll=${action.scheduleHoldMs})")
                     // The rise is live: from here a sideways drag opens the app list, so say so.
-                    if (edge == ScreenEdge.BOTTOM) confirmTick()
+                    // With the list off nothing can open, and the gesture's own buzz is enough.
+                    if (edge == ScreenEdge.BOTTOM && dragListEnabled) confirmTick()
                     action.scheduleHoldMs?.let { postDelayed(holdRunnable, it) }
                 }
                 is TrackerAction.RearmHold -> {
@@ -611,7 +641,7 @@ internal class EdgeTouchOverlay(
             return handle(action, replayable)
         }
 
-        /** Detaching must invalidate callbacks even when the finger never sends UP. */
+        /** Detaching or a stuck stream must invalidate callbacks even when the finger never sends UP. */
         fun dispose() {
             cancelHold()
             controller?.cancel()

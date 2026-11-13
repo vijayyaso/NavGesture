@@ -27,6 +27,7 @@ import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.FavouriteList
 import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SwitcherCancel
 import com.vijayyaso.navgesture.gesture.SwitcherSelection
 import com.vijayyaso.navgesture.gesture.SlideTravel
 import com.vijayyaso.navgesture.gesture.TouchSample
@@ -145,15 +146,21 @@ internal class EdgeSwitcherController(
     fun move(sample: TouchSample) {
         if (!opened || touchMode) return
         latest = sample
-        // Sliding back down to the edge gives up: close without opening anything.
-        val openedAt = origin?.yPx ?: return
-        if (sample.yPx - openedAt >= density * CANCEL_DP) {
-            Log.i(TAG, "SWITCHER_CANCEL")
-            cancel()
-            return
-        }
+        if (cancelledBySlideDown(sample)) return
         travel.add(sample.xPx / density, sample.timestampMs)
         if (style != AppListStyle.TAP) updateSelection()
+    }
+
+    /**
+     * Sliding back down to the edge gives up: close without opening anything. A finger that
+     * runs off the glass may cross the line only in its UP, so the lift checks it too.
+     */
+    private fun cancelledBySlideDown(sample: TouchSample): Boolean {
+        val openedAt = origin?.yPx ?: return false
+        if (!SwitcherCancel.isCancel(openedAt, sample.yPx, panel.screenHeightPx.toFloat(), density)) return false
+        Log.i(TAG, "SWITCHER_CANCEL")
+        cancel()
+        return true
     }
 
     fun release(sample: TouchSample) {
@@ -162,6 +169,7 @@ internal class EdgeSwitcherController(
             return
         }
         latest = sample
+        if (cancelledBySlideDown(sample)) return
         travel.add(sample.xPx / density, sample.timestampMs)
         if (style != AppListStyle.TAP) updateSelection()
         if (!style.opensOnLift(steps)) {
@@ -314,9 +322,6 @@ internal class EdgeSwitcherController(
 
     private companion object {
         const val TAG = "NavGesture"
-
-        /** Downward travel from the open point that gives up and closes the row. */
-        const val CANCEL_DP = 32f
 
         /** A touch-mode panel left alone this long closes itself; any touch on it restarts it. */
         const val IDLE_TIMEOUT_MS = 10_000L

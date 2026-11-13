@@ -37,4 +37,17 @@ object RecentApps {
         val newest = resumedOldestFirst.lastOrNull() ?: return false
         return newest == ordered.firstOrNull()
     }
+
+    /**
+     * True when [ordered] leaves fewer than [MIN_OTHERS] apps to switch to once the app in
+     * front is left out. A long stay in one app (a video) empties a short window, so the
+     * caller reads a longer one; that only adds older apps after the short list's.
+     */
+    fun tooFew(ordered: List<String>, currentFirst: Boolean): Boolean {
+        val others = ordered.size - if (currentFirst && ordered.isNotEmpty()) 1 else 0
+        return others < MIN_OTHERS
+    }
+
+    /** Fewer apps than this to switch to and the list is too thin to be useful. */
+    const val MIN_OTHERS = 2
 }

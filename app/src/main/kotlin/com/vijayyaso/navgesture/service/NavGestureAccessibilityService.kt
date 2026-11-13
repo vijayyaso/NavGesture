@@ -327,6 +327,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
                 .unregisterDisplayListener(displayListener)
         }
         overlay?.remove()
+        // A failed setUp can get here before the performer exists.
+        if (::performer.isInitialized) performer.close()
         gestureBar?.release()
         gestureBar = null
         overlay = null

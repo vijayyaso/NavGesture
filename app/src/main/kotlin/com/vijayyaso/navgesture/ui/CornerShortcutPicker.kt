@@ -46,6 +46,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -65,6 +66,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.BottomCorner
@@ -278,7 +280,16 @@ private fun AppShortcutsGroup(
 ) {
     val context = LocalContext.current
     val iconPx = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
-    val page by produceState<ShortcutPage?>(initialValue = null, apps) {
+    // Bumped on each return to the app, so access given in Settings or from a computer shows.
+    // The first resume is the page opening, which loads anyway.
+    var returns by remember { mutableIntStateOf(0) }
+    val opening = remember { booleanArrayOf(true) }
+    LifecycleResumeEffect(Unit) {
+        if (opening[0]) opening[0] = false else returns++
+        onPauseOrDispose { }
+    }
+    // A reload keeps the page it replaces on screen until the new one is ready.
+    val page by produceState<ShortcutPage?>(initialValue = null, apps, returns) {
         val loaded = apps ?: return@produceState
         value = withContext(Dispatchers.IO) {
             val (access, byPackage) = ShortcutCatalog.forPackages(context, loaded.map { it.packageName })

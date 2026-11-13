@@ -70,8 +70,26 @@ class AppSwitcher(internal val context: Context) {
         val usage = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
             ?: return RecentList(emptyList(), false)
         val now = System.currentTimeMillis()
-        val events = runCatching { usage.queryEvents(now - TRAIL_WINDOW_MS, now) }.getOrNull()
+        // Apps the user can still return to: recent ones whose process is alive. Clearing the
+        // system recents kills those processes, so the row empties with it.
+        val alive = runningPackages()
+        val homes = homePackages()
+        val short = recentApps(usage, now - TRAIL_WINDOW_MS, now, alive, homes)
             ?: return RecentList(emptyList(), false)
+        if (!RecentApps.tooFew(short.packages, short.currentFirst)) return short
+        // A long stay in one app leaves no resume in the short window; a day's events only
+        // add older apps after the short list's, under the same filters.
+        return recentApps(usage, now - WIDE_WINDOW_MS, now, alive, homes) ?: short
+    }
+
+    private fun recentApps(
+        usage: UsageStatsManager,
+        from: Long,
+        now: Long,
+        alive: Set<String>,
+        homes: Set<String>,
+    ): RecentList? {
+        val events = runCatching { usage.queryEvents(from, now) }.getOrNull() ?: return null
         val resumed = mutableListOf<String>()
         val event = UsageEvents.Event()
         while (events.hasNextEvent()) {
@@ -79,15 +97,16 @@ class AppSwitcher(internal val context: Context) {
             if (event.eventType != UsageEvents.Event.ACTIVITY_RESUMED) continue
             resumed.add(event.packageName ?: continue)
         }
-        // Apps the user can still return to: recent ones whose process is alive. Clearing the
-        // system recents kills those processes, so the row empties with it.
-        val alive = runningPackages()
         val recent = if (alive.isEmpty()) resumed else resumed.filter { it in alive }
-        Log.i(TAG, "SWITCHER_POOL usage=${resumed.size} running=${alive.size} kept=${recent.size}")
+        Log.i(
+            TAG,
+            "SWITCHER_POOL window=${(now - from) / 60_000}min usage=${resumed.size} " +
+                "running=${alive.size} kept=${recent.size}",
+        )
         val ordered = RecentApps.order(
             recent.filterNot { it in HOUSEKEEPING },
             context.packageName,
-            homePackages(),
+            homes,
         ) { packageName ->
             context.packageManager.getLaunchIntentForPackage(packageName) != null
         }.take(MAX_APPS)
@@ -121,6 +140,9 @@ class AppSwitcher(internal val context: Context) {
     companion object {
         private const val TAG = "NavGesture"
         private const val TRAIL_WINDOW_MS = 30L * 60L * 1000L
+
+        /** Read only when the short window gives too few apps; heavier, so never first. */
+        private const val WIDE_WINDOW_MS = 24L * 60L * 60L * 1000L
 
         /** A row, not a list: the panel shows six, so anything past eight is unreachable. */
         private const val MAX_APPS = 8

@@ -68,7 +68,10 @@ internal fun FavouriteAppsScreen() {
         scope.launch { store.set(updated) }
     }
 
-    SettingsGroup(title = stringResource(R.string.section_favourites)) {
+    SettingsGroup(
+        title = stringResource(R.string.section_favourites),
+        footer = stringResource(R.string.favourites_limit, FavouriteList.MAX_FAVOURITES),
+    ) {
         if (chosen.isEmpty()) {
             FootNote(stringResource(R.string.favourites_empty))
         }
@@ -100,6 +103,9 @@ internal fun FavouriteAppsScreen() {
         }
     }
     SettingsGroup(title = stringResource(R.string.section_all_apps)) {
-        AppChecklist(apps, chosen) { packageName -> save(FavouriteList.toggle(chosen, packageName)) }
+        AppChecklist(apps, chosen) { packageName ->
+            // A full list ignores the tick; the footer above says why.
+            save(FavouriteList.toggle(chosen, packageName, FavouriteList.MAX_FAVOURITES))
+        }
     }
 }

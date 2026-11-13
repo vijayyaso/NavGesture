@@ -56,7 +56,17 @@ internal class SwitcherPanelOverlay(
     /** The bottom strip's height; the panel sits above it, or the strip would take its taps. */
     private val bottomStripPx: Int,
 ) {
-    private val view = PanelView(context, geometry.density)
+    /** Gap between the panel's bottom edge and the screen's. */
+    private val bottomOffsetPx =
+        maxOf(bottomStripPx + (STRIP_GAP_DP * geometry.density).toInt(), (BOTTOM_GAP_DP * geometry.density).toInt())
+
+    /** Worked out once here, so measuring, drawing and touch all use the same grid. */
+    private val gridRows = SwitcherSelection.gridRowsThatFit(
+        geometry.heightPx / geometry.density,
+        bottomOffsetPx / geometry.density,
+    )
+
+    private val view = PanelView(context, geometry.density, gridRows)
     private var attached = false
 
     /** A touch on an app cell in touch mode, with the app's index. */
@@ -67,6 +77,9 @@ internal class SwitcherPanelOverlay(
 
     /** Any finger down on the touch-mode panel, so a slow user is not timed out mid-touch. */
     var onTouchStart: (() -> Unit)? = null
+
+    /** Display height in the space of the strips' rawY; a rotation builds a new panel. */
+    val screenHeightPx: Int get() = geometry.heightPx
 
     init {
         view.onPick = { index -> onPick?.invoke(index) }
@@ -84,7 +97,7 @@ internal class SwitcherPanelOverlay(
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            y = maxOf(bottomStripPx + (STRIP_GAP_DP * geometry.density).toInt(), (BOTTOM_GAP_DP * geometry.density).toInt())
+            y = bottomOffsetPx
             fitInsetsTypes = 0
             alpha = 0f
         }
@@ -147,7 +160,12 @@ internal class SwitcherPanelOverlay(
     }
 
     @SuppressLint("ViewConstructor")
-    private class PanelView(context: Context, private val density: Float) : View(context) {
+    private class PanelView(
+        context: Context,
+        private val density: Float,
+        /** The most rows the touch grid may use on this screen. */
+        private val gridRows: Int,
+    ) : View(context) {
         private enum class Mode { ROW, GRID, MESSAGE }
 
         var onPick: ((Int) -> Unit)? = null
@@ -236,7 +254,7 @@ internal class SwitcherPanelOverlay(
         private val availableDp: Float get() = (width / density - SIDE_PADDING_DP * 2).coerceAtLeast(0f)
 
         private val grid: SwitcherSelection.Grid
-            get() = SwitcherSelection.tapGrid(apps.size, availableDp, CELL_W_DP)
+            get() = SwitcherSelection.tapGrid(apps.size, availableDp, CELL_W_DP, gridRows)
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -245,7 +263,7 @@ internal class SwitcherPanelOverlay(
                 Mode.MESSAGE -> MESSAGE_HEIGHT_DP
                 Mode.GRID -> {
                     val available = (width / density - SIDE_PADDING_DP * 2).coerceAtLeast(0f)
-                    val rows = SwitcherSelection.tapGrid(apps.size, available, CELL_W_DP).rows
+                    val rows = SwitcherSelection.tapGrid(apps.size, available, CELL_W_DP, gridRows).rows
                     rows.coerceAtLeast(1) * CELL_H_DP + GRID_PADDING_DP * 2
                 }
             }
@@ -429,9 +447,9 @@ internal class SwitcherPanelOverlay(
         const val ICON_DP = 48f
 
         /** Grid cell: room for the icon and one line of its name. */
-        const val CELL_W_DP = 72f
-        const val CELL_H_DP = 84f
-        const val GRID_PADDING_DP = 12f
+        const val CELL_W_DP = SwitcherSelection.GRID_CELL_W_DP
+        const val CELL_H_DP = SwitcherSelection.GRID_CELL_H_DP
+        const val GRID_PADDING_DP = SwitcherSelection.GRID_PADDING_DP
         const val SCROLL_MS = 160L
 
         const val NOT_TOUCHABLE_FLAGS =

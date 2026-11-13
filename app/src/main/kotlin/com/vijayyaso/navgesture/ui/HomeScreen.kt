@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.settings.PackageListStore
 import com.vijayyaso.navgesture.ui.theme.IconTint
 
@@ -62,7 +63,13 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
     )
-    StatusBlock(model.status, model.configuration, model.restrictedSettingsApply) {
+    StatusBlock(
+        status = model.status,
+        configuration = model.configuration,
+        restrictedSettingsApply = model.restrictedSettingsApply,
+        barStuck = model.gestureBar == GestureBarHider.BarState.STUCK_HIDDEN,
+        onOpenNavigation = model::openNavigationSettings,
+    ) {
         model.requestAccessibility(context)
     }
     SetupGroup(model)

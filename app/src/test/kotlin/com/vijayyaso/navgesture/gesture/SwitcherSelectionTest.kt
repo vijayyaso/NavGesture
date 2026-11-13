@@ -19,6 +19,7 @@ package com.vijayyaso.navgesture.gesture
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SwitcherSelectionTest {
@@ -98,19 +99,56 @@ class SwitcherSelectionTest {
     @Test
     fun `the grid wraps into rows of the columns that fit`() {
         // 360 dp wide, 72 dp cells: 5 columns.
-        assertEquals(SwitcherSelection.Grid(5, 2), SwitcherSelection.tapGrid(8, 360f, 72f))
-        assertEquals(SwitcherSelection.Grid(3, 1), SwitcherSelection.tapGrid(3, 360f, 72f))
+        assertEquals(SwitcherSelection.Grid(5, 2), SwitcherSelection.tapGrid(8, 360f, 72f, 6))
+        assertEquals(SwitcherSelection.Grid(3, 1), SwitcherSelection.tapGrid(3, 360f, 72f, 6))
     }
 
     @Test
-    fun `the grid stops at three rows`() {
-        val grid = SwitcherSelection.tapGrid(20, 360f, 72f)
+    fun `the grid stops at the rows that fit`() {
+        val grid = SwitcherSelection.tapGrid(20, 360f, 72f, 3)
         assertEquals(SwitcherSelection.Grid(5, 3), grid)
         assertEquals(15, grid.capacity)
+        assertEquals(SwitcherSelection.Grid(5, 4), SwitcherSelection.tapGrid(20, 360f, 72f, 6))
     }
 
     @Test
     fun `an empty grid has no cells`() {
-        assertEquals(0, SwitcherSelection.tapGrid(0, 360f, 72f).capacity)
+        assertEquals(0, SwitcherSelection.tapGrid(0, 360f, 72f, 6).capacity)
+    }
+
+    @Test
+    fun `a tall phone gets more rows, up to the cap`() {
+        // 873 dp tall (the owner's phone), 40 dp under the panel: 6 rows, the cap.
+        assertEquals(SwitcherSelection.MAX_GRID_ROWS, SwitcherSelection.gridRowsThatFit(873f, 40f))
+        // A 640 dp phone: 6 rows of 84 dp fit under the status bar.
+        assertEquals(6, SwitcherSelection.gridRowsThatFit(640f, 52f))
+        assertEquals(6, SwitcherSelection.MAX_GRID_ROWS)
+    }
+
+    @Test
+    fun `a short landscape screen keeps the three rows it had`() {
+        // 360 dp tall, with a gesture bar under the strip.
+        assertEquals(3, SwitcherSelection.gridRowsThatFit(360f, 52f))
+        assertEquals(3, SwitcherSelection.gridRowsThatFit(360f, 40f))
+    }
+
+    @Test
+    fun `a screen too short for a row still shows one`() {
+        assertEquals(1, SwitcherSelection.gridRowsThatFit(120f, 40f))
+    }
+
+    @Test
+    fun `every favourite fits the grid on a 360 by 640 dp phone both ways up`() {
+        val max = FavouriteList.MAX_FAVOURITES
+        // The panel keeps 14 dp each side; 52 dp under it is a 20 dp strip, a 24 dp gesture
+        // bar and an 8 dp gap, the most a phone puts there.
+        fun capacity(widthDp: Float, heightDp: Float) = SwitcherSelection.tapGrid(
+            max,
+            widthDp - 14f * 2,
+            SwitcherSelection.GRID_CELL_W_DP,
+            SwitcherSelection.gridRowsThatFit(heightDp, 52f),
+        ).capacity
+        assertTrue(capacity(360f, 640f) >= max)
+        assertTrue(capacity(640f, 360f) >= max)
     }
 }

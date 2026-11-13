@@ -37,7 +37,17 @@ object FavouriteList {
         }
     }
 
-    fun toggle(packages: List<String>, packageName: String): List<String> =
-        if (packageName in packages) packages.filterNot { it == packageName }
-        else packages + packageName
+    /** Removing always works; adding stops at [max], so a list saved over it can only shrink. */
+    fun toggle(packages: List<String>, packageName: String, max: Int = Int.MAX_VALUE): List<String> =
+        when {
+            packageName in packages -> packages.filterNot { it == packageName }
+            packages.size >= max -> packages
+            else -> packages + packageName
+        }
+
+    /**
+     * Favourites the tap grid can always show: 4 columns by 6 rows on a 360 x 640 dp phone,
+     * and 8 by 3 when it is turned. The drag row loops, so it reaches any number.
+     */
+    const val MAX_FAVOURITES = 24
 }

@@ -26,6 +26,8 @@ import android.os.Handler
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.edit
+import com.vijayyaso.navgesture.BuildConfig
+import com.vijayyaso.navgesture.diagnostics.ServiceLog
 
 /**
  * Hides the small gesture bar HyperOS draws at the bottom under a third-party launcher.
@@ -42,7 +44,9 @@ import androidx.core.content.edit
  *
  * A bar this app hid is marked on disk before the write, so a kill that skips the service's
  * unbind - a force stop or a crash - still leaves a trace. [restoreIfStopped] then gives the
- * phone its bar back, so it is never left with neither the bar nor the gestures.
+ * phone its bar back, so it is never left with neither the bar nor the gestures. Giving it back
+ * needs the same permission; if that is gone, the app says so ([stuck]) and points to the phone's
+ * own navigation settings, since it cannot write the bar back itself.
  */
 class GestureBarHider(private val context: Context, private val handler: Handler) {
 
@@ -87,7 +91,14 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         val hiding = wanted
         stopObserving()
         wanted = false
-        if (hiding && canWrite()) show(context)
+        if (!hiding) return
+        if (canWrite()) {
+            show(context)
+        } else if (stuck(canWrite = false, hiddenByUs(context), isHidden())) {
+            // Nothing can write the bar back now, so the history says so instead of staying silent.
+            Log.w(TAG, "GESTURE_BAR_STUCK service stopping, no permission to show the bar")
+            ServiceLog.add(context, STUCK_LINE)
+        }
     }
 
     private fun write(hidden: Boolean) = write(context, hidden)
@@ -105,6 +116,20 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         context.contentResolver.unregisterContentObserver(observer)
         observing = false
     }
+
+    /** What the Gesture bar section shows. */
+    enum class BarState {
+        /** No section: not HyperOS, or the Play build without the grant. */
+        NONE,
+        CAN_HIDE,
+        NEEDS_GRANT,
+
+        /** See [stuck]: the user must bring the bar back from the phone's own settings. */
+        STUCK_HIDDEN,
+    }
+
+    /** What [restoreIfStopped] found and did. */
+    enum class Restore { NOT_NEEDED, SHOWN, NOT_SHOWN, NO_PERMISSION }
 
     companion object {
         fun canWrite(context: Context): Boolean =
@@ -128,16 +153,53 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         fun shouldRestore(hidByUs: Boolean, serviceRunning: Boolean, switchedOn: Boolean): Boolean =
             hidByUs && !serviceRunning && !switchedOn
 
+        /** A bar this app hid is still hidden, and without the permission nothing can show it. */
+        fun stuck(canWrite: Boolean, hidByUs: Boolean, hiddenNow: Boolean): Boolean =
+            !canWrite && hidByUs && hiddenNow
+
+        fun barState(
+            hyperOs: Boolean,
+            play: Boolean,
+            canWrite: Boolean,
+            hidByUs: Boolean,
+            hiddenNow: Boolean,
+        ): BarState = when {
+            stuck(canWrite, hidByUs, hiddenNow) -> BarState.STUCK_HIDDEN
+            !hyperOs -> BarState.NONE
+            canWrite -> BarState.CAN_HIDE
+            // The Play build never shows an adb instruction.
+            play -> BarState.NONE
+            else -> BarState.NEEDS_GRANT
+        }
+
+        /** Reads a few settings and a small preferences file. */
+        fun barState(context: Context): BarState = barState(
+            hyperOs = NavigationModeReader.isHyperOsDevice(),
+            play = BuildConfig.IS_PLAY,
+            canWrite = canWrite(context),
+            hidByUs = hiddenByUs(context),
+            hiddenNow = isHidden(context),
+        )
+
         /** Shows a bar this app left hidden when the service died without its unbind. */
         fun restoreIfStopped(
             context: Context,
             serviceRunning: Boolean,
             switchedOn: Boolean,
-        ): Boolean {
-            if (!shouldRestore(hiddenByUs(context), serviceRunning, switchedOn)) return false
-            if (!canWrite(context)) return false
+        ): Restore {
+            val hidByUs = hiddenByUs(context)
+            if (!shouldRestore(hidByUs, serviceRunning, switchedOn)) return Restore.NOT_NEEDED
+            if (!canWrite(context)) {
+                if (stuck(canWrite = false, hidByUs, isHidden(context))) {
+                    Log.w(TAG, "GESTURE_BAR_STUCK gestures gone, no permission to show the bar")
+                    return Restore.NO_PERMISSION
+                }
+                // Brought back by hand, so there is nothing left for this app to give back.
+                markHidden(context, hidden = false)
+                return Restore.NOT_NEEDED
+            }
             show(context)
-            return !isHidden(context)
+            return if (isHidden(context)) Restore.NOT_SHOWN else Restore.SHOWN
         }
 
         private fun hiddenByUs(context: Context): Boolean =
@@ -168,6 +230,9 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         /** What the user types once, from a computer, to let this app hide the bar. */
         const val GRANT_COMMAND =
             "adb shell pm grant com.vijayyaso.navgesture android.permission.WRITE_SECURE_SETTINGS"
+
+        /** The history line for a bar left hidden with the gestures gone. */
+        const val STUCK_LINE = "the bar stays hidden: the adb permission to show it again is gone"
 
         private const val PREFS = "gesture_bar"
         private const val KEY_HIDDEN_BY_US = "hidden_by_us"

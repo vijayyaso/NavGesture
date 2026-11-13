@@ -153,6 +153,49 @@ case "$(resumed_activity)" in
   *) fail "the app lost focus with neither swipe confirmed" ;;
 esac
 
+# A short rise, then a longer drag sideways: the app-list gesture, as in app-switch.sh.
+L_DRAG_X=$((L_WIDTH / 2))
+L_DRAG_Y=$((L_BOTTOM_Y - 120))
+L_DRAG="input motionevent DOWN ${L_DRAG_X} ${L_BOTTOM_Y} && input motionevent MOVE ${L_DRAG_X} ${L_DRAG_Y} && input motionevent MOVE $((L_DRAG_X + 320)) ${L_DRAG_Y} && sleep 0.3 && input motionevent UP $((L_DRAG_X + 320)) ${L_DRAG_Y}"
+
+echo >&2
+echo "== a first sideways drag shows the pill and opens no app list ==" >&2
+case_try=1
+while [ "${case_try}" -le 3 ]; do
+  open_in_landscape
+  reset_log
+  "${ADB_BIN}" shell "${L_DRAG}" >/dev/null
+  sleep 3
+  # shellcheck disable=SC2310 # a false predicate means the drag arrived in time
+  stalled "${case_try}" || break
+  case_try=$((case_try + 1))
+done
+assert_log "the first landscape drag shows the pill" "GESTURE_CONFIRM_SHOWN BOTTOM AppList"
+assert_no_log "the first drag opens no app list" "SWITCHER_OPEN"
+assert_no_log "the first drag starts no app" "SWITCHER_LAUNCHED"
+assert_no_log "the held-back drag is not replayed to the app" "REPLAY_DISPATCHED"
+case "$(resumed_activity)" in
+  *"${PKG}"*) pass "the app stayed in front after the first drag" ;;
+  *) fail "the app lost focus after one unconfirmed drag" ;;
+esac
+
+echo >&2
+echo "== a second drag inside the window opens the app list ==" >&2
+case_try=1
+while [ "${case_try}" -le 3 ]; do
+  open_in_landscape
+  reset_log
+  # One device shell keeps the second touch-down inside the 2 s window. The pause lets the
+  # strips become touchable again first, as no finger comes back within a few milliseconds.
+  "${ADB_BIN}" shell "${L_DRAG} && sleep 0.4 && ${L_DRAG}" >/dev/null
+  sleep 2
+  # shellcheck disable=SC2310 # a false predicate means the drags arrived in time
+  stalled "${case_try}" || break
+  case_try=$((case_try + 1))
+done
+assert_log "the first drag shows the pill" "GESTURE_CONFIRM_SHOWN BOTTOM AppList"
+assert_log "the second drag opens the app list" "SWITCHER_OPEN bottom recents"
+
 echo >&2
 echo "== back in portrait one swipe goes Home ==" >&2
 # shellcheck disable=SC2310 # a timeout is reported as a failed case, not a script error

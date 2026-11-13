@@ -34,6 +34,8 @@ class LandscapeConfirmTest {
         val confirm = LandscapeConfirm()
         val performed = mutableListOf<GestureAction>()
         val pills = mutableListOf<GestureAction>()
+        var listsOpened = 0
+        var listPills = 0
         var time = 0L
 
         init {
@@ -41,10 +43,16 @@ class LandscapeConfirmTest {
         }
 
         private fun feed(action: TrackerAction) {
-            if (action !is TrackerAction.Fire) return
-            when (confirm.onFire(action.action, action.edge, time)) {
-                is ConfirmVerdict.Perform -> performed += action.action
-                is ConfirmVerdict.ShowPill -> pills += action.action
+            when (action) {
+                is TrackerAction.Fire -> when (confirm.onFire(action.action, action.edge, time)) {
+                    is ConfirmVerdict.Perform -> performed += action.action
+                    is ConfirmVerdict.ShowPill -> pills += action.action
+                }
+                is TrackerAction.OpenSwitcher -> when (confirm.onOpenList(action.edge, time)) {
+                    is ConfirmVerdict.Perform -> listsOpened++
+                    is ConfirmVerdict.ShowPill -> listPills++
+                }
+                else -> Unit
             }
         }
 
@@ -68,6 +76,14 @@ class LandscapeConfirmTest {
             down(CENTRE_X)
             move(CENTRE_X, BOTTOM_Y - 150f)
             up(CENTRE_X, BOTTOM_Y - 150f)
+        }
+
+        // A short rise, then 200px sideways: past the 120px app-list drag and wider than the rise.
+        fun dragSideways() {
+            down(CENTRE_X)
+            move(CENTRE_X, BOTTOM_Y - 150f)
+            move(CENTRE_X + 200f, BOTTOM_Y - 150f)
+            up(CENTRE_X + 200f, BOTTOM_Y - 150f)
         }
 
         // Past the 250px Recents line, then still long enough for the tail to catch up.
@@ -317,5 +333,137 @@ class LandscapeConfirmTest {
         confirm.onStreamEnd(ScreenEdge.BOTTOM, 20L)
         confirm.onDown(ScreenEdge.BOTTOM, 500L)
         assertEquals(ConfirmVerdict.Perform, confirm.onFire(corner, ScreenEdge.BOTTOM, 510L))
+    }
+
+    @Test
+    fun `a pill with no touch down asks to wake at its expiry`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        assertEquals(null, confirm.wakeAtMs)
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 1_000L)
+        assertEquals(1_000L + ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
+    }
+
+    @Test
+    fun `a confirming touch held past the expiry asks for no wake-up`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        assertEquals(null, confirm.wakeAtMs)
+        confirm.expire(ConfirmPill.WINDOW_MS + 500L)
+        assertTrue(confirm.pillShown)
+        assertEquals(null, confirm.wakeAtMs)
+    }
+
+    @Test
+    fun `ending a confirming touch after the expiry drops the pill`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        confirm.onStreamEnd(ScreenEdge.BOTTOM, ConfirmPill.WINDOW_MS + 800L)
+        assertFalse(confirm.pillShown)
+        assertEquals(null, confirm.wakeAtMs)
+    }
+
+    @Test
+    fun `a lost confirming touch hands the pill back to its timer`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        confirm.onTouchLost()
+        assertEquals(ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
+        confirm.expire(ConfirmPill.WINDOW_MS + 500L)
+        assertFalse(confirm.pillShown)
+        confirm.onDown(ScreenEdge.BOTTOM, 10_000L)
+        assertTrue(confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 10_100L) is ConfirmVerdict.ShowPill)
+    }
+
+    @Test
+    fun `a bottom touch whose end never came does not confirm a much later swipe`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        confirm.onDown(ScreenEdge.BOTTOM, 60_000L)
+        assertFalse(confirm.pillShown)
+        assertTrue(confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 60_100L) is ConfirmVerdict.ShowPill)
+    }
+
+    @Test
+    fun `a side touch starting ends the confirmation of the bottom touch`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        confirm.onDown(ScreenEdge.LEFT, 200L)
+        assertEquals(ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
+        assertTrue(confirm.pillShown)
+    }
+
+    @Test
+    fun `a first sideways drag in landscape shows the pill and opens nothing`() {
+        val screen = Screen()
+        screen.dragSideways()
+        assertEquals(0, screen.listsOpened)
+        assertEquals(1, screen.listPills)
+        assertTrue(screen.performed.isEmpty())
+        assertTrue(screen.pills.isEmpty())
+        assertTrue(screen.confirm.pillShown)
+    }
+
+    @Test
+    fun `a sideways drag inside the window opens the app list and drops the pill`() {
+        val screen = Screen()
+        screen.dragSideways()
+        screen.pause(1_000L)
+        screen.dragSideways()
+        assertEquals(1, screen.listsOpened)
+        assertEquals(1, screen.listPills)
+        assertFalse(screen.confirm.pillShown)
+    }
+
+    @Test
+    fun `a sideways drag confirms a pill a Home swipe raised`() {
+        val screen = Screen()
+        screen.swipeUp()
+        screen.pause(500L)
+        screen.dragSideways()
+        assertEquals(1, screen.listsOpened)
+        assertTrue(screen.performed.isEmpty())
+    }
+
+    @Test
+    fun `an open app list held past the window asks for no wake-up`() {
+        val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
+        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onDown(ScreenEdge.BOTTOM, 100L)
+        assertEquals(ConfirmVerdict.Perform, confirm.onOpenList(ScreenEdge.BOTTOM, 200L))
+        confirm.expire(ConfirmPill.WINDOW_MS + 5_000L)
+        assertFalse(confirm.pillShown)
+        assertEquals(null, confirm.wakeAtMs)
+    }
+
+    @Test
+    fun `a sideways drag after the window shows the pill again`() {
+        val screen = Screen()
+        screen.dragSideways()
+        screen.pause(ConfirmPill.WINDOW_MS)
+        assertFalse(screen.confirm.pillShown)
+        screen.dragSideways()
+        assertEquals(0, screen.listsOpened)
+        assertEquals(2, screen.listPills)
+    }
+
+    @Test
+    fun `portrait opens the app list on the first sideways drag`() {
+        val screen = Screen(landscape = false)
+        screen.dragSideways()
+        assertEquals(1, screen.listsOpened)
+        assertEquals(0, screen.listPills)
+    }
+
+    @Test
+    fun `with the setting off landscape opens the app list on the first sideways drag`() {
+        val screen = Screen(GestureConfiguration(landscapeConfirmEnabled = false))
+        screen.dragSideways()
+        assertEquals(1, screen.listsOpened)
+        assertFalse(screen.confirm.pillShown)
     }
 }

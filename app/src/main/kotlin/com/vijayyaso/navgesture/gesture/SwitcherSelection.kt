@@ -19,6 +19,7 @@ package com.vijayyaso.navgesture.gesture
 
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /** Pure selection, scrolling and grid maths for the bottom app switcher. */
@@ -53,8 +54,28 @@ object SwitcherSelection {
         return Math.floorMod(steps, count)
     }
 
+    /** Grid cell: room for the icon and one line of its name. */
+    const val GRID_CELL_W_DP = 72f
+    const val GRID_CELL_H_DP = 84f
+    const val GRID_PADDING_DP = 12f
+
+    /** Room kept above the grid for the status bar. */
+    const val GRID_TOP_GAP_DP = 24f
+
+    /** More rows than this would cover most of a phone; [FavouriteList.MAX_FAVOURITES] fits. */
+    const val MAX_GRID_ROWS = 6
+
+    /**
+     * Rows of the touch grid that fit between the panel's bottom edge, [bottomOffsetDp] above
+     * the screen's, and the status bar, on a screen [screenHeightDp] tall. At least one.
+     */
+    fun gridRowsThatFit(screenHeightDp: Float, bottomOffsetDp: Float): Int {
+        val roomDp = screenHeightDp - bottomOffsetDp - GRID_TOP_GAP_DP - GRID_PADDING_DP * 2
+        return floor(roomDp / GRID_CELL_H_DP).toInt().coerceIn(1, MAX_GRID_ROWS)
+    }
+
     /** Columns and rows of the touch grid; apps past [maxRows] rows are not shown. */
-    fun tapGrid(count: Int, availableDp: Float, cellDp: Float, maxRows: Int = 3): Grid {
+    fun tapGrid(count: Int, availableDp: Float, cellDp: Float, maxRows: Int): Grid {
         if (count <= 0 || cellDp <= 0f) return Grid(0, 0)
         val columns = (availableDp / cellDp).toInt().coerceAtLeast(1).coerceAtMost(count)
         val rows = ceil(count / columns.toFloat()).toInt().coerceAtMost(maxRows)

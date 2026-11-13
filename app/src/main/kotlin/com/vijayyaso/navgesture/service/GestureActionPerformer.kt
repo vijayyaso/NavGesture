@@ -40,6 +40,10 @@ class GestureActionPerformer(private val service: AccessibilityService) {
         Thread(task, "NavGesture-shortcut").apply { isDaemon = true }
     }
 
+    // Set when the service goes away, so a shortcut still queued then starts nothing.
+    @Volatile
+    private var closed = false
+
     private val assistantTag: String? by lazy {
         NavigationIntegrationFactory.create(service).assistantAttributionTag
     }
@@ -90,18 +94,29 @@ class GestureActionPerformer(private val service: AccessibilityService) {
      */
     private fun appShortcut(shortcut: CornerShortcut.AppShortcut): Boolean {
         Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
-        shortcutThread.execute {
-            val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
-            if (found == null) {
-                lastFailure = "corner ${shortcut.id}: shortcut not found"
-                Log.w(TAG, lastFailure.orEmpty())
-                return@execute
+        // A swipe racing the service's end finds the thread shut; that must not throw here.
+        runCatching {
+            shortcutThread.execute {
+                if (closed) return@execute
+                val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
+                if (found == null) {
+                    lastFailure = "corner ${shortcut.id}: shortcut not found"
+                    Log.w(TAG, lastFailure.orEmpty())
+                    return@execute
+                }
+                if (closed) return@execute
+                if (!ShortcutCatalog.launch(service, found)) {
+                    lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
+                }
             }
-            if (!ShortcutCatalog.launch(service, found)) {
-                lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
-            }
-        }
+        }.onFailure { Log.w(TAG, "corner ${shortcut.id}: dropped, the service is stopping") }
         return true
+    }
+
+    /** The service is going away: the thread ends once the lookup in flight, if any, returns. */
+    fun close() {
+        closed = true
+        shortcutThread.shutdown()
     }
 
     private fun global(name: String, globalAction: Int): Boolean {

@@ -28,11 +28,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +41,7 @@ import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.navigation.GestureBarHider
-import com.vijayyaso.navgesture.navigation.NavigationModeReader
+import com.vijayyaso.navgesture.navigation.GestureBarHider.BarState
 import kotlin.math.roundToInt
 
 @Composable
@@ -150,13 +150,11 @@ internal fun GestureSettingsScreen(model: AppModel) {
         ) { updated -> model.update { it.copy(maximumArmDurationMs = updated.toLong()) } }
     }
 
-    // Read on every recomposition, so a grant made while the app is open shows on return.
-    val canHide = GestureBarHider.canWrite(LocalContext.current)
+    // AppModel reads this again on every return, so a grant made from a computer shows at once.
     // The bar settings exist only on HyperOS. The Play build never shows an adb instruction, so
-    // there the switch appears only once the grant is already in place.
-    if (NavigationModeReader.isHyperOsDevice() && (canHide || !BuildConfig.IS_PLAY)) {
-        GestureBarSection(configuration, canHide, model)
-    }
+    // there the switch appears only once the grant is in place, or to say a bar it hid is stuck.
+    val bar = model.gestureBar
+    if (bar != BarState.NONE) GestureBarSection(configuration, bar, model)
 
     SettingsGroup(title = stringResource(R.string.section_feedback)) {
         ToggleRow(
@@ -211,16 +209,48 @@ internal fun gestureSettingsSummary(configuration: GestureConfiguration): String
 private val EDGE_WIDTH_RANGE = 8f..64f
 
 @Composable
-private fun GestureBarSection(configuration: GestureConfiguration, canHide: Boolean, model: AppModel) {
+private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState, model: AppModel) {
+    var failure by remember { mutableStateOf<String?>(null) }
+    val openNavigation = { failure = model.openNavigationSettings() }
     SettingsGroup(title = stringResource(R.string.section_gesture_bar)) {
-        ToggleRow(
-            label = stringResource(R.string.label_hide_gesture_bar),
-            checked = configuration.hideGestureBar && canHide,
-            supporting = if (canHide) {
-                stringResource(R.string.hide_gesture_bar_body)
-            } else {
-                stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND)
-            },
-        ) { updated -> if (canHide) model.update { it.copy(hideGestureBar = updated) } }
+        when (bar) {
+            BarState.CAN_HIDE -> ToggleRow(
+                label = stringResource(R.string.label_hide_gesture_bar),
+                checked = configuration.hideGestureBar,
+                supporting = stringResource(R.string.hide_gesture_bar_body),
+            ) { updated -> model.update { it.copy(hideGestureBar = updated) } }
+            BarState.NEEDS_GRANT -> ToggleRow(
+                label = stringResource(R.string.label_hide_gesture_bar),
+                checked = false,
+                supporting = stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND),
+            ) {}
+            BarState.STUCK_HIDDEN -> {
+                // It really is hidden, so the switch says on; only the phone's own screen can undo it.
+                ToggleRow(
+                    label = stringResource(R.string.label_hide_gesture_bar),
+                    checked = true,
+                    supporting = stringResource(R.string.hide_gesture_bar_stuck),
+                ) { openNavigation() }
+                InfoRow(
+                    title = stringResource(R.string.gesture_bar_stuck_title),
+                    supporting = listOfNotNull(
+                        stringResource(R.string.gesture_bar_stuck_body),
+                        stringResource(R.string.gesture_bar_stuck_grant, GestureBarHider.GRANT_COMMAND)
+                            .takeUnless { BuildConfig.IS_PLAY },
+                        failure?.let { stringResource(R.string.outcome_failed, it) },
+                    ).joinToString("\n"),
+                    supportingTag = TestTags.GESTURE_BAR_STUCK,
+                    actions = {
+                        FilledTonalButton(
+                            onClick = openNavigation,
+                            modifier = Modifier.testTag(TestTags.GESTURE_BAR_OPEN_NAVIGATION),
+                        ) {
+                            Text(stringResource(R.string.action_open_navigation_settings))
+                        }
+                    },
+                )
+            }
+            BarState.NONE -> Unit
+        }
     }
 }

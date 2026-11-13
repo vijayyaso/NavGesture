@@ -168,8 +168,10 @@ internal class UpdateController(
     }
 
     suspend fun setEnabled(enabled: Boolean) {
+        // Off shows before the store answers, so work still in flight stops writing at once.
+        if (!enabled) mutableState.value = UpdateState(enabled = false)
         store.setEnabled(enabled)
-        if (enabled) onAppOpen() else mutableState.value = UpdateState(enabled = false)
+        if (enabled) onAppOpen()
     }
 
     suspend fun checkNow() {
@@ -187,6 +189,8 @@ internal class UpdateController(
         recovering({ fail(CheckFailure.Unexpected(it)) }) {
             val now = clock()
             val fetched = source.latest()
+            // Switched off while the request was out: its answer is neither kept nor shown.
+            if (!mutableState.value.enabled) return
             store.recordAttempt(now, (fetched as? FetchResult.Ok)?.body)
             update { it.copy(lastCheckedMs = now) }
             decide(fetched)
@@ -244,6 +248,8 @@ internal class UpdateController(
                 update { it.copy(phase = UpdatePhase.Downloading(percent)) }
             }
         }
+        // Switched off while it downloaded: nothing is handed to the system.
+        if (!mutableState.value.enabled) return
         if (downloaded !is DownloadResult.Ok || !downloaded.verified) {
             val failure = if (downloaded is DownloadResult.Ok) DownloadResult.Unverified else downloaded
             update { it.copy(phase = UpdatePhase.DownloadFailed(failure)) }
@@ -276,7 +282,9 @@ internal class UpdateController(
         fallback(e.reason())
     }
 
+    // Work in flight when the switch goes off, such as download progress, leaves the off state alone.
     private inline fun update(transform: (UpdateState) -> UpdateState) {
-        mutableState.value = transform(mutableState.value)
+        val current = mutableState.value
+        if (current.enabled) mutableState.value = transform(current)
     }
 }

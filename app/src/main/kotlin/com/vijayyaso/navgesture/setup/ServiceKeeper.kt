@@ -69,35 +69,43 @@ object ServiceKeeper {
      * [GestureBarHider] hid comes back, in the Play build too.
      */
     fun check(context: Context, from: String) {
-        heal(context, from)
-        val restored = GestureBarHider.restoreIfStopped(
-            context,
-            serviceRunning = NavGestureAccessibilityService.isRunning(),
-            switchedOn = DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context),
-        )
-        if (restored) ServiceLog.add(context, "$from: gestures gone, the phone's own bar shown again")
+        val healed = heal(context, from)
+        val bar = when (
+            GestureBarHider.restoreIfStopped(
+                context,
+                serviceRunning = NavGestureAccessibilityService.isRunning(),
+                switchedOn = DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context),
+            )
+        ) {
+            GestureBarHider.Restore.SHOWN -> "gestures gone, the phone's own bar shown again"
+            GestureBarHider.Restore.NOT_SHOWN -> "gestures gone, the phone's own bar did not come back"
+            GestureBarHider.Restore.NO_PERMISSION -> "gestures gone; ${GestureBarHider.STUCK_LINE}"
+            GestureBarHider.Restore.NOT_NEEDED -> null
+        }
+        // One line per check, so the history's repeat filter keeps the tile's checks to one line.
+        val line = listOfNotNull(healed, bar).joinToString("; ")
+        if (line.isNotEmpty()) ServiceLog.add(context, "$from: $line")
     }
 
-    private fun heal(context: Context, from: String) {
-        if (BuildConfig.IS_PLAY) return
-        if (NavGestureAccessibilityService.isRunning()) return
+    /** What it found, for the history, or null when there is nothing to say. */
+    private fun heal(context: Context, from: String): String? {
+        if (BuildConfig.IS_PLAY) return null
+        if (NavGestureAccessibilityService.isRunning()) return null
         val pause = BankPause.paused(context)
         if (pause != null) {
             // A live bank pause owns the switch: turning it on now would show the bank app
             // the service it was paused for.
-            if (BankPause.watcherRunning) return
+            if (BankPause.watcherRunning) return null
             BankPause.clearPause(context)
             ServiceLog.add(context, "$from: a bank pause outlived its watcher, ending it")
         }
         // Listed but not yet running: the system binds it by itself.
-        if (DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)) return
-        if (!prefs(context).getBoolean(KEY_WANTED, false)) return
-        when {
-            !GestureBarHider.canWrite(context) ->
-                ServiceLog.add(context, "$from: found switched off; the adb permission is gone")
-            turnOn(context) ->
-                ServiceLog.add(context, "$from: found switched off without a goodbye, turned back on")
-            else -> ServiceLog.add(context, "$from: found switched off, could not turn it on")
+        if (DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)) return null
+        if (!prefs(context).getBoolean(KEY_WANTED, false)) return null
+        return when {
+            !GestureBarHider.canWrite(context) -> "found switched off; the adb permission is gone"
+            turnOn(context) -> "found switched off without a goodbye, turned back on"
+            else -> "found switched off, could not turn it on"
         }
     }
 

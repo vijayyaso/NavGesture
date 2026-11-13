@@ -34,6 +34,8 @@ import com.vijayyaso.navgesture.diagnostics.Diagnostics
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.navigation.EnableRequestOutcome
+import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.navigation.NavigationIntegration
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 import com.vijayyaso.navgesture.navigation.NavigationMode
@@ -75,6 +77,8 @@ internal class AppModel(
     var assistant by mutableStateOf(readAssistant(context))
         private set
     private var batteryUnrestricted by mutableStateOf(batteryUnrestricted(context))
+    var gestureBar by mutableStateOf(GestureBarHider.barState(context))
+        private set
 
     /** Set by a Turn on tap without consent; the screen stack shows the disclosure and clears it. */
     var disclosureRequested by mutableStateOf(false)
@@ -107,6 +111,7 @@ internal class AppModel(
         usageAccess = hasUsageAccess(context)
         assistant = readAssistant(context)
         batteryUnrestricted = batteryUnrestricted(context)
+        gestureBar = GestureBarHider.barState(context)
         // The collection reads log files, so it runs off the main thread. A newer refresh cancels an older one.
         collecting?.cancel()
         collecting = scope.launch {
@@ -116,6 +121,10 @@ internal class AppModel(
             }
         }
     }
+
+    /** Opens the phone's own navigation screen; the reason when it could not. */
+    fun openNavigationSettings(): String? =
+        (integration.requestEnable() as? EnableRequestOutcome.Failed)?.reason
 
     fun update(transform: (GestureConfiguration) -> GestureConfiguration) {
         scope.launch { settings.update(transform) }
