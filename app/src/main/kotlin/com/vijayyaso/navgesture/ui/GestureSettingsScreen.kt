@@ -17,6 +17,8 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -200,19 +202,27 @@ private fun CheatSheet(configuration: GestureConfiguration) {
         configuration.rightEdgeBackEnabled -> R.string.gesture_back_right_how
         else -> null
     }
-    buildList {
-        back?.let { add(R.string.gesture_back_name to it) }
-        add(R.string.gesture_home_recents_name to R.string.gesture_home_recents_how)
-        if (configuration.edgeAppListEnabled) {
-            add(R.string.gesture_switch_apps_name to R.string.gesture_switch_apps_how)
-        }
-        if (configuration.circleToSearchEnabled) {
-            add(R.string.gesture_circle_to_search_name to R.string.gesture_circle_to_search_how)
-        }
-        if (configuration.anyCornerShortcut) {
-            add(R.string.gesture_corner_name to R.string.gesture_corner_how)
-        }
-    }.forEach { (name, how) -> InfoRow(title = stringResource(name), supporting = stringResource(how)) }
+    // Each row keeps its own slot, so one folding in or out never shifts another's state.
+    CheatRow(R.string.gesture_back_name, back)
+    CheatRow(R.string.gesture_home_recents_name, R.string.gesture_home_recents_how)
+    CheatRow(
+        R.string.gesture_switch_apps_name,
+        R.string.gesture_switch_apps_how.takeIf { configuration.edgeAppListEnabled },
+    )
+    CheatRow(
+        R.string.gesture_circle_to_search_name,
+        R.string.gesture_circle_to_search_how.takeIf { configuration.circleToSearchEnabled },
+    )
+    CheatRow(R.string.gesture_corner_name, R.string.gesture_corner_how.takeIf { configuration.anyCornerShortcut })
+}
+
+/** A cheat-sheet row shown while [how] is set. Folding away, it keeps its last text. */
+@Composable
+private fun CheatRow(@StringRes name: Int, @StringRes how: Int?) {
+    val shownHow = rememberLastShown(how, shown = how != null)
+    AnimatedVisibility(visible = how != null, enter = BlockEnter, exit = BlockExit) {
+        shownHow?.let { InfoRow(title = stringResource(name), supporting = stringResource(it)) }
+    }
 }
 
 @Composable

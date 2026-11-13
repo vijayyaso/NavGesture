@@ -19,6 +19,9 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -28,7 +31,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
@@ -41,6 +43,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -48,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
@@ -55,11 +59,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
@@ -313,25 +319,31 @@ private fun AppShortcutsGroup(
             val name = entry.app.packageName
             val searching = query.isNotEmpty()
             val expanded = if (searching) name !in closedInSearch else name in open
-            // One child per app, so the card draws its lines between apps, not inside one.
-            Column {
-                AppHeaderRow(entry.app, expanded, TestTags.cornerApp(name)) {
-                    if (searching) {
-                        closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
-                    } else {
-                        open = if (name in open) open - name else open + name
+            // Keyed by app and by search, so only a tap on the app animates: starting or ending a
+            // search, or the filter, rebuilds the block in place without motion.
+            key(name, searching) {
+                // One child per app, so the card draws its lines between apps, not inside one.
+                Column {
+                    AppHeaderRow(entry.app, expanded, TestTags.cornerApp(name)) {
+                        if (searching) {
+                            closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
+                        } else {
+                            open = if (name in open) open - name else open + name
+                        }
                     }
-                }
-                if (expanded) {
-                    shown.forEach { (shortcut, icon) ->
-                        PickRow(
-                            title = shortcut.label,
-                            selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
-                            modifier = Modifier
-                                .padding(start = 40.dp)
-                                .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
-                            leading = { AppIconImage(icon ?: entry.app.icon) },
-                        ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
+                    AnimatedVisibility(visible = expanded, enter = BlockEnter, exit = BlockExit) {
+                        Column {
+                            shown.forEach { (shortcut, icon) ->
+                                PickRow(
+                                    title = shortcut.label,
+                                    selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
+                                    modifier = Modifier
+                                        .padding(start = 40.dp)
+                                        .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
+                                    leading = { AppIconImage(icon ?: entry.app.icon) },
+                                ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
+                            }
+                        }
                     }
                 }
             }
@@ -343,14 +355,19 @@ private fun AppShortcutsGroup(
 @Composable
 private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, tag: String, onToggle: () -> Unit) {
     val state = stringResource(if (expanded) R.string.corner_expanded else R.string.corner_collapsed)
+    // One arrow that turns to point down. It points to the end side, so right-to-left turns it
+    // the other way round.
+    val down = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
+    val turn by animateFloatAsState(if (expanded) down else 0f, tween(EXPAND_MS, easing = EaseOutStrong))
     ListItem(
         leadingContent = { AppIconImage(app.icon) },
         headlineContent = { Text(app.label) },
         trailingContent = {
             Icon(
-                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.rotate(turn),
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -19,6 +19,7 @@ package com.vijayyaso.navgesture.ui
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -44,21 +45,25 @@ internal fun UpdatesScreenContent(updates: UpdateViewModel) {
                 onChange = updates::setEnabled,
             )
         }
-        if (!state.enabled) return@Column
-        SettingsGroup {
-            UpdateStatusRow(
-                state = state,
-                onCheckNow = updates::checkNow,
-                onInstall = updates::downloadAndInstall,
-                onAllowInstalls = {
-                    context.startFirst(
-                        Intent(
-                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                            "package:${context.packageName}".toUri(),
-                        ),
-                    )
-                },
-            )
+        // The status group opens and closes with the switch, whole. Switching off empties the
+        // state, so while it folds it keeps drawing the last state it had.
+        val shownState = rememberLastShown(state, shown = state.enabled)
+        AnimatedVisibility(visible = state.enabled, enter = BlockEnter, exit = BlockExit) {
+            SettingsGroup {
+                UpdateStatusRow(
+                    state = shownState,
+                    onCheckNow = updates::checkNow,
+                    onInstall = updates::downloadAndInstall,
+                    onAllowInstalls = {
+                        context.startFirst(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                "package:${context.packageName}".toUri(),
+                            ),
+                        )
+                    },
+                )
+            }
         }
     }
 }

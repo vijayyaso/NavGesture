@@ -25,6 +25,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 
 // The only motion numbers the screens use. Compose already scales them by the phone's
 // animator duration scale, so "Remove animations" turns them all off.
@@ -49,6 +51,19 @@ internal val BlockEnter: EnterTransition =
 /** The same block closing: it fades a little faster than its space closes. */
 internal val BlockExit: ExitTransition =
     fadeOut(tween(FADE_OUT_MS)) + shrinkVertically(tween(SHRINK_MS, easing = EaseOutStrong))
+
+/**
+ * [value] while [shown], else the last value seen while shown. A block folding away keeps
+ * drawing what it showed instead of the empty state that hid it.
+ */
+@Composable
+internal fun <T> rememberLastShown(value: T, shown: Boolean): T {
+    val held = remember { Held(value) }
+    if (shown) held.value = value
+    return held.value
+}
+
+private class Held<T>(var value: T)
 
 /** A finished card folding away, drawing its last content while it goes. */
 internal val CardFoldExit: ExitTransition =

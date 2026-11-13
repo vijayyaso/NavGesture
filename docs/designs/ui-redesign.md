@@ -167,13 +167,18 @@ its rows.
     group title (`SectionHeader`, 32 dp from the screen edge), then a rounded
     card (16 dp corners, 16 dp side margin, `surface` colour) holding the
     rows, then the optional footer (small grey text, 32 dp from the screen
-    edge). Between two measured children it draws a 0.5 dp hairline in
+    edge). Between two children that both have height it draws a 0.5 dp hairline in
     `outlineVariant`, inset 16 dp from the start and flush with the card's
     end. The inset is the same for every row, so groups that mix rows with
     and without icons line up.
     The dividers are drawn by a small custom `Layout` that stacks children
-    like a `Column` and records each child's bottom edge for the draw step.
-    Rows that a screen leaves out with `if` are not children. A plain
+    like a `Column` and records where each line goes for the draw step
+    (`dividerEdges`, unit tested): above each child with height that has a
+    child with height somewhere above it. Rows that a screen leaves out with
+    `if` are not children. An `AnimatedVisibility` is one child, and while
+    it folds to nothing it draws no line, not even on the card's edge. A
+    group that can vanish whole is wrapped from outside, so no title or
+    empty card stays behind. A plain
     `Column` cannot draw a line *between* arbitrary children: a row does not
     know whether it is the first one in its card.
     **A divider separates children, so one logical block must be one
@@ -257,6 +262,16 @@ screen times anything with `delay()`.
     Done. It appears without motion, and only once the saved setup record
     is read (`AppModel.recordLoaded`): before that, steps confirmed by hand
     look undone, and the card would show and then fold on every cold start.
+*   **Blocks under a switch slide open and closed** with `BlockEnter` and
+    `BlockExit`: the Timing and Needs groups under the Circle to Search
+    switch, the hold slider under its system-timing switch, the status
+    group under the Updates switch (github), the shortcut rows under an app
+    in the corner picker, and the Gestures cheat-sheet rows on Gesture
+    settings. A block folding away keeps its last content
+    (`rememberLastShown`). The corner picker's arrow is one glyph that turns
+    90° to point down over 200 ms, the other way in right-to-left. Only a
+    tap on an app animates it: starting a search, the search filter,
+    ticking an app and "Loading…" turning into the list stay instant.
 
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 
