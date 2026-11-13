@@ -48,6 +48,10 @@ object RecentApps {
         return others < MIN_OTHERS
     }
 
+    /** The app before the one in front: the second entry when the first is the app in front. */
+    fun previous(ordered: List<String>, currentFirst: Boolean): String? =
+        ordered.getOrNull(if (currentFirst) 1 else 0)
+
     /** Fewer apps than this to switch to and the list is too thin to be useful. */
     const val MIN_OTHERS = 2
 }

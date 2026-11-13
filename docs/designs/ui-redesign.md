@@ -475,7 +475,15 @@ group with no title is written as **(no title)**.
     title)** (only after a failure): last problem row.
 *   **Gesture settings** — **Edges**: one
     block (edge width value, its body text, the Adjust button, the hint
-    text), left back switch, right back switch, landscape-confirm switch.
+    text), landscape-confirm switch. **Swipes** (added 2026-11-14, replacing
+    the left and right back switches): Left edge, Right edge and Bottom edge
+    rows (`row_left_edge`, `row_right_edge`, `row_bottom_edge`), each with a
+    one-line summary of its actions, each opening its edge page. **(no
+    title)** (only while no swipe or corner goes Home, or none goes Back):
+    one warning row per missing action, "No swipe goes Home" / "No swipe
+    goes Back", naming the NavGesture tile as the way out (`warning_no_home`,
+    `warning_no_back`); it folds in and out like a Needs block. Home's
+    Gestures tile shows the first warning in place of its distances line.
     **Corner shortcuts**: left corner row, right corner row; *footer: corner
     shortcuts body*. (Moved here from App switching on 2026-11-13: a corner
     runs any action and works with the app list off.) **Distance and
@@ -483,6 +491,18 @@ group with no title is written as **(no title)**.
     the same condition as today (`isHyperOsDevice() && (canHide ||
     !IS_PLAY)`).
     **Feedback**: haptics switch. Then the Reset button below the cards.
+*   **Edge pages** (added 2026-11-14, `SwipeEdgeScreen.kt`, screens
+    `LEFT_EDGE`, `RIGHT_EDGE`, `BOTTOM_EDGE`) — **(no title)**: one row per
+    swipe, showing its action and opening the action picker. Left and right:
+    "Swipe in" (`row_slot_left_whole_short`, `row_slot_right_whole_short`).
+    Bottom: "Swipe up" and "Swipe up and pause" (`row_slot_bottom_short`,
+    `row_slot_bottom_pause`).
+*   **Action picker** (`SwipeActionPicker.kt`, one screen per slot:
+    `LEFT_CORNER`, `RIGHT_CORNER`, `LEFT_SWIPE_IN`, `RIGHT_SWIPE_IN`,
+    `BOTTOM_SWIPE_UP`, `BOTTOM_SWIPE_UP_PAUSE`) — the corner picker, reused
+    for every slot. Phone actions now start with Back, Home, Recents and
+    Previous app. **Previous app** (only while usage access is missing): the
+    usage access row with its Grant button.
 *   **Troubleshooting** — **Known fixes**: the fix rows with their buttons.
     **This device**: the device value rows. **Last problems**: the three
     value rows, then the recorded-failure block and the service-history
@@ -601,7 +621,7 @@ removed or renamed. No new test tag is needed.
     `AboutScreen.kt`, `DisclosureScreen.kt` — wrap rows in `SettingsGroup`
     per the screen list above; icons per the glyph table; buttons per the
     button table. No logic change. `AppPicker.kt` and
-    `CornerShortcutPicker.kt` are not changed: their callers wrap them in a
+    `CornerShortcutPicker.kt` (now `SwipeActionPicker.kt`) are not changed: their callers wrap them in a
     group.
 9.  `github/kotlin/com/vijayyaso/navgesture/ui/Store.kt` — `HomeRow` →
     `homeTile(onOpen): HomeTile?`.

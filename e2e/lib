@@ -396,6 +396,29 @@ tap_id() {
   tap_node "${node}"
 }
 
+# find_text <text> - like find_id, but finds the node by the exact text it shows.
+find_text() {
+  scroll_app up
+  size="$("${ADB_BIN}" shell wm size | tr -d '\r' | awk -F': *' '{print $2}' | tail -1)"
+  clear_y=$((${size#*x} - 260))
+  text_try=1
+  while [ "${text_try}" -le 6 ]; do
+    # shellcheck disable=SC2310 # an empty dump is the retry signal, not an error
+    hit="$(ui_nodes | grep -m1 "text=\"$1\"" || true)"
+    middle="$(printf '%s\n' "${hit}" |
+      sed -n 's/.*bounds="\[[0-9]*,\([0-9]*\)\]\[[0-9]*,\([0-9]*\)\]".*/\1 \2/p' |
+      awk '{print int(($1 + $2) / 2)}')"
+    if [ -n "${middle}" ] && [ "${middle}" -lt "${clear_y}" ]; then
+      printf '%s\n' "${hit}"
+      return 0
+    fi
+    scroll_app down
+    sleep 1
+    text_try=$((text_try + 1))
+  done
+  return 1
+}
+
 # text_of_id <tag> - prints the text the node with that tag shows.
 text_of_id() {
   # shellcheck disable=SC2310 # a missing node is reported by the caller

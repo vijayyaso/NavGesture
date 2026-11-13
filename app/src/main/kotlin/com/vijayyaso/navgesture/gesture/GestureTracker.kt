@@ -111,23 +111,23 @@ class GestureTracker(
     private var tailY = 0f
     private var tailAtMs = 0L
 
-    private val backEnabled: Boolean
-        get() = when (edge) {
-            ScreenEdge.LEFT -> configuration.leftEdgeBackEnabled
-            ScreenEdge.RIGHT -> configuration.rightEdgeBackEnabled
-            ScreenEdge.BOTTOM -> true
-        }
+    // The zone this touch started in, read at DOWN.
+    private var zone = SwipeZone.WHOLE
 
-    // Fixed for now: a side swipe is Back, a bottom swipe is Home, and its pause is Recents.
-    private val shortAction: GestureAction.Run = GestureAction.Run(
-        SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT),
-        if (edge == ScreenEdge.BOTTOM) SwipeAction.Home else SwipeAction.Back,
-    )
+    // The bottom always arms, since its pause and app-list drag need the rise. A side arms
+    // only when its zone holds an action, the same rule that installs its strip.
+    private val armsHere: Boolean
+        get() = edge == ScreenEdge.BOTTOM || configuration.slots.zoneInUse(edge, zone)
 
-    private val pauseRun: GestureAction.Run = GestureAction.Run(
-        SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE),
-        SwipeAction.Recents,
-    )
+    private val shortAction: GestureAction.Run
+        get() = slotRun(SlotId.Edge(edge, zone, SwipeKind.SHORT))
+
+    private val pauseRun: GestureAction.Run
+        get() = slotRun(SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE))
+
+    // With no pause action a bottom pause is a plain short swipe, so nothing polls for it.
+    private val pausePolls: Boolean
+        get() = edge == ScreenEdge.BOTTOM && pauseRun.action != SwipeAction.None
 
     private val longPressAction: GestureAction? =
         if (edge == ScreenEdge.BOTTOM && configuration.circleToSearchEnabled) {
@@ -176,6 +176,8 @@ class GestureTracker(
         tailY = pivotY(sample)
         tailAtMs = sample.timestampMs
         corner = cornerAt(sample)
+        // Side strips are centred on the screen, so its middle splits a side into halves.
+        zone = configuration.slots.zoneAt(edge, sample.yPx, screenHeightPx / 2f)
         armTimedOut = false
         longPressPending = edge == ScreenEdge.BOTTOM &&
             longPressAction != null && overHandle(sample)
@@ -220,11 +222,11 @@ class GestureTracker(
             tracked = null
             return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
         }
-        if (!backEnabled || !hasArmed(origin, sample)) return TrackerAction.None
+        if (!armsHere || !hasArmed(origin, sample)) return TrackerAction.None
 
         arm = Arm.Rising
         return TrackerAction.Armed(
-            scheduleHoldMs = if (edge == ScreenEdge.BOTTOM) FRAME_MS else null,
+            scheduleHoldMs = if (pausePolls) FRAME_MS else null,
             pending = shortAction.action,
         )
     }
@@ -276,7 +278,7 @@ class GestureTracker(
      * no MOVE at all and the tail still has to catch up with it.
      */
     fun onHoldElapsed(nowMs: Long): TrackerAction {
-        if (edge != ScreenEdge.BOTTOM || arm != Arm.Rising) return TrackerAction.None
+        if (!pausePolls || arm != Arm.Rising) return TrackerAction.None
         val origin = tracked ?: return TrackerAction.None
         val sample = latest ?: return TrackerAction.None
         advanceTail(nowMs)
@@ -321,9 +323,9 @@ class GestureTracker(
             if (edge == ScreenEdge.BOTTOM && isPulledBack(origin, sample)) return TrackerAction.Reverted
             if (state == Arm.Primed) {
                 val flick = upwardDpPerMs(sample.timestampMs) > configuration.homeFlickDpPerMs
-                return TrackerAction.Fire(if (flick) shortAction else pauseRun, edge)
+                return fire(if (flick) shortAction else pauseRun)
             }
-            return TrackerAction.Fire(shortAction, edge)
+            return fire(shortAction)
         }
 
         if (armTimedOut) return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
@@ -331,7 +333,7 @@ class GestureTracker(
         // load does this, and a slow emulator does it reliably. The release is still a
         // swipe if it clears the threshold on its own, so judge it by the same rule.
         if (sample.timestampMs - origin.timestampMs <= configuration.maximumArmDurationMs) {
-            if (backEnabled && hasArmed(origin, sample)) return TrackerAction.Fire(shortAction, edge)
+            if (armsHere && hasArmed(origin, sample)) return fire(shortAction)
         }
         return TrackerAction.Unused(rejectionFor(origin, sample))
     }
@@ -342,10 +344,22 @@ class GestureTracker(
         arm = null
         corner = null
         armTimedOut = false
+        zone = SwipeZone.WHOLE
         longPressPending = false
         latest = null
         recent.clear()
     }
+
+    private fun slotRun(slot: SlotId.Edge): GestureAction.Run =
+        GestureAction.Run(slot, configuration.slots[slot])
+
+    // An empty slot runs nothing, so the touch goes back to the app underneath.
+    private fun fire(run: GestureAction.Run): TrackerAction =
+        if (run.action == SwipeAction.None) {
+            TrackerAction.Unused(RejectionReason.SLOT_EMPTY)
+        } else {
+            TrackerAction.Fire(run, edge)
+        }
 
     private fun cornerRun(side: BottomCorner): GestureAction.Run =
         GestureAction.Run(SlotId.Corner(side), configuration.shortcutFor(side))
@@ -487,6 +501,8 @@ class GestureTracker(
             offAxisPx > travelPx * configuration.offAxisToleranceRatio -> RejectionReason.OFF_AXIS
             sample.timestampMs - origin.timestampMs > configuration.maximumArmDurationMs ->
                 RejectionReason.TOO_SLOW_TO_ARM
+            // A whole swipe on a zone with nothing set.
+            !armsHere -> RejectionReason.SLOT_EMPTY
             else -> RejectionReason.INSUFFICIENT_MOVEMENT
         }
     }

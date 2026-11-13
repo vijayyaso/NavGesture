@@ -22,6 +22,7 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.widget.Toast
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.RecentApps
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 
@@ -65,7 +66,8 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 if (!launched) lastFailure = "corner ${action.id}: ${AppSwitcher.lastFailure}"
                 return launched
             }
-            SwipeAction.PreviousApp, SwipeAction.Torch -> {
+            SwipeAction.PreviousApp -> return previousApp()
+            SwipeAction.Torch -> {
                 lastFailure = "${action.id}: not available yet"
                 return false
             }
@@ -101,6 +103,30 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 }
             }
         }.onFailure { Log.w(TAG, "corner ${shortcut.id}: dropped, the service is stopping") }
+        return true
+    }
+
+    /**
+     * Reads the recent apps on [shortcutThread], since the usage query is slow. With no usage
+     * access, or no other app, it opens Recents instead. Returns true once the work is queued.
+     */
+    private fun previousApp(): Boolean {
+        Log.i(TAG, "SWIPE_ACTION ${SwipeAction.PreviousApp.id}")
+        runCatching {
+            shortcutThread.execute {
+                if (closed) return@execute
+                val recent = switcher.recentApps()
+                val previous = RecentApps.previous(recent.packages, recent.currentFirst)
+                if (closed) return@execute
+                if (previous == null) {
+                    Log.i(TAG, "PREVIOUS_APP none, opening Recents")
+                    global("Recents", AccessibilityService.GLOBAL_ACTION_RECENTS)
+                    return@execute
+                }
+                Log.i(TAG, "PREVIOUS_APP $previous")
+                if (!switcher.launch(previous)) lastFailure = "previous app: ${AppSwitcher.lastFailure}"
+            }
+        }.onFailure { Log.w(TAG, "previous app: dropped, the service is stopping") }
         return true
     }
 

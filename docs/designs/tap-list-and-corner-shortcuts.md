@@ -223,7 +223,7 @@ of the screen, minus 4 dp, kept between 12 and 32 dp
     later, after the strips' return to visible has settled (the launch rule
     needs a visible overlay) and the bubble is gone (screenshot). CANCEL or a
     second finger drops it.
-*   **Choices** (`CornerShortcut`, stored as its id string):
+*   **Choices** (`SwipeAction`, stored as its id string):
 
     | Id | Does |
     | --- | --- |

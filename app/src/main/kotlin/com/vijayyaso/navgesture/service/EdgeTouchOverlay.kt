@@ -109,9 +109,10 @@ internal class EdgeTouchOverlay(
         }
         syncPill(restored = true)
 
-        val listShortcut = listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut)
-            .any { it.needsListPanel }
-        if (configuration.edgeAppListEnabled || listShortcut) {
+        // Built only when something can open it: the bottom drag, or a swipe or corner set to a list.
+        val listAction = configuration.slots.holds { it.needsListPanel } ||
+            listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut).any { it.needsListPanel }
+        if (configuration.edgeAppListEnabled || listAction) {
             val stripPx = (configuration.edgeWidthDp * geometry.density).toInt() + geometry.navBottomPx
             val panel = SwitcherPanelOverlay(context, windowManager, geometry, stripPx).also { it.install() }
             switcherPanel = panel
@@ -130,9 +131,10 @@ internal class EdgeTouchOverlay(
             }
         }
 
+        // A side with nothing to run has no strip, so the app underneath gets its touches.
         val edges = buildList {
-            if (configuration.leftEdgeBackEnabled) add(ScreenEdge.LEFT)
-            if (configuration.rightEdgeBackEnabled) add(ScreenEdge.RIGHT)
+            if (configuration.slots.edgeInUse(ScreenEdge.LEFT)) add(ScreenEdge.LEFT)
+            if (configuration.slots.edgeInUse(ScreenEdge.RIGHT)) add(ScreenEdge.RIGHT)
             add(ScreenEdge.BOTTOM)
         }
 
@@ -307,6 +309,11 @@ internal class EdgeTouchOverlay(
         // again (HyperOS allows an app launch only then) and a screenshot must miss the bubble.
         if (action is GestureAction.Run && (action.slot is SlotId.Corner || action.action.settles)) {
             handler.postDelayed({ run(action.action) }, SETTLE_MS)
+            return
+        }
+        // A list opens the panel, which only the overlay has.
+        if (action is GestureAction.Run && action.action.needsListPanel) {
+            run(action.action)
             return
         }
         onGestureAction(action, edge)
@@ -600,9 +607,9 @@ internal class EdgeTouchOverlay(
                     // A swipe is under way, so this touch can no longer be a long press.
                     removeCallbacks(longPressRunnable)
                     Log.d(TAG, "$edge armed (pause poll=${action.scheduleHoldMs})")
-                    // The rise is live: from here a sideways drag opens the app list, so say so.
-                    // With the list off nothing can open, and the gesture's own buzz is enough.
-                    if (edge == ScreenEdge.BOTTOM && dragListEnabled) confirmTick()
+                    // The rise is live and a sideways drag opens the app list, so say so: once, and
+                    // only when the list is on and the arm did not already buzz (no pause action).
+                    if (edge == ScreenEdge.BOTTOM && dragListEnabled && !buzz) confirmTick()
                     action.scheduleHoldMs?.let {
                         removeCallbacks(holdRunnable)
                         postDelayed(holdRunnable, it)
@@ -612,8 +619,8 @@ internal class EdgeTouchOverlay(
                     removeCallbacks(holdRunnable)
                     postDelayed(holdRunnable, action.delayMs)
                 }
-                // The release now means Recents; the haptic gate ticks for it.
-                is TrackerAction.Pending -> Log.d(TAG, "$edge RECENTS_PRIMED")
+                // The release now means the pause action; the haptic gate ticks for it.
+                is TrackerAction.Pending -> Log.d(TAG, "$edge PENDING ${action.kind} ${action.action.id}")
                 is TrackerAction.Fire -> {
                     cancelHold()
                     if (admitted) {

@@ -35,10 +35,12 @@
     <string name="status_stopped_body">The switch is on, but the service is not running. Turn it off and on again.</string>
     <string name="status_bar_stuck_hint">The phone\'s own gesture bar is still hidden, and NavGesture lost the permission to show it. Open navigation settings to bring it back.</string>
     <string name="status_working">Gestures are on</string>
-    <string name="status_working_body">Back from the sides, Home and Recents from the bottom.</string>
-    <string name="status_working_body_left">Back from the left side, Home and Recents from the bottom.</string>
-    <string name="status_working_body_right">Back from the right side, Home and Recents from the bottom.</string>
-    <string name="status_working_body_bottom">Home and Recents from the bottom.</string>
+    <!-- The working body joins these parts with commas, for example "Back from the sides, Home and Recents from the bottom." -->
+    <string name="status_part_sides">%1$s from the sides</string>
+    <string name="status_part_left">%1$s from the left side</string>
+    <string name="status_part_right">%1$s from the right side</string>
+    <string name="status_part_bottom">%1$s from the bottom</string>
+    <string name="status_working_body_none">No swipe is set.</string>
     <string name="action_turn_on">Turn on</string>
     <string name="status_switch">Gestures on or off</string>
     <string name="action_fix">Fix</string>
@@ -142,6 +144,9 @@
     <string name="corner_lock_screen">Lock screen</string>
     <string name="corner_power_menu">Power menu</string>
     <string name="corner_split_screen">Split screen</string>
+    <string name="corner_home">Home</string>
+    <string name="corner_recents">Recents</string>
+    <string name="corner_previous_app">Previous app</string>
     <string name="corner_open_app">Open an app</string>
     <string name="corner_open_named_app">Open %1$s</string>
     <string name="corner_section_app_lists">App lists</string>
@@ -212,6 +217,15 @@
     <string name="action_done">Done</string>
     <string name="label_left_edge_back">Left edge</string>
     <string name="label_right_edge_back">Right edge</string>
+    <string name="label_bottom_edge">Bottom edge</string>
+    <string name="section_swipes">Swipes</string>
+    <string name="slot_swipe_in">Swipe in</string>
+    <string name="slot_swipe_up">Swipe up</string>
+    <string name="slot_swipe_up_pause">Swipe up and pause</string>
+    <string name="pair_and">%1$s and %2$s</string>
+    <string name="swipe_warning_no_home">No swipe goes Home</string>
+    <string name="swipe_warning_no_back">No swipe goes Back</string>
+    <string name="swipe_warning_way_out">To turn gestures off, use the NavGesture tile in Quick Settings.</string>
     <string name="label_landscape_confirm">Confirm in landscape</string>
     <string name="label_landscape_confirm_body">Swipe up twice to leave a landscape app</string>
     <string name="section_distance_and_timing">How far and how long</string>

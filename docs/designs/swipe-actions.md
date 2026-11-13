@@ -1,8 +1,8 @@
 # Swipe actions: pick what every swipe does, and three new side swipes
 
 *   **Author:** vijayyaso
-*   **Status:** Draft 2026-11-14. Nothing in this doc is built yet; every
-    item is `[not built]` until its phase lands.
+*   **Status:** Phases 0a, 0b and A are built (2026-11-14). Phases B, C
+    and D are `[not built]`.
 *   **Date:** 2026-11-14
 
 --------------------------------------------------------------------------------
@@ -180,8 +180,9 @@ defaults: side `SHORT` = Back for both edges and every zone; bottom `SHORT`
 `leftSplit` and `rightSplit` (default off). A touch on an edge that is not
 split reads the `WHOLE` zone; on a split edge a DOWN whose y is above the
 strip's centre reads `TOP_HALF`, and one at or below it `BOTTOM_HALF`.
-The corner slots hold what `leftCornerShortcut` and `rightCornerShortcut`
-hold today, under their existing keys.
+The corner slots stay in `GestureConfiguration` as `leftCornerShortcut` and
+`rightCornerShortcut`, under their existing keys; `SwipeSlots` holds the edge
+slots, and `givesHome` and `givesBack` read both.
 The two halves keep their own stored values, so switching the split off and
 on loses nothing.
 
@@ -209,7 +210,8 @@ model; the three screens that read them ask the slots instead
     split flags, `longSwipeDp` and `waitMs`.
 *   Debug builds read `navgesture_slot_<key>` global settings in place of a
     stored slot, as the corner overrides do today, so the e2e suites can
-    set a slot without the UI.
+    set a slot without the UI. A save starts from the stored values without
+    any override, so an override is never written.
 
 ### Gesture grammar (`gesture/GestureTracker.kt`)
 
@@ -249,6 +251,7 @@ pause.
     from the DOWN point along the swipe axis (`travelFrom`), as the trigger
     is today.
 *   **Arming.** A side edge arms when any slot of the touched zone is set.
+    A whole swipe on a zone with nothing set ends as `Unused(SLOT_EMPTY)`.
 *   **Bands.** The pending action is re-read on every MOVE:
 
     | Travel from DOWN | Pending action |
@@ -356,18 +359,23 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
     `SlotId`. Its string names and test tags (`corner_none`,
     `corner_app_...`, `row_left_corner`, ...) stay, because two e2e suites
     use them. The list gains the five actions. Previous app
-    shows the "Needs usage access" row while access is missing.
+    shows the "Needs usage access" row while access is missing. Each
+    slot's picker is its own `Screen` entry (`LEFT_SWIPE_IN`,
+    `RIGHT_SWIPE_IN`, `BOTTOM_SWIPE_UP`, `BOTTOM_SWIPE_UP_PAUSE`), as the
+    two corner pickers are, because a screen is saved by its name alone.
 *   **Warning**: on Gesture settings and on Home's Gestures tile summary,
     while no slot or corner holds Home ("No swipe goes Home") and while
     none holds Back ("No swipe goes Back"). The text names the way out:
     the NavGesture tile in Quick Settings turns gestures off and brings the
     phone's own bar back. It never blocks a choice.
 *   The touch-area adjuster and the status card read `edgeInUse`, and name
-    each side by its SHORT action's label where they say "Back" today.
+    each side by its SHORT action's label where they say "Back" today. The
+    status card names the bottom edge's two actions the same way.
 
 ### Logs
 
-`GESTURE_FIRED <EDGE> <id>` keeps its form. `SWIPE_ACTION <id>` replaces
+`GESTURE_FIRED <EDGE> <id>` keeps its form. The debug line
+`RECENTS_PRIMED` becomes `PENDING <kind> <id>`. `SWIPE_ACTION <id>` replaces
 `CORNER_SHORTCUT <id>` for every action, and `e2e/corner.sh` and
 `e2e/app-shortcuts.sh` move to it in the same commit. Phase 0a logs it only
 for the actions that logged `CORNER_SHORTCUT` before (not Back, Home,

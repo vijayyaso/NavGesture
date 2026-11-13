@@ -211,6 +211,10 @@ sealed interface SwipeAction {
                 None,
                 RecentsList,
                 FavouritesList,
+                Back,
+                Home,
+                Recents,
+                PreviousApp,
                 Notifications,
                 QuickSettings,
                 Screenshot,
@@ -221,9 +225,7 @@ sealed interface SwipeAction {
         }
 
         // Read from storage but not offered by the picker yet.
-        private val extra: List<SwipeAction> by lazy {
-            listOf(Back, Home, Recents, PreviousApp, Torch)
-        }
+        private val extra: List<SwipeAction> by lazy { listOf(Torch) }
 
         /** An unknown or empty id is [None], so a downgrade never leaves a broken corner. */
         fun decode(stored: String?): SwipeAction {
@@ -288,8 +290,12 @@ data class GestureConfiguration(
     val leftCornerShortcut: SwipeAction = SwipeAction.None,
     /** What a swipe up and inward from the bottom-right corner does. */
     val rightCornerShortcut: SwipeAction = SwipeAction.None,
-    val leftEdgeBackEnabled: Boolean = true,
-    val rightEdgeBackEnabled: Boolean = true,
+    /** What each side and bottom swipe does. The defaults are Back, Home and Recents. */
+    val slots: SwipeSlots = SwipeSlots(),
+    /** Travel from the DOWN point past which a side swipe is a long swipe. */
+    val longSwipeDp: Float = 120f,
+    /** How long a side swipe must stay still to count as "swipe and wait". */
+    val waitMs: Long = 350L,
     val hapticFeedbackEnabled: Boolean = true,
     /** Off by default: it changes a system setting, and needs a one-time adb grant. */
     val hideGestureBar: Boolean = false,
@@ -309,6 +315,21 @@ data class GestureConfiguration(
         BottomCorner.RIGHT -> rightCornerShortcut
     }
 
+    /** What [slot] holds, a corner included. */
+    fun actionFor(slot: SlotId): SwipeAction = when (slot) {
+        is SlotId.Corner -> shortcutFor(slot.side)
+        is SlotId.Edge -> slots[slot]
+    }
+
+    /** This configuration with [action] in [slot], a corner included. */
+    fun withAction(slot: SlotId, action: SwipeAction): GestureConfiguration = when (slot) {
+        is SlotId.Corner -> when (slot.side) {
+            BottomCorner.LEFT -> copy(leftCornerShortcut = action)
+            BottomCorner.RIGHT -> copy(rightCornerShortcut = action)
+        }
+        is SlotId.Edge -> copy(slots = slots.with(slot, action))
+    }
+
     val effectiveCircleToSearchHoldMs: Long
         get() = if (circleToSearchFollowsSystemTiming) {
             platform.longPressTimeoutMs
@@ -322,8 +343,9 @@ data class GestureConfiguration(
      */
     fun withGestureSettingsOf(source: GestureConfiguration): GestureConfiguration = copy(
         edgeWidthDp = source.edgeWidthDp,
-        leftEdgeBackEnabled = source.leftEdgeBackEnabled,
-        rightEdgeBackEnabled = source.rightEdgeBackEnabled,
+        slots = source.slots,
+        longSwipeDp = source.longSwipeDp,
+        waitMs = source.waitMs,
         landscapeConfirmEnabled = source.landscapeConfirmEnabled,
         sideMinimumSwipeDistanceDp = source.sideMinimumSwipeDistanceDp,
         bottomMinimumSwipeDistanceDp = source.bottomMinimumSwipeDistanceDp,
@@ -356,6 +378,9 @@ enum class RejectionReason {
     WRONG_DIRECTION,
     TOO_SLOW_TO_ARM,
     OFF_AXIS,
+
+    /** The swipe was made, but its slot holds no action, so the app underneath gets it. */
+    SLOT_EMPTY,
 }
 
 sealed interface TrackerAction {

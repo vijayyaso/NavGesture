@@ -57,6 +57,11 @@ import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeSlots
+import com.vijayyaso.navgesture.gesture.SwipeZone
 
 /** The answer to why the app was opened, with the one action the current state needs. */
 @Composable
@@ -79,9 +84,9 @@ internal fun StatusBlock(
         ServiceStatus.WORKING -> R.string.status_working
     }
     val body = when (status) {
-        ServiceStatus.OFF -> R.string.status_off_body
-        ServiceStatus.STOPPED -> R.string.status_stopped_body
-        ServiceStatus.WORKING -> workingBody(configuration)
+        ServiceStatus.OFF -> stringResource(R.string.status_off_body)
+        ServiceStatus.STOPPED -> stringResource(R.string.status_stopped_body)
+        ServiceStatus.WORKING -> workingBody(configuration.slots)
     }
     val (badgeNow, glyphNow) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
     val badge by animateColorAsState(badgeNow, tween(TONE_MS, easing = EaseOutStrong), label = "status badge")
@@ -134,7 +139,7 @@ internal fun StatusBlock(
             )
         }
         Text(
-            text = stringResource(body),
+            text = body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -180,10 +185,33 @@ internal fun StatusBlock(
     }
 }
 
-private fun workingBody(configuration: GestureConfiguration): Int = when {
-    configuration.leftEdgeBackEnabled && configuration.rightEdgeBackEnabled ->
-        R.string.status_working_body
-    configuration.leftEdgeBackEnabled -> R.string.status_working_body_left
-    configuration.rightEdgeBackEnabled -> R.string.status_working_body_right
-    else -> R.string.status_working_body_bottom
+/** "Back from the sides, Home and Recents from the bottom.", from what each swipe does. */
+@Composable
+private fun workingBody(slots: SwipeSlots): String {
+    val left = sideName(slots, ScreenEdge.LEFT)
+    val right = sideName(slots, ScreenEdge.RIGHT)
+    val bottom = actionsName(
+        listOf(
+            slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)],
+            slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)],
+        ),
+    )
+    val parts = buildList {
+        if (left != null && left == right) {
+            add(stringResource(R.string.status_part_sides, left))
+        } else {
+            left?.let { add(stringResource(R.string.status_part_left, it)) }
+            right?.let { add(stringResource(R.string.status_part_right, it)) }
+        }
+        bottom?.let { add(stringResource(R.string.status_part_bottom, it)) }
+    }
+    if (parts.isEmpty()) return stringResource(R.string.status_working_body_none)
+    return parts.joinToString(", ", postfix = ".")
+}
+
+/** A side in use is named by its short swipe's action; a side with no strip is left out. */
+@Composable
+private fun sideName(slots: SwipeSlots, edge: ScreenEdge): String? {
+    if (!slots.edgeInUse(edge)) return null
+    return shortcutLabel(slots[SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT)])
 }

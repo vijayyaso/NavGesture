@@ -17,6 +17,11 @@
 
 package com.vijayyaso.navgesture.ui
 
+import com.vijayyaso.navgesture.gesture.BottomCorner
+import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
@@ -174,5 +179,43 @@ class BackStackTest {
     @Test
     fun `a broken saved value restores to home`() {
         assertEquals(listOf(Screen.HOME), backStackFromSaved(listOf("nonsense")).screens)
+    }
+
+    @Test
+    fun `an edge page and its picker stack on gesture settings and restore by name`() {
+        val pages = listOf(
+            Screen.LEFT_EDGE to Screen.LEFT_SWIPE_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_SWIPE_IN,
+            Screen.BOTTOM_EDGE to Screen.BOTTOM_SWIPE_UP,
+            Screen.BOTTOM_EDGE to Screen.BOTTOM_SWIPE_UP_PAUSE,
+        )
+        pages.forEach { (page, picker) ->
+            val stack = home.open(Screen.GESTURE_SETTINGS, 300).open(page, 0).open(picker, 120)
+            assertEquals(listOf(Screen.HOME, Screen.GESTURE_SETTINGS, page, picker), stack.screens)
+            assertEquals(listOf(Screen.HOME, Screen.GESTURE_SETTINGS, page), stack.back().screens)
+            assertEquals(120, stack.back().top.scroll)
+            assertEquals(stack, backStackFromSaved(stack.toSaved()))
+        }
+    }
+
+    @Test
+    fun `the three edge pages restore from their saved names`() {
+        assertEquals(
+            listOf(Screen.HOME, Screen.LEFT_EDGE, Screen.RIGHT_EDGE, Screen.BOTTOM_EDGE),
+            backStackOf(listOf("HOME", "LEFT_EDGE", "RIGHT_EDGE", "BOTTOM_EDGE")).screens,
+        )
+    }
+
+    @Test
+    fun `each picker page sets its own slot, and no other screen sets one`() {
+        val pickers = mapOf(
+            Screen.LEFT_CORNER to SlotId.Corner(BottomCorner.LEFT),
+            Screen.RIGHT_CORNER to SlotId.Corner(BottomCorner.RIGHT),
+            Screen.LEFT_SWIPE_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT),
+            Screen.RIGHT_SWIPE_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.SHORT),
+            Screen.BOTTOM_SWIPE_UP to SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT),
+            Screen.BOTTOM_SWIPE_UP_PAUSE to SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE),
+        )
+        Screen.entries.forEach { assertEquals(it.name, pickers[it], it.pickerSlot) }
     }
 }

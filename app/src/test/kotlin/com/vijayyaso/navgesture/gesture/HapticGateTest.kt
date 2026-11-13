@@ -145,4 +145,27 @@ class HapticGateTest {
         }
         assertEquals(2, run.ticks.size)
     }
+
+    @Test
+    fun `a bottom arm with no pause action buzzes like a side arm, and its release stays quiet`() {
+        val noPause = SwipeSlots().with(SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE), SwipeAction.None)
+        val run = Run(ScreenEdge.BOTTOM, GestureConfiguration(slots = noPause))
+        run.down(540f, 2300f)
+        assertTrue(run.move(540f, 2200f) is TrackerAction.Armed)
+        assertTrue(run.up(540f, 2100f) is TrackerAction.Fire)
+        assertEquals(1, run.ticks.size)
+        assertTrue(run.ticks.single() is TrackerAction.Armed)
+    }
+
+    @Test
+    fun `an arm with nothing pending stays quiet`() {
+        val longOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Screenshot)
+        val run = Run(ScreenEdge.LEFT, GestureConfiguration(slots = longOnly))
+        run.down(0f, 1200f)
+        assertEquals(TrackerAction.Armed(null, SwipeAction.None), run.move(180f, 1200f))
+        assertEquals(TrackerAction.Unused(RejectionReason.SLOT_EMPTY), run.up(180f, 1200f))
+        assertTrue(run.ticks.isEmpty())
+    }
 }

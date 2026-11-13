@@ -91,7 +91,7 @@ switching screen (since 2026-11-13 they are on Gesture settings):
 *   The current picker (`CornerShortcutPicker.kt`) is not used by any e2e
     suite; the `corner` suite sets shortcuts through the debug overrides
     `navgesture_left_corner` / `navgesture_right_corner`, read with
-    `CornerShortcut.decode`. (Since 2026-11-12 the `app-shortcuts` suite
+    `SwipeAction.decode`. (Since 2026-11-12 the `app-shortcuts` suite
     opens the picker.)
 
 ## Goals
@@ -133,7 +133,7 @@ switching screen (since 2026-11-13 they are on Gesture settings):
 New case:
 
 ```text
-data class AppShortcut(val packageName: String, val shortcutId: String) : CornerShortcut
+data class AppShortcut(val packageName: String, val shortcutId: String) : SwipeAction
     id = "shortcut:" + packageName + "/" + shortcutId
 ```
 
@@ -249,7 +249,7 @@ existing `label_left_corner` / `label_right_corner`.
     current choice. Rows that pick are `selectable` with
     `Role.RadioButton`. App rows that only open or close their shortcut list
     use `Role.Button` with a state description (expanded / collapsed).
-*   The fixed rows come from the existing `CornerShortcut.fixed` list, in
+*   The fixed rows come from the existing `SwipeAction.fixed` list, in
     its order (its KDoc already promises the picker order); the section
     title for each comes from a small `when`.
 *   Fixed-choice glyphs (`material-icons-core` plus three small vectors drawn
@@ -570,7 +570,7 @@ assembleGithubDebug`) that must pass.
 ### Phase 1 — model
 
 1.  `main/kotlin/com/vijayyaso/navgesture/gesture/GestureModel.kt` — add
-    `CornerShortcut.AppShortcut` and the `shortcut:` prefix in `decode`.
+    `SwipeAction.AppShortcut` and the `shortcut:` prefix in `decode`.
 2.  `test/kotlin/com/vijayyaso/navgesture/gesture/CornerShortcutTest.kt` —
     round trip, id with `/`, missing `/`, blank package, blank id.
 

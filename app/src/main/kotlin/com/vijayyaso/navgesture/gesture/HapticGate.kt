@@ -28,7 +28,9 @@ class HapticGate {
 
     fun shouldTick(action: TrackerAction): Boolean = when (action) {
         // An arm that schedules a hold stays quiet, so a plain upward swipe buzzes on fire.
-        is TrackerAction.Armed -> (action.scheduleHoldMs == null).also { if (it) armTicked = true }
+        // So does an arm with nothing to run: lifting there hands the touch back to the app.
+        is TrackerAction.Armed ->
+            (action.scheduleHoldMs == null && action.pending != SwipeAction.None).also { if (it) armTicked = true }
         is TrackerAction.Fire -> {
             val ticked = armTicked
             armTicked = false

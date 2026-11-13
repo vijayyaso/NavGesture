@@ -41,8 +41,9 @@ import kotlin.math.ceil
 
 /**
  * The bubble that rises from an edge under the finger, in the manner of Fluid Navigation
- * Gestures: it carries the icon of the action a release would run, so the bottom shows Home
- * and swaps to Recents when the pause primes it, and a side shows the Back arrow. It follows the finger along the edge,
+ * Gestures: it carries the icon of the action a release would run, so by default the bottom
+ * shows Home and swaps to Recents when the pause primes it, and a side shows the Back arrow.
+ * With no action pending it shows no icon. It follows the finger along the edge,
  * grows as the finger travels in, and springs back into the edge on release while the
  * action fires alongside.
  *

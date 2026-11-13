@@ -70,7 +70,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.vijayyaso.navgesture.R
-import com.vijayyaso.navgesture.gesture.BottomCorner
+import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.ui.theme.NavGestureTheme
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +127,15 @@ internal enum class Screen(@param:StringRes val title: Int) {
     FAVOURITE_APPS(R.string.section_favourite_apps),
     LEFT_CORNER(R.string.label_left_corner),
     RIGHT_CORNER(R.string.label_right_corner),
+    LEFT_EDGE(R.string.label_left_edge_back),
+    RIGHT_EDGE(R.string.label_right_edge_back),
+    BOTTOM_EDGE(R.string.label_bottom_edge),
+
+    // One picker page per swipe, since a screen is saved by its name alone.
+    LEFT_SWIPE_IN(R.string.slot_swipe_in),
+    RIGHT_SWIPE_IN(R.string.slot_swipe_in),
+    BOTTOM_SWIPE_UP(R.string.slot_swipe_up),
+    BOTTOM_SWIPE_UP_PAUSE(R.string.slot_swipe_up_pause),
     BANK_APPS(R.string.section_bank_apps),
     CIRCLE_TO_SEARCH(R.string.section_circle_to_search),
     UPDATES(R.string.section_updates),
@@ -273,23 +282,17 @@ private fun ScreenContent(
             model = model,
             onOpenFavourites = { open(Screen.FAVOURITE_APPS) },
         )
-        Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = close)
-        Screen.RIGHT_CORNER -> CornerPickerScreen(BottomCorner.RIGHT, model, onDone = close)
+        Screen.LEFT_CORNER, Screen.RIGHT_CORNER, Screen.LEFT_SWIPE_IN, Screen.RIGHT_SWIPE_IN,
+        Screen.BOTTOM_SWIPE_UP, Screen.BOTTOM_SWIPE_UP_PAUSE,
+        -> screen.pickerSlot?.let { SwipeActionPickerScreen(it, model, onDone = close) }
+        Screen.LEFT_EDGE -> SwipeEdgeScreen(ScreenEdge.LEFT, model, onOpen = open)
+        Screen.RIGHT_EDGE -> SwipeEdgeScreen(ScreenEdge.RIGHT, model, onOpen = open)
+        Screen.BOTTOM_EDGE -> SwipeEdgeScreen(ScreenEdge.BOTTOM, model, onOpen = open)
         Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
         Screen.BANK_APPS -> BankAppsScreen(model)
         Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)
         Screen.UPDATES -> Store.UpdatesScreen()
-        Screen.GESTURE_SETTINGS -> GestureSettingsScreen(
-            model = model,
-            onOpenCorner = { corner ->
-                open(
-                    when (corner) {
-                        BottomCorner.LEFT -> Screen.LEFT_CORNER
-                        BottomCorner.RIGHT -> Screen.RIGHT_CORNER
-                    },
-                )
-            },
-        )
+        Screen.GESTURE_SETTINGS -> GestureSettingsScreen(model = model, onOpen = open)
         Screen.TROUBLESHOOTING -> TroubleshootingScreen(model)
         Screen.ABOUT -> AboutScreen(model)
         // Back and Not now are the same: nothing is recorded.

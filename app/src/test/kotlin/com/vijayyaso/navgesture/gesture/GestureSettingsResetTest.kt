@@ -38,8 +38,12 @@ class GestureSettingsResetTest {
         switcherAdaptiveSpeed = false,
         leftCornerShortcut = SwipeAction.Screenshot,
         rightCornerShortcut = SwipeAction.OpenApp("org.example.camera"),
-        leftEdgeBackEnabled = false,
-        rightEdgeBackEnabled = false,
+        slots = SwipeSlots(rightSplit = true)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.Notifications)
+            .with(SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.LONG), SwipeAction.Screenshot),
+        longSwipeDp = 200f,
+        waitMs = 600L,
         hapticFeedbackEnabled = false,
         hideGestureBar = true,
         landscapeConfirmEnabled = false,
@@ -73,6 +77,19 @@ class GestureSettingsResetTest {
         val reset = customised.withGestureSettingsOf(defaults)
 
         assertEquals(customised, reset.withGestureSettingsOf(customised))
+    }
+
+    @Test
+    fun `a reset gives every swipe its default action and its undo gives them back`() {
+        val reset = customised.withGestureSettingsOf(defaults)
+
+        assertEquals(SwipeSlots(), reset.slots)
+        assertEquals(defaults.longSwipeDp, reset.longSwipeDp, 0f)
+        assertEquals(defaults.waitMs, reset.waitMs)
+        val undone = reset.withGestureSettingsOf(customised)
+        assertEquals(customised.slots, undone.slots)
+        assertEquals(200f, undone.longSwipeDp, 0f)
+        assertEquals(600L, undone.waitMs)
     }
 
     @Test

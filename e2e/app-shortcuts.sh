@@ -92,7 +92,12 @@ open_left_picker() {
     if tap_id row_left_corner; then
       sleep 3
       title="$(string_res corner_section_app_shortcuts)"
-      if ui_nodes | grep -q "text=\"${title}\""; then
+      # The card sits below the fixed choices, so scroll down to it.
+      # shellcheck disable=SC2310 # a missing card is the retry signal, not an error
+      if find_text "${title}" >/dev/null; then
+        # Back to the top, where the callers look for the fixed choices.
+        scroll_app up
+        scroll_app up
         return 0
       fi
     fi

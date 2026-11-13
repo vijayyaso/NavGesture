@@ -27,6 +27,11 @@ internal object TestTags {
     const val APP_SEARCH = "app_search"
     const val ROW_LEFT_CORNER = "row_left_corner"
     const val ROW_RIGHT_CORNER = "row_right_corner"
+    const val ROW_LEFT_EDGE = "row_left_edge"
+    const val ROW_RIGHT_EDGE = "row_right_edge"
+    const val ROW_BOTTOM_EDGE = "row_bottom_edge"
+    const val WARNING_NO_HOME = "warning_no_home"
+    const val WARNING_NO_BACK = "warning_no_back"
     const val ROW_BANK_APPS = "row_bank_apps"
     const val BANK_APPS_COPY = "bank_apps_copy"
     const val ROW_CIRCLE_TO_SEARCH = "row_circle_to_search"
@@ -69,6 +74,10 @@ internal object TestTags {
 
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"
+
+    /** A swipe's row on its edge page, named by its storage key: `row_slot_left_whole_short`. */
+    fun slotRow(slot: com.vijayyaso.navgesture.gesture.SlotId.Edge): String =
+        "row_" + com.vijayyaso.navgesture.gesture.SwipeSlots.keyOf(slot)
 
     /** An app's header in the corner picker's App shortcuts card. */
     fun cornerApp(packageName: String): String = "corner_app_$packageName"

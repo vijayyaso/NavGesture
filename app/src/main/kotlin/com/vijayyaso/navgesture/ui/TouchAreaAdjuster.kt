@@ -65,6 +65,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeSlots
+import com.vijayyaso.navgesture.gesture.SwipeZone
 import kotlin.math.roundToInt
 
 /**
@@ -118,8 +122,8 @@ internal fun TouchAreaAdjuster(
             val band = local.dp
             val sideLength = maxHeight * SIDE_LENGTH_FRACTION
             val bottomLength = maxWidth * BOTTOM_LENGTH_FRACTION
-            val leftLabel = sideLabel(configuration.leftEdgeBackEnabled)
-            val rightLabel = sideLabel(configuration.rightEdgeBackEnabled)
+            val leftLabel = sideLabel(configuration.slots, ScreenEdge.LEFT)
+            val rightLabel = sideLabel(configuration.slots, ScreenEdge.RIGHT)
             val description = stringResource(R.string.edge_area_preview_desc, local.roundToInt())
 
             Box(
@@ -146,7 +150,7 @@ internal fun TouchAreaAdjuster(
                         modifier = Modifier.align(Alignment.CenterStart),
                     )
                     OverlayLabel(
-                        text = stringResource(leftLabel),
+                        text = leftLabel,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(start = band + HIT_EXPAND + 10.dp),
@@ -164,7 +168,7 @@ internal fun TouchAreaAdjuster(
                         modifier = Modifier.align(Alignment.CenterEnd),
                     )
                     OverlayLabel(
-                        text = stringResource(rightLabel),
+                        text = rightLabel,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = band + HIT_EXPAND + 10.dp),
@@ -258,8 +262,10 @@ internal fun TouchAreaAdjuster(
 }
 
 /** Null when no swipe listens on that side. */
-private fun sideLabel(backEnabled: Boolean): Int? =
-    if (backEnabled) R.string.gesture_back_name else null
+/** A side with a strip is named by its short swipe's action; a side with none has no band. */
+@Composable
+private fun sideLabel(slots: SwipeSlots, edge: ScreenEdge): String? =
+    if (slots.edgeInUse(edge)) shortcutLabel(slots[SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT)]) else null
 
 @Composable
 private fun OverlayLabel(text: String, modifier: Modifier = Modifier) {

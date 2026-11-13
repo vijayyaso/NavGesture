@@ -27,14 +27,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -70,7 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.AppListStyle
-import com.vijayyaso.navgesture.gesture.BottomCorner
+import com.vijayyaso.navgesture.gesture.SlotId
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.service.RuntimeAccess
 import com.vijayyaso.navgesture.service.ShortcutCatalog
@@ -100,17 +104,17 @@ internal fun AppListStyleChoice(selected: AppListStyle, onChange: (AppListStyle)
     }
 }
 
-/** A corner's row on Gesture settings: shows its shortcut and opens the picker page. */
+/** A slot's row: shows its action and opens the picker page. */
 @Composable
-internal fun CornerShortcutRow(
+internal fun SwipeActionRow(
     title: String,
-    shortcut: SwipeAction,
+    action: SwipeAction,
     tag: String,
     onOpen: () -> Unit,
 ) {
     NavigationRow(
         title = title,
-        supporting = shortcutLabel(shortcut),
+        supporting = shortcutLabel(action),
         tag = tag,
         onClick = onOpen,
     )
@@ -128,6 +132,10 @@ internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
     SwipeAction.LockScreen -> stringResource(R.string.corner_lock_screen)
     SwipeAction.PowerMenu -> stringResource(R.string.corner_power_menu)
     SwipeAction.SplitScreen -> stringResource(R.string.corner_split_screen)
+    SwipeAction.Back -> stringResource(R.string.gesture_back_name)
+    SwipeAction.Home -> stringResource(R.string.corner_home)
+    SwipeAction.Recents -> stringResource(R.string.corner_recents)
+    SwipeAction.PreviousApp -> stringResource(R.string.corner_previous_app)
     is SwipeAction.OpenApp -> {
         val apps by rememberLaunchableApps(waitForScreen = false)
         val label = apps?.firstOrNull { it.packageName == shortcut.packageName }?.label
@@ -135,10 +143,8 @@ internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
         stringResource(R.string.corner_open_named_app, label)
     }
     is SwipeAction.AppShortcut -> appShortcutLabel(shortcut)
-    // Not in the picker yet, so never shown. They read as their stored id.
-    SwipeAction.Back, SwipeAction.Home, SwipeAction.Recents,
-    SwipeAction.PreviousApp, SwipeAction.Torch,
-    -> shortcut.id
+    // Not in the picker yet, so it reads as its stored id.
+    SwipeAction.Torch -> shortcut.id
 }
 
 /** "App: Shortcut", read off the main thread; says so when the app no longer offers it. */
@@ -163,19 +169,15 @@ private fun appLabel(context: Context, packageName: String): String = runCatchin
 }.getOrDefault(packageName)
 
 /**
- * The picker page for one corner: the fixed choices, then a search box over the apps' own
- * shortcuts and the apps themselves. Picking saves at once and goes back.
+ * The picker page for one slot, a corner or a swipe: the fixed choices, then a search box over
+ * the apps' own shortcuts and the apps themselves. Picking saves at once and goes back.
  */
 @Composable
-internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: () -> Unit) {
-    val current = model.configuration.shortcutFor(corner)
+internal fun SwipeActionPickerScreen(slot: SlotId, model: AppModel, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val current = model.configuration.actionFor(slot)
     val pick: (SwipeAction) -> Unit = { picked ->
-        model.update {
-            when (corner) {
-                BottomCorner.LEFT -> it.copy(leftCornerShortcut = picked)
-                BottomCorner.RIGHT -> it.copy(rightCornerShortcut = picked)
-            }
-        }
+        model.update { it.withAction(slot, picked) }
         onDone()
     }
 
@@ -184,6 +186,21 @@ internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: (
     FixedGroup(null, fixed[FixedSection.NOTHING].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_app_lists), fixed[FixedSection.LISTS].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_phone_actions), fixed[FixedSection.ACTIONS].orEmpty(), current, pick)
+    // Previous app reads the recent apps, so it says what it needs while access is missing.
+    AnimatedVisibility(visible = !model.usageAccess, enter = BlockEnter, exit = BlockExit) {
+        SettingsGroup(title = stringResource(R.string.corner_previous_app)) {
+            InfoRow(
+                title = stringResource(R.string.label_usage_access),
+                supporting = stringResource(R.string.feature_needs_usage_access),
+                supportingTag = TestTags.USAGE_ACCESS,
+                trailing = {
+                    FilledTonalButton(onClick = { openUsageAccess(context) }) {
+                        Text(stringResource(R.string.action_grant_usage_access))
+                    }
+                },
+            )
+        }
+    }
 
     var query by rememberSaveable { mutableStateOf("") }
     SearchField(query, stringResource(R.string.corner_search_apps)) { query = it }
@@ -230,10 +247,12 @@ private fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
     SwipeAction.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
     SwipeAction.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
     SwipeAction.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
+    SwipeAction.Back -> GroupIcon(Icons.AutoMirrored.Filled.ArrowBack, IconTint.BLUE)
+    SwipeAction.Home -> GroupIcon(Icons.Filled.Home, IconTint.BLUE)
+    SwipeAction.Recents -> GroupIcon(RecentsGlyph, IconTint.BLUE)
+    SwipeAction.PreviousApp -> GroupIcon(Icons.Filled.Refresh, IconTint.BLUE)
     is SwipeAction.OpenApp, is SwipeAction.AppShortcut -> null
-    SwipeAction.Back, SwipeAction.Home, SwipeAction.Recents,
-    SwipeAction.PreviousApp, SwipeAction.Torch,
-    -> null
+    SwipeAction.Torch -> null
 }
 
 /** A row that picks: a check mark marks the current choice, and it reads as a radio button. */
@@ -407,8 +426,8 @@ private fun OpenAppGroup(
     }
 }
 
-// material-icons-core has no screenshot, power or split-screen glyph, so these three are drawn
-// here on the same 24-unit grid. Icon() tints them like any other glyph.
+// material-icons-core has no screenshot, power, split-screen or recents glyph, so these four are
+// drawn here on the same 24-unit grid. Icon() tints them like any other glyph.
 
 private val ScreenshotGlyph: ImageVector = ImageVector.Builder(
     name = "Screenshot",
@@ -457,5 +476,20 @@ private val SplitScreenGlyph: ImageVector = ImageVector.Builder(
     path(fill = SolidColor(Color.Black)) {
         moveTo(5f, 3f); horizontalLineTo(19f); verticalLineTo(11f); horizontalLineTo(5f); close()
         moveTo(5f, 13f); horizontalLineTo(19f); verticalLineTo(21f); horizontalLineTo(5f); close()
+    }
+}.build()
+
+private val RecentsGlyph: ImageVector = ImageVector.Builder(
+    name = "Recents",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // Two cards, one behind the other, as the phone's Recents button draws them.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(8f, 7f); horizontalLineTo(20f); verticalLineTo(21f); horizontalLineTo(8f); close()
+        moveTo(4f, 3f); horizontalLineTo(16f); verticalLineTo(5f); horizontalLineTo(6f)
+        verticalLineTo(17f); horizontalLineTo(4f); close()
     }
 }.build()
