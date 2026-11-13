@@ -34,7 +34,7 @@ This is blocked because the call needs `android.permission.CHANGE_OVERLAY_PACKAG
 | Route | Why it fails |
 | --- | --- |
 | `cmd overlay enable ...` from the app | `CHANGE_OVERLAY_PACKAGES` is signature-level |
-| Writing `Settings.Secure` `navigation_mode` | `WRITE_SECURE_SETTINGS` is signature or privileged. Reading it is unrestricted, so the app can report the mode but never change it |
+| Writing `Settings.Secure` `navigation_mode` | `WRITE_SECURE_SETTINGS` is signature or privileged. Reading it is unrestricted. Without the adb grant the app can only report the mode; with it, "Hide the gesture bar" keeps the mode gestural |
 | Shizuku | Apache-2.0 and legally forkable, yet its privileged server still has to be started by ADB or root |
 | Granting the permission over adb | On the target device `adb shell` holds neither `WRITE_SECURE_SETTINGS` nor `GRANT_RUNTIME_PERMISSIONS`. Xiaomi keeps both behind the Mi-account "USB debugging (Security settings)" toggle |
 
@@ -50,4 +50,4 @@ Auto-clicking the toggle once the settings screen opens, using the app's own acc
 
 Worth doing only as best-effort, with a manual fallback.
 
-HyperOS also resets the navigation mode across a reboot. `boot/BootCompletedReceiver.kt` observes that and reports it. A normal APK cannot restore it.
+HyperOS also resets the navigation mode across a reboot. `boot/BootCompletedReceiver.kt` observes that and reports it. A normal APK cannot restore it. With the adb grant and "Hide the gesture bar" on, `GestureBarHider` writes `navigation_mode` back to gestural when the service connects and whenever the setting changes (ported from upstream #127). It saves the mode from before the first hide and puts it back when the bar is shown. This has not been tried on a phone.

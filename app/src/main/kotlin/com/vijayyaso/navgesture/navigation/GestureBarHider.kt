@@ -40,7 +40,9 @@ import com.vijayyaso.navgesture.diagnostics.ServiceLog
  * HyperOS 3.0: the bar went away and every NavGesture swipe still landed.
  *
  * HyperOS resets the mode when the launcher changes, so while the user wants it hidden the
- * service watches both settings and writes them back.
+ * service watches the settings and writes them back. Android's own `navigation_mode` (a secure
+ * setting) is kept gestural too, as upstream does: HyperOS is reported to reset it across a
+ * reboot. The mode from before the first hide is saved and put back when the bar is shown.
  *
  * A bar this app hid is marked on disk before the write, so a kill that skips the service's
  * unbind - a force stop or a crash - still leaves a trace. [restoreIfStopped] then gives the
@@ -54,7 +56,7 @@ class GestureBarHider(private val context: Context, private val handler: Handler
 
     private val observer = object : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean) {
-            if (wanted && !isHidden()) {
+            if (wanted && !isKept(context)) {
                 Log.i(TAG, "GESTURE_BAR_RESET by the system, hiding it again")
                 write(hidden = true)
             }
@@ -74,7 +76,7 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         if (hide) startObserving() else stopObserving()
         if (!canWrite()) return
         // Only undo what this app did, so a bar the user never asked to hide is left alone.
-        if (hide && !isHidden()) write(hidden = true)
+        if (hide && !isKept(context)) write(hidden = true)
         // A bar hidden before the mark existed is still this app's to give back.
         if (hide && isHidden()) markHidden(context, hidden = true)
         if (!hide && changed) show(context)
@@ -108,6 +110,7 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         val resolver = context.contentResolver
         resolver.registerContentObserver(Settings.Global.getUriFor(FORCE_FSG), false, observer)
         resolver.registerContentObserver(Settings.Global.getUriFor(HIDE_LINE), false, observer)
+        resolver.registerContentObserver(Settings.Secure.getUriFor(NAV_MODE), false, observer)
         observing = true
     }
 
@@ -138,6 +141,14 @@ class GestureBarHider(private val context: Context, private val handler: Handler
 
         fun isHidden(context: Context): Boolean =
             global(context, FORCE_FSG) == 1 && global(context, HIDE_LINE) == 1
+
+        /** Hidden, and Android's own mode still gestural where the phone has that setting. */
+        fun isKept(context: Context): Boolean =
+            kept(global(context, FORCE_FSG), global(context, HIDE_LINE), navigationMode(context))
+
+        fun kept(forceFsg: Int, hideLine: Int, navigationMode: Int): Boolean =
+            forceFsg == 1 && hideLine == 1 &&
+                (navigationMode == MODE_UNKNOWN || navigationMode == MODE_GESTURAL)
 
         /** Gives the phone its own gesture bar back. Needs [canWrite]. */
         fun show(context: Context) {
@@ -215,17 +226,37 @@ class GestureBarHider(private val context: Context, private val handler: Handler
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
         private fun write(context: Context, hidden: Boolean) {
+            val mode = navigationMode(context)
+            // Only the first hide saves the mode: a later write is a reset being undone.
+            if (hidden && !hiddenByUs(context) && mode != MODE_UNKNOWN) {
+                prefs(context).edit(commit = true) { putInt(KEY_MODE_BEFORE, mode) }
+            }
             // Recorded before the write, so a kill straight after still leaves the trace.
             if (hidden) markHidden(context, hidden = true)
             runCatching {
                 val resolver = context.contentResolver
                 if (hidden) Settings.Global.putInt(resolver, HIDE_LINE, 1)
                 Settings.Global.putInt(resolver, FORCE_FSG, if (hidden) 1 else 0)
+                if (hidden) {
+                    if (mode != MODE_UNKNOWN && mode != MODE_GESTURAL) {
+                        Settings.Secure.putInt(resolver, NAV_MODE, MODE_GESTURAL)
+                    }
+                } else {
+                    val before = prefs(context).getInt(KEY_MODE_BEFORE, MODE_UNKNOWN)
+                    if (before != MODE_UNKNOWN && before != mode) {
+                        Settings.Secure.putInt(resolver, NAV_MODE, before)
+                    }
+                    prefs(context).edit(commit = true) { remove(KEY_MODE_BEFORE) }
+                }
             }.onFailure { Log.w(TAG, "Could not write the gesture-bar settings", it) }
         }
 
         private fun global(context: Context, key: String): Int =
             runCatching { Settings.Global.getInt(context.contentResolver, key, 0) }.getOrDefault(0)
+
+        private fun navigationMode(context: Context): Int = runCatching {
+            Settings.Secure.getInt(context.contentResolver, NAV_MODE, MODE_UNKNOWN)
+        }.getOrDefault(MODE_UNKNOWN)
 
         /** What the user types once, from a computer, to let this app hide the bar. */
         const val GRANT_COMMAND =
@@ -238,6 +269,10 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         private const val KEY_HIDDEN_BY_US = "hidden_by_us"
         private const val FORCE_FSG = "force_fsg_nav_bar"
         private const val HIDE_LINE = "hide_gesture_line"
+        private const val KEY_MODE_BEFORE = "navigation_mode_before"
+        private const val NAV_MODE = "navigation_mode"
+        internal const val MODE_GESTURAL = 2
+        internal const val MODE_UNKNOWN = -1
         private const val TAG = "NavGesture"
     }
 }

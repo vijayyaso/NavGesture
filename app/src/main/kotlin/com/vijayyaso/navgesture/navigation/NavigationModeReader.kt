@@ -23,7 +23,7 @@ import android.provider.Settings
 
 /**
  * Reading `Settings.Secure` needs no permission; *writing* it needs `WRITE_SECURE_SETTINGS`
- * (adb or root only) — which is why this app can report the mode but never change it.
+ * (adb or root only). This object only reports the mode; [GestureBarHider] keeps it with the grant.
  */
 internal object NavigationModeReader {
 

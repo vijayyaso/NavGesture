@@ -99,4 +99,18 @@ class GestureBarRestoreTest {
         assertFalse(GestureBarHider.stuck(canWrite = false, hidByUs = false, hiddenNow = true))
         assertFalse(GestureBarHider.stuck(canWrite = false, hidByUs = true, hiddenNow = false))
     }
+
+    @Test
+    fun `a reset of any of the three settings counts as no longer kept`() {
+        val gestural = GestureBarHider.MODE_GESTURAL
+        assertTrue(GestureBarHider.kept(forceFsg = 1, hideLine = 1, navigationMode = gestural))
+        assertFalse(GestureBarHider.kept(forceFsg = 0, hideLine = 1, navigationMode = gestural))
+        assertFalse(GestureBarHider.kept(forceFsg = 1, hideLine = 0, navigationMode = gestural))
+        assertFalse(GestureBarHider.kept(forceFsg = 1, hideLine = 1, navigationMode = 0))
+    }
+
+    @Test
+    fun `a phone without the navigation mode setting is judged on the other two`() {
+        assertTrue(GestureBarHider.kept(forceFsg = 1, hideLine = 1, navigationMode = GestureBarHider.MODE_UNKNOWN))
+    }
 }
