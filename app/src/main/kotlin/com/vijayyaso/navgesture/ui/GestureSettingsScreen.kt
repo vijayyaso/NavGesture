@@ -51,10 +51,6 @@ import kotlin.math.roundToInt
 internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner) -> Unit) {
     val configuration = model.configuration
     var adjustOpen by rememberSaveable { mutableStateOf(false) }
-    SettingsGroup(title = stringResource(R.string.gestures_title)) {
-        CheatSheet(configuration)
-    }
-
     SettingsGroup(title = stringResource(R.string.section_edges)) {
         // One child, so no line cuts through the touch-area block.
         Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -190,38 +186,6 @@ internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner)
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Text(stringResource(R.string.action_reset_defaults))
-    }
-}
-
-/** Only the gestures this configuration has, so a turned-off one is not advertised. */
-@Composable
-private fun CheatSheet(configuration: GestureConfiguration) {
-    val back = when {
-        configuration.leftEdgeBackEnabled && configuration.rightEdgeBackEnabled -> R.string.gesture_back_how
-        configuration.leftEdgeBackEnabled -> R.string.gesture_back_left_how
-        configuration.rightEdgeBackEnabled -> R.string.gesture_back_right_how
-        else -> null
-    }
-    // Each row keeps its own slot, so one folding in or out never shifts another's state.
-    CheatRow(R.string.gesture_back_name, back)
-    CheatRow(R.string.gesture_home_recents_name, R.string.gesture_home_recents_how)
-    CheatRow(
-        R.string.gesture_switch_apps_name,
-        R.string.gesture_switch_apps_how.takeIf { configuration.edgeAppListEnabled },
-    )
-    CheatRow(
-        R.string.gesture_circle_to_search_name,
-        R.string.gesture_circle_to_search_how.takeIf { configuration.circleToSearchEnabled },
-    )
-    CheatRow(R.string.gesture_corner_name, R.string.gesture_corner_how.takeIf { configuration.anyCornerShortcut })
-}
-
-/** A cheat-sheet row shown while [how] is set. Folding away, it keeps its last text. */
-@Composable
-private fun CheatRow(@StringRes name: Int, @StringRes how: Int?) {
-    val shownHow = rememberLastShown(how, shown = how != null)
-    AnimatedVisibility(visible = how != null, enter = BlockEnter, exit = BlockExit) {
-        shownHow?.let { InfoRow(title = stringResource(name), supporting = stringResource(it)) }
     }
 }
 

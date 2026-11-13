@@ -17,6 +17,7 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.FilledTonalButton
@@ -38,7 +39,9 @@ internal fun AppSwitchingScreen(
         ToggleRow(
             label = stringResource(R.string.label_edge_app_list),
             checked = configuration.edgeAppListEnabled,
-            supporting = stringResource(R.string.edge_app_list_body),
+            supporting = stringResource(
+                if (configuration.swapAppLists) R.string.edge_app_list_body_swapped else R.string.edge_app_list_body,
+            ),
             tag = TestTags.SWITCH_EDGE_APP_LIST,
         ) { updated -> model.update { it.copy(edgeAppListEnabled = updated) } }
         NavigationRow(
@@ -47,6 +50,12 @@ internal fun AppSwitchingScreen(
             icon = GroupIcon(Icons.Filled.Star, IconTint.ORANGE),
             onClick = onOpenFavourites,
         )
+        ToggleRow(
+            label = stringResource(R.string.label_swap_app_lists),
+            checked = configuration.swapAppLists,
+            supporting = stringResource(R.string.label_swap_app_lists_body),
+            tag = TestTags.SWITCH_SWAP_APP_LISTS,
+        ) { updated -> model.update { it.copy(swapAppLists = updated) } }
     }
     SettingsGroup(title = stringResource(R.string.section_list_style)) {
         AppListStyleChoice(configuration.appListStyle) { style ->
@@ -66,36 +75,25 @@ internal fun AppSwitchingScreen(
             tag = TestTags.SWITCH_ADAPTIVE_SPEED,
         ) { updated -> model.update { it.copy(switcherAdaptiveSpeed = updated) } }
     }
-    // The explainer is the footer, outside the tagged status text that the status-refresh
-    // suite compares exactly.
-    SettingsGroup(
-        title = stringResource(R.string.section_needs),
-        footer = stringResource(R.string.usage_access_explainer),
-    ) {
-        InfoRow(
-            title = stringResource(R.string.label_usage_access),
-            supporting = stringResource(
-                if (model.usageAccess) R.string.label_usage_access_granted else R.string.label_usage_access_missing,
-            ),
-            supportingTag = TestTags.USAGE_ACCESS,
-            trailing = if (model.usageAccess) {
-                null
-            } else {
-                {
+    // Shown only while the permission is missing: once granted there is nothing to do here.
+    AnimatedVisibility(visible = !model.usageAccess, enter = BlockEnter, exit = BlockExit) {
+        SettingsGroup(
+            title = stringResource(R.string.section_needs),
+            footer = stringResource(R.string.usage_access_explainer),
+        ) {
+            InfoRow(
+                title = stringResource(R.string.label_usage_access),
+                supporting = stringResource(R.string.label_usage_access_missing),
+                supportingTag = TestTags.USAGE_ACCESS,
+                trailing = {
                     FilledTonalButton(onClick = { openUsageAccess(context) }) {
                         Text(stringResource(R.string.action_grant_usage_access))
                     }
-                }
-            },
-        )
+                },
+            )
+        }
     }
-    SettingsGroup(title = stringResource(R.string.section_gestures_it_adds)) {
-        InfoRow(
-            title = stringResource(R.string.gesture_switch_apps_name),
-            supporting = stringResource(R.string.gesture_switch_apps_how),
-        )
-        LastProblem(model.diagnostics.lastAppSwitchFailure)
-    }
+    LastProblem(model.diagnostics.lastAppSwitchFailure)
 }
 
 /** Sideways travel per app, from twitchy to calm. */

@@ -66,7 +66,9 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     inside a 45° cone. Then, while still rising, a MOVE whose sideways
     travel from DOWN is ≥ 40 dp and larger than the rise opens the list: a
     drag to the right opens recent apps, a drag to the left opens
-    favourites. When "Bottom app switcher" is on, arming gives one light
+    favourites. The "Swap the two lists" switch on App switching
+    (`swapAppLists`, off by default) trades the two sides; the corner
+    shortcuts name their list and are not affected. When "Bottom app switcher" is on, arming gives one light
     tick to say that a sideways drag can now open the list; when it is off
     there is no arm tick. Before arming, a stream older than 1000 ms is
     given up (`maximumArmDurationMs`).

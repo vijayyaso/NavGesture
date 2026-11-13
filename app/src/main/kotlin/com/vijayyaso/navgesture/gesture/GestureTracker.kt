@@ -233,11 +233,11 @@ class GestureTracker(
             val rise = abs(origin.yPx - sample.yPx)
             if (sideways >= switcherDragPx && sideways > rise) {
                 arm = Arm.Switcher
-                // Right opens recent apps, left opens favourites: the direction is the choice.
+                // Right opens recent apps and left opens favourites, unless the user swapped them.
                 return TrackerAction.OpenSwitcher(
                     ScreenEdge.BOTTOM,
                     sample,
-                    recents = sample.xPx >= origin.xPx,
+                    recents = (sample.xPx >= origin.xPx) != configuration.swapAppLists,
                 )
             }
         }

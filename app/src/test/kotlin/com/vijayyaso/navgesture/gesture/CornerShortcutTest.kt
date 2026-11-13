@@ -62,8 +62,6 @@ class CornerShortcutTest {
         val configuration = GestureConfiguration(rightCornerShortcut = CornerShortcut.LockScreen)
         assertEquals(CornerShortcut.None, configuration.shortcutFor(BottomCorner.LEFT))
         assertEquals(CornerShortcut.LockScreen, configuration.shortcutFor(BottomCorner.RIGHT))
-        assertEquals(true, configuration.anyCornerShortcut)
-        assertEquals(false, GestureConfiguration().anyCornerShortcut)
     }
 
     @Test fun `drag always opens what is highlighted, tap never highlights`() {

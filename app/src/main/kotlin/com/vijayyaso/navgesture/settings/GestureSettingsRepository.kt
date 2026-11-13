@@ -62,6 +62,7 @@ class GestureSettingsRepository(
             preferences[RECENTS_LINE_PERCENT] = updated.recentsLinePercent
             preferences[OFF_AXIS_TOLERANCE] = updated.offAxisToleranceRatio
             preferences[EDGE_APP_LIST] = updated.edgeAppListEnabled
+            preferences[SWAP_APP_LISTS] = updated.swapAppLists
             preferences[APP_LIST_STYLE] = updated.appListStyle.name
             preferences[SWITCHER_STEP_DP] = updated.switcherStepDp
             preferences[SWITCHER_ADAPTIVE_SPEED] = updated.switcherAdaptiveSpeed
@@ -94,6 +95,7 @@ class GestureSettingsRepository(
                 preferences[OFF_AXIS_TOLERANCE] ?: defaults.offAxisToleranceRatio,
             edgeAppListEnabled =
                 debugEdgeAppListEnabled() ?: (preferences[EDGE_APP_LIST] ?: defaults.edgeAppListEnabled),
+            swapAppLists = preferences[SWAP_APP_LISTS] ?: defaults.swapAppLists,
             appListStyle = (debugOverride(APP_LIST_STYLE_OVERRIDE) ?: preferences[APP_LIST_STYLE])
                 ?.let(AppListStyle::decode) ?: defaults.appListStyle,
             switcherStepDp = preferences[SWITCHER_STEP_DP] ?: defaults.switcherStepDp,
@@ -141,6 +143,7 @@ class GestureSettingsRepository(
         val RECENTS_LINE_PERCENT = floatPreferencesKey("recents_line_percent")
         val OFF_AXIS_TOLERANCE = floatPreferencesKey("off_axis_tolerance_ratio")
         val EDGE_APP_LIST = booleanPreferencesKey("edge_app_list_enabled")
+        val SWAP_APP_LISTS = booleanPreferencesKey("swap_app_lists")
         val APP_LIST_STYLE = stringPreferencesKey("app_list_style")
         val SWITCHER_STEP_DP = floatPreferencesKey("switcher_step_dp")
         val SWITCHER_ADAPTIVE_SPEED = booleanPreferencesKey("switcher_adaptive_speed")

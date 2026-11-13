@@ -78,6 +78,23 @@ assert_log "the left drag opens favourites" "SWITCHER_OPEN bottom favourites"
 assert_no_log "the left drag is not read as Home" "GESTURE_FIRED BOTTOM Home"
 
 echo >&2
+echo "== with the two lists swapped, right opens favourites and left opens recent apps ==" >&2
+open_screen row_app_switching switch_swap_app_lists
+# shellcheck disable=SC2310 # a switch that does not turn is reported by the checks below
+set_toggle_id switch_swap_app_lists true || true
+open_test_app
+reset_log
+swipe_up_drag $((WIDTH / 2)) 320
+assert_log "the right drag opens favourites" "SWITCHER_OPEN bottom favourites"
+open_test_app
+reset_log
+swipe_up_drag $((WIDTH / 2)) -320
+assert_log "the left drag opens recents" "SWITCHER_OPEN bottom recents"
+open_screen row_app_switching switch_swap_app_lists
+# shellcheck disable=SC2310 # a switch left on fails the checks of the next section
+set_toggle_id switch_swap_app_lists false || true
+
+echo >&2
 echo "== a still pause is the phone's own Recents, not the app list ==" >&2
 open_test_app
 reset_log

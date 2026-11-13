@@ -210,6 +210,8 @@ data class GestureConfiguration(
     val offAxisToleranceRatio: Float = 1.0f,
     /** Swipe up from the bottom and drag sideways to show the app list. */
     val edgeAppListEnabled: Boolean = true,
+    /** Off: drag right for recent apps, left for favourites. On: the two sides trade places. */
+    val swapAppLists: Boolean = false,
     /** Drag to pick, touch to pick, or both. */
     val appListStyle: AppListStyle = AppListStyle.DRAG,
     /** Sideways travel that moves the app list selection by one app. */
@@ -240,10 +242,6 @@ data class GestureConfiguration(
         BottomCorner.LEFT -> leftCornerShortcut
         BottomCorner.RIGHT -> rightCornerShortcut
     }
-
-    val anyCornerShortcut: Boolean
-        get() = leftCornerShortcut != CornerShortcut.None ||
-            rightCornerShortcut != CornerShortcut.None
 
     val effectiveCircleToSearchHoldMs: Long
         get() = if (circleToSearchFollowsSystemTiming) {

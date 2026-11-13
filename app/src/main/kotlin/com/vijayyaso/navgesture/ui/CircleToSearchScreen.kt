@@ -70,28 +70,27 @@ private fun CircleToSearchDetails(model: AppModel) {
         }
     }
 
-    SettingsGroup(title = stringResource(R.string.section_needs)) {
-        InfoRow(
-            title = stringResource(R.string.label_assistant),
-            supporting = stringResource(
-                when (model.assistant) {
-                    Assistant.GOOGLE -> R.string.assistant_google
-                    Assistant.OTHER -> R.string.assistant_other
-                    Assistant.UNKNOWN -> R.string.label_circle_to_search_assistant
-                },
-            ),
-            actions = if (model.assistant == Assistant.GOOGLE) {
-                null
-            } else {
-                {
+    // Shown only until Google is the assistant: after that there is nothing to do here.
+    if (model.assistant != Assistant.GOOGLE) {
+        SettingsGroup(title = stringResource(R.string.section_needs)) {
+            InfoRow(
+                title = stringResource(R.string.label_assistant),
+                supporting = stringResource(
+                    if (model.assistant == Assistant.OTHER) {
+                        R.string.assistant_other
+                    } else {
+                        R.string.label_circle_to_search_assistant
+                    },
+                ),
+                actions = {
                     FilledTonalButton(onClick = { openAssistantSettings(context) }) {
                         Text(stringResource(R.string.action_open_assistant_settings))
                     }
-                }
-            },
-        )
-        LastProblem(model.diagnostics.lastCircleToSearchFailure)
+                },
+            )
+        }
     }
+    LastProblem(model.diagnostics.lastCircleToSearchFailure)
 }
 
 @Composable

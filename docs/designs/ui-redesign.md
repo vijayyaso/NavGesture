@@ -277,8 +277,7 @@ screen times anything with `delay()`.
     `BlockExit`: the Timing and Needs groups under the Circle to Search
     switch, the hold slider under its system-timing switch, the status
     group under the Updates switch (github), the shortcut rows under an app
-    in the corner picker, and the Gestures cheat-sheet rows on Gesture
-    settings. A block folding away keeps its last content
+    in the corner picker, and the Needs group on App switching. A block folding away keeps its last content
     (`rememberLastShown`). The corner picker's arrow is one glyph that turns
     90° to point down over 200 ms, the other way in right-to-left. Only a
     tap on an app animates it: starting a search, the search filter,
@@ -442,15 +441,24 @@ group with no title is written as **(no title)**.
 
 *   **Setup** — **Required**: required steps. **Recommended**: recommended
     steps; *footer: setup footer (HyperOS or generic text)*.
-*   **App switching** — **(no title)**: app-list switch, Favourite apps row.
-    **List style**: the three style radio rows, drag step slider, adaptive
-    speed switch. **Needs**: usage access row; *footer: usage access explainer*.
-    **Gestures it adds**: switch-apps info row, last problem row.
+*   **App switching** — **(no title)**: app-list switch, Favourite apps row,
+    "Swap the two lists" switch (`switch_swap_app_lists`). **List style**:
+    the three style radio rows, drag step slider, adaptive speed switch.
+    **Needs** (only while usage access is missing): usage access row with
+    its Grant button; *footer: usage access explainer*. **(no title)**
+    (only after a failure): last problem row.
+*   **No information-only rows** (2026-11-14). A settings screen shows a
+    row only when the user can act on it. A "Needs" row shows while its
+    permission is missing and goes once it is granted; a "Last problem"
+    card shows only when there is a problem (`LastProblem`). The
+    cheat-sheet group on Gesture settings and the "Gestures it adds" group
+    are removed. Troubleshooting and About stay information screens.
 *   **Favourite apps** — **Favourites**: picked apps with move/remove buttons,
     or the empty text inside the card. Then the app search box (`app_search`,
     between the cards), then **All apps**: the checklist.
 *   **Bank apps** — the two intro texts as plain footnotes above everything.
-    **Needs**: adb grant, usage access, notifications rows. **Picked**: the
+    **Needs**: adb grant, usage access, notifications rows, each only while
+    it is missing; no card once all three are met. **Picked**: the
     picked apps or the empty text. Then the app search box, then **All
     apps**: the checklist.
 *   **App search** (both pickers, `AppChecklist` in `AppPicker.kt`, added
@@ -462,9 +470,10 @@ group with no title is written as **(no title)**.
     card says "No apps match". The text survives a rotation
     (`rememberSaveable`).
 *   **Circle to Search** — **(no title)**: the switch; *footer: feature body*.
-    If on: **Timing**: system-timing switch, hold slider. **Needs**:
-    assistant row, last problem row.
-*   **Gesture settings** — **Gestures**: cheat-sheet rows. **Edges**: one
+    If on: **Timing**: system-timing switch, hold slider. **Needs** (only
+    until Google is the assistant): assistant row with its button. **(no
+    title)** (only after a failure): last problem row.
+*   **Gesture settings** — **Edges**: one
     block (edge width value, its body text, the Adjust button, the hint
     text), left back switch, right back switch, landscape-confirm switch.
     **Corner shortcuts**: left corner row, right corner row; *footer: corner
@@ -513,8 +522,9 @@ group with no title is written as **(no title)**.
     footnote. No text changes (Play policy text, mirrored in
     `docs/play-store/disclosure.md`).
 
-The `usage_access` node keeps showing only its status string (the explainer
-stays a separate footer), so `status-refresh.sh` still matches it exactly.
+The `usage_access` node shows only the "missing" status string (the explainer
+stays a separate footer), so `status-refresh.sh` still matches it exactly;
+once access is granted the node is gone, and the suite checks that too.
 
 ## Alternatives considered
 

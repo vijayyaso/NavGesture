@@ -90,51 +90,44 @@ internal fun BankAppsScreen(model: AppModel) {
 
     val canWrite = resumes >= 0 && GestureBarHider.canWrite(context)
     val notifications = resumes >= 0 && NotificationManagerCompat.from(context).areNotificationsEnabled()
-    SettingsGroup(title = stringResource(R.string.section_needs)) {
-        InfoRow(
-            title = stringResource(R.string.label_adb_grant),
-            supporting = if (canWrite) {
-                stringResource(R.string.label_granted)
-            } else {
-                stringResource(R.string.bank_apps_needs_grant, GestureBarHider.GRANT_COMMAND)
-            },
-            // Home shows this screen only in the github build, so the Play build never sees it.
-            actions = if (canWrite) null else { { CopyGrantButton(TestTags.BANK_APPS_COPY) } },
-        )
-        InfoRow(
-            title = stringResource(R.string.label_usage_access),
-            supporting = stringResource(
-                if (model.usageAccess) R.string.label_usage_access_granted else R.string.bank_apps_needs_usage,
-            ),
-            trailing = if (model.usageAccess) {
-                null
-            } else {
-                {
-                    FilledTonalButton(onClick = { openUsageAccess(context) }) {
-                        Text(stringResource(R.string.action_grant_usage_access))
-                    }
-                }
-            },
-        )
-        InfoRow(
-            title = stringResource(R.string.label_notifications),
-            supporting = stringResource(
-                if (notifications) R.string.bank_apps_notifications_on else R.string.bank_apps_notifications_off,
-            ),
-            trailing = if (notifications) {
-                null
-            } else {
-                {
-                    FilledTonalButton(onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            context.startFirst(notificationSettings(context.packageName))
+    // Each need shows only while it is missing, and the card goes once all three are met.
+    if (!canWrite || !model.usageAccess || !notifications) {
+        SettingsGroup(title = stringResource(R.string.section_needs)) {
+            if (!canWrite) {
+                InfoRow(
+                    title = stringResource(R.string.label_adb_grant),
+                    supporting = stringResource(R.string.bank_apps_needs_grant, GestureBarHider.GRANT_COMMAND),
+                    // Home shows this screen only in the github build, so the Play build never sees it.
+                    actions = { CopyGrantButton(TestTags.BANK_APPS_COPY) },
+                )
+            }
+            if (!model.usageAccess) {
+                InfoRow(
+                    title = stringResource(R.string.label_usage_access),
+                    supporting = stringResource(R.string.bank_apps_needs_usage),
+                    trailing = {
+                        FilledTonalButton(onClick = { openUsageAccess(context) }) {
+                            Text(stringResource(R.string.action_grant_usage_access))
                         }
-                    }) { Text(stringResource(R.string.action_allow)) }
-                }
-            },
-        )
+                    },
+                )
+            }
+            if (!notifications) {
+                InfoRow(
+                    title = stringResource(R.string.label_notifications),
+                    supporting = stringResource(R.string.bank_apps_notifications_off),
+                    trailing = {
+                        FilledTonalButton(onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                context.startFirst(notificationSettings(context.packageName))
+                            }
+                        }) { Text(stringResource(R.string.action_allow)) }
+                    },
+                )
+            }
+        }
     }
     SettingsGroup(title = stringResource(R.string.section_bank_apps_picked)) {
         if (chosen.isEmpty()) FootNote(stringResource(R.string.bank_apps_empty))

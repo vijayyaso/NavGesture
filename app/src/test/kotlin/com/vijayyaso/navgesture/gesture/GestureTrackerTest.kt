@@ -520,6 +520,36 @@ class GestureTrackerTest {
     }
 
     @Test
+    fun `a left drag opens favourites`() {
+        val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
+        t.onDown(sample(540f, 2395f, 0L))
+        t.onMove(sample(540f, 2295f, 50L))
+        val drag = sample(340f, 2295f, 100L)
+        assertEquals(TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, drag, recents = false), t.onMove(drag))
+    }
+
+    @Test
+    fun `with the lists swapped a right drag opens favourites and a left drag recent apps`() {
+        val swapped = GestureConfiguration(swapAppLists = true)
+        val right = tracker(ScreenEdge.BOTTOM, configuration = swapped)
+        right.onDown(sample(540f, 2395f, 0L))
+        right.onMove(sample(540f, 2295f, 50L))
+        val dragRight = sample(740f, 2295f, 100L)
+        assertEquals(
+            TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, dragRight, recents = false),
+            right.onMove(dragRight),
+        )
+        val left = tracker(ScreenEdge.BOTTOM, configuration = swapped)
+        left.onDown(sample(540f, 2395f, 0L))
+        left.onMove(sample(540f, 2295f, 50L))
+        val dragLeft = sample(340f, 2295f, 100L)
+        assertEquals(
+            TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, dragLeft, recents = true),
+            left.onMove(dragLeft),
+        )
+    }
+
+    @Test
     fun `a sideways drag with the app list on opens the switcher`() {
         val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
         t.onDown(sample(540f, 2395f, 0L))

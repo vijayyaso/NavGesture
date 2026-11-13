@@ -513,10 +513,11 @@ internal fun ThresholdSlider(
     }
 }
 
+/** A feature's last failure, in its own card. Draws nothing while there is none. */
 @Composable
 internal fun LastProblem(failure: String?) {
-    ValueRow(
-        label = stringResource(R.string.label_last_problem),
-        value = failure ?: stringResource(R.string.diag_none),
-    )
+    if (failure == null) return
+    SettingsGroup {
+        ValueRow(label = stringResource(R.string.label_last_problem), value = failure)
+    }
 }
