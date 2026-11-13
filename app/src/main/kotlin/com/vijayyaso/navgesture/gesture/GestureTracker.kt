@@ -129,8 +129,6 @@ class GestureTracker(
         SwipeAction.Recents,
     )
 
-    private val holdAction: GestureAction.Run? = if (edge == ScreenEdge.BOTTOM) pauseRun else null
-
     private val longPressAction: GestureAction? =
         if (edge == ScreenEdge.BOTTOM && configuration.circleToSearchEnabled) {
             GestureAction.CircleToSearch
@@ -226,7 +224,7 @@ class GestureTracker(
 
         arm = Arm.Rising
         return TrackerAction.Armed(
-            scheduleHoldMs = if (holdAction != null) FRAME_MS else null,
+            scheduleHoldMs = if (edge == ScreenEdge.BOTTOM) FRAME_MS else null,
             pending = shortAction.action,
         )
     }
@@ -251,7 +249,7 @@ class GestureTracker(
                 )
             }
         }
-        if (holdAction == null) return followSide(origin, state, sample)
+        if (edge != ScreenEdge.BOTTOM) return followSide(origin, state, sample)
         // A primed or fired gesture owns the release.
         if (state != Arm.Rising) return TrackerAction.None
         return TrackerAction.None
@@ -278,7 +276,7 @@ class GestureTracker(
      * no MOVE at all and the tail still has to catch up with it.
      */
     fun onHoldElapsed(nowMs: Long): TrackerAction {
-        if (holdAction == null || arm != Arm.Rising) return TrackerAction.None
+        if (edge != ScreenEdge.BOTTOM || arm != Arm.Rising) return TrackerAction.None
         val origin = tracked ?: return TrackerAction.None
         val sample = latest ?: return TrackerAction.None
         advanceTail(nowMs)
@@ -319,8 +317,8 @@ class GestureTracker(
         if (state != null) {
             // The release point decides, so a swipe brought back to the edge in one batched
             // event reverts as surely as one that disarmed on the way.
-            if (holdAction == null && !isPastTrigger(origin, sample)) return TrackerAction.Reverted
-            if (holdAction != null && isPulledBack(origin, sample)) return TrackerAction.Reverted
+            if (edge != ScreenEdge.BOTTOM && !isPastTrigger(origin, sample)) return TrackerAction.Reverted
+            if (edge == ScreenEdge.BOTTOM && isPulledBack(origin, sample)) return TrackerAction.Reverted
             if (state == Arm.Primed) {
                 val flick = upwardDpPerMs(sample.timestampMs) > configuration.homeFlickDpPerMs
                 return TrackerAction.Fire(if (flick) shortAction else pauseRun, edge)

@@ -603,7 +603,10 @@ internal class EdgeTouchOverlay(
                     // The rise is live: from here a sideways drag opens the app list, so say so.
                     // With the list off nothing can open, and the gesture's own buzz is enough.
                     if (edge == ScreenEdge.BOTTOM && dragListEnabled) confirmTick()
-                    action.scheduleHoldMs?.let { postDelayed(holdRunnable, it) }
+                    action.scheduleHoldMs?.let {
+                        removeCallbacks(holdRunnable)
+                        postDelayed(holdRunnable, it)
+                    }
                 }
                 is TrackerAction.RearmHold -> {
                     removeCallbacks(holdRunnable)
@@ -619,7 +622,10 @@ internal class EdgeTouchOverlay(
                         onFire(stream, action.action)
                     }
                 }
-                is TrackerAction.Disarmed -> Log.d(TAG, "$edge disarmed, pulled back inside the trigger")
+                is TrackerAction.Disarmed -> {
+                    removeCallbacks(holdRunnable)
+                    Log.d(TAG, "$edge disarmed, pulled back inside the trigger")
+                }
                 // Consumed rather than replayed: the app never asked for this swipe.
                 is TrackerAction.Reverted -> Log.i(TAG, "GESTURE_REVERTED $edge")
                 is TrackerAction.Unused -> {
