@@ -17,19 +17,10 @@
 
 package com.vijayyaso.navgesture.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.service.RuntimeAccess
@@ -44,22 +35,18 @@ import com.vijayyaso.navgesture.service.RuntimeShortcuts
 internal fun RuntimeShortcutsHint(access: RuntimeAccess) {
     val context = LocalContext.current
     when (access) {
-        RuntimeAccess.NEEDS_GRANT -> {
-            var copied by remember { mutableStateOf(false) }
-            InfoRow(
-                title = stringResource(R.string.runtime_shortcuts_title),
-                supporting = stringResource(R.string.runtime_shortcuts_needs_grant, RuntimeShortcuts.GRANT_COMMANDS),
-                supportingTag = TestTags.RUNTIME_SHORTCUTS_HINT,
-                actions = {
-                    FilledTonalButton(
-                        onClick = { copied = copyCommands(context) },
-                        modifier = Modifier.testTag(TestTags.RUNTIME_SHORTCUTS_COPY),
-                    ) {
-                        Text(stringResource(if (copied) R.string.label_copied else R.string.action_copy_commands))
-                    }
-                },
-            )
-        }
+        RuntimeAccess.NEEDS_GRANT -> InfoRow(
+            title = stringResource(R.string.runtime_shortcuts_title),
+            supporting = stringResource(R.string.runtime_shortcuts_needs_grant, RuntimeShortcuts.GRANT_COMMANDS),
+            supportingTag = TestTags.RUNTIME_SHORTCUTS_HINT,
+            actions = {
+                CopyButton(
+                    text = RuntimeShortcuts.GRANT_COMMANDS,
+                    label = stringResource(R.string.action_copy_commands),
+                    tag = TestTags.RUNTIME_SHORTCUTS_COPY,
+                )
+            },
+        )
         RuntimeAccess.NEEDS_USAGE_ACCESS -> InfoRow(
             title = stringResource(R.string.runtime_shortcuts_title),
             supporting = stringResource(R.string.runtime_shortcuts_needs_usage),
@@ -73,8 +60,3 @@ internal fun RuntimeShortcutsHint(access: RuntimeAccess) {
         RuntimeAccess.NOT_IN_BUILD, RuntimeAccess.UNREADABLE, RuntimeAccess.READY -> Unit
     }
 }
-
-private fun copyCommands(context: Context): Boolean = runCatching {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return false
-    clipboard.setPrimaryClip(ClipData.newPlainText("adb", RuntimeShortcuts.GRANT_COMMANDS))
-}.isSuccess

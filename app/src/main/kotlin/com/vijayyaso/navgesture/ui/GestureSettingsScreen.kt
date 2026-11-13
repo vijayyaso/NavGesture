@@ -241,6 +241,7 @@ private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState
                 label = stringResource(R.string.label_hide_gesture_bar),
                 checked = false,
                 supporting = stringResource(R.string.hide_gesture_bar_needs_grant, GestureBarHider.GRANT_COMMAND),
+                actions = { CopyGrantButton() },
             ) {}
             BarState.STUCK_HIDDEN -> {
                 // It really is hidden, so the switch says on; only the phone's own screen can undo it.
@@ -265,10 +266,18 @@ private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState
                         ) {
                             Text(stringResource(R.string.action_open_navigation_settings))
                         }
+                        // Shown with the grant line above, so never in the Play build.
+                        if (!BuildConfig.IS_PLAY) CopyGrantButton()
                     },
                 )
             }
             BarState.NONE -> Unit
         }
     }
+}
+
+/** Copies the one-time computer command; the Play build never shows it (see barState). */
+@Composable
+internal fun CopyGrantButton(tag: String = TestTags.GESTURE_BAR_COPY) {
+    CopyButton(GestureBarHider.GRANT_COMMAND, stringResource(R.string.action_copy_command), tag)
 }

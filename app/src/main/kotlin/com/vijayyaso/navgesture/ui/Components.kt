@@ -18,6 +18,9 @@
 
 package com.vijayyaso.navgesture.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -59,6 +63,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -310,11 +315,21 @@ internal fun ToggleRow(
     checked: Boolean,
     supporting: String? = null,
     tag: String? = null,
+    actions: (@Composable () -> Unit)? = null,
     onChange: (Boolean) -> Unit,
 ) {
     ListItem(
         headlineContent = { Text(label) },
-        supportingContent = supporting?.let { { SupportingText(it) } },
+        supportingContent = if (supporting == null && actions == null) {
+            null
+        } else {
+            {
+                Column {
+                    supporting?.let { SupportingText(it) }
+                    actions?.let { RowActions(it) }
+                }
+            }
+        },
         trailingContent = {
             Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.tagged(tag))
         },
@@ -370,14 +385,7 @@ internal fun InfoRow(
                 Column {
                     under?.let { Box(Modifier.padding(vertical = 4.dp)) { it() } }
                     supporting?.let { SupportingText(it, Modifier.tagged(supportingTag)) }
-                    actions?.let {
-                        // Wraps onto a second line rather than squeezing a button at a large font.
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            itemVerticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 8.dp),
-                        ) { it() }
-                    }
+                    actions?.let { RowActions(it) }
                 }
             }
         },
@@ -385,6 +393,34 @@ internal fun InfoRow(
         colors = transparentItem,
     )
 }
+
+/** Buttons under a row's text. They wrap onto a second line rather than squeeze at a large font. */
+@Composable
+private fun RowActions(actions: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 8.dp),
+    ) { actions() }
+}
+
+/** Puts [text] on the clipboard, then reads "Copied" until the text changes. */
+@Composable
+internal fun CopyButton(text: String, label: String, tag: String? = null, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var copied by remember(text) { mutableStateOf(false) }
+    FilledTonalButton(
+        onClick = { copied = copyToClipboard(context, label, text) },
+        modifier = modifier.tagged(tag),
+    ) {
+        Text(if (copied) stringResource(R.string.label_copied) else label)
+    }
+}
+
+private fun copyToClipboard(context: Context, label: String, text: String): Boolean = runCatching {
+    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return false
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+}.isSuccess
 
 /** From this font scale on, side-by-side layouts stack: chips go under titles, tiles one per row. */
 internal const val STACKED_FONT_SCALE = 1.5f

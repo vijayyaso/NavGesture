@@ -345,6 +345,7 @@ The glyph table under Colours is the only list. Every glyph in it is in
 | Gesture settings Adjust | `OutlinedButton` full width | `FilledTonalButton` full width |
 | Updates install / allow installs | `FilledTonalButton` | `FilledTonalButton` |
 | Updates check now | `OutlinedButton` | `OutlinedButton` |
+| Copy buttons (added 2026-11-13): "Copy command" under the gesture-bar and Bank apps computer step, "Copy commands" in the corner picker | — | `FilledTonalButton` (`CopyButton` in `Components.kt`, the one copy); reads "Copied" once copied. Shown only where the command text shows, so never in the Play build |
 | Disclosure Agree / Not now | `Button` / `OutlinedButton` in a `FlowRow` | same types, full width, stacked |
 
 **Navigation rows without an icon:** the About source and license rows and

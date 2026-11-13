@@ -244,6 +244,9 @@
     <string name="gesture_bar_stuck_title">Bring the bar back yourself</string>
     <string name="gesture_bar_stuck_body">Open navigation settings, then pick buttons or show the gesture line again.</string>
     <string name="gesture_bar_stuck_grant">Or give the permission back from a computer:\n%1$s</string>
+    <!-- The copy button under a computer command, here and on Bank apps. -->
+    <string name="action_copy_command">Copy command</string>
+    <string name="label_copied">Copied</string>
     <string name="section_feedback">Feedback</string>
     <string name="label_haptics">Vibrate</string>
     <string name="value_dp">%1$d</string>

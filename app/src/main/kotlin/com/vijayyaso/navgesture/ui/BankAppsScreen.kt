@@ -98,6 +98,8 @@ internal fun BankAppsScreen(model: AppModel) {
             } else {
                 stringResource(R.string.bank_apps_needs_grant, GestureBarHider.GRANT_COMMAND)
             },
+            // Home shows this screen only in the github build, so the Play build never sees it.
+            actions = if (canWrite) null else { { CopyGrantButton(TestTags.BANK_APPS_COPY) } },
         )
         InfoRow(
             title = stringResource(R.string.label_usage_access),

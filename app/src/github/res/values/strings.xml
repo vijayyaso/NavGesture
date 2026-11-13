@@ -84,5 +84,4 @@
     <string name="runtime_shortcuts_needs_grant">Shortcuts that apps add while running, like GPay \"Scan any QR code\", show here after a one-time step. Turn on USB debugging (Security settings) in Developer options, then run from a computer:\n%1$s</string>
     <string name="runtime_shortcuts_needs_usage">Shortcuts that apps add while running also need Usage access for NavGesture.</string>
     <string name="action_copy_commands">Copy commands</string>
-    <string name="label_copied">Copied</string>
 </resources>

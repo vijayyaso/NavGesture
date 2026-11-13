@@ -396,7 +396,7 @@ else, and the fixed shortcuts work as before.
 | `play/…/service/RuntimeShortcuts.kt` | Same signatures; returns `NOT_IN_BUILD` and nothing. |
 | `github/…/ui/RuntimeShortcutsHint.kt` | The row at the top of the App shortcuts card while locked. |
 | `play/…/ui/RuntimeShortcutsHint.kt` | Draws nothing. |
-| `github/res/values/strings.xml` | The row's strings, and a github `corner_app_shortcuts_body` that drops "shortcuts the app adds while running cannot be shown". |
+| `github/res/values/strings.xml` | The row's strings, and a github `corner_app_shortcuts_body` that drops "shortcuts the app adds while running cannot be shown". (Since 2026-11-13 the button is the shared `CopyButton` in `Components.kt`, and `label_copied` lives in `main/res/values/strings.xml`.) |
 | `testGithub/…/service/ShortcutDumpTest.kt`, `testGithub/resources/shortcut-dump/` | Parser tests on five real dump samples. |
 | `e2e/app-shortcuts.sh`, `e2e/fixtures/shortcut-app/`, `e2e/run.sh`, `e2e/lib` | The suite, its test app, its entry in `all_suites`, and `string_res <name> [source set]`. |
 

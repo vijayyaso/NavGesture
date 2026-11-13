@@ -146,7 +146,7 @@ else
 fi
 if tap_id runtime_shortcuts_copy; then
   sleep 1
-  copied="$(string_res label_copied github)"
+  copied="$(string_res label_copied)"
   if ui_nodes | grep -q "text=\"${copied}\""; then pass "Copy commands copies"; else fail "Copy commands copies"; fi
 else
   fail "Copy commands copies (no button)"
