@@ -348,9 +348,10 @@ The glyph table under Colours is the only list. Every glyph in it is in
 | Copy buttons (added 2026-11-13): "Copy command" under the gesture-bar and Bank apps computer step, "Copy commands" in the corner picker | — | `FilledTonalButton` (`CopyButton` in `Components.kt`, the one copy); reads "Copied" once copied. Shown only where the command text shows, so never in the Play build |
 | Disclosure Agree / Not now | `Button` / `OutlinedButton` in a `FlowRow` | same types, full width, stacked |
 
-**Navigation rows without an icon:** the About source and license rows and
-the two corner-shortcut rows stay without icons (they are value rows inside
-their own screen). Only the rows in the glyph table get one.
+**Navigation rows without an icon:** the About source, license and Help and
+feedback rows and the two corner-shortcut rows stay without icons (they are
+value rows inside their own screen). Only the rows in the glyph table get
+one.
 
 Each screen keeps its rows, order and logic; its `SectionHeader` + rows runs
 become `SettingsGroup(title) { rows }`, and its standalone `FootNote`s become
@@ -410,6 +411,13 @@ group with no title is written as **(no title)**.
     standalone footnote (it sits after the button, so it is not a group
     footer).
 *   **About** — **(no title)**: version, website, source, license.
+    **Help and feedback** (added 2026-11-13, both builds): Report a bug
+    (`row_report_bug`, opens a new GitHub issue labelled bug), Request a
+    feature (`row_request_feature`, a new issue labelled enhancement), Email
+    the developer (`row_email_developer`, `ACTION_SENDTO` to the public
+    contact address with the subject "NavGesture <version> feedback"). Each
+    opens another app through `startFirst`, so a phone with no browser or
+    no email app gets no crash, the same as the source row.
     **Credits**: the two credit rows.
 *   **Updates** (github only) — **(no title)**: the update switch; *footer:
     switch body*. If on: **(no title)**: the status row with its buttons.

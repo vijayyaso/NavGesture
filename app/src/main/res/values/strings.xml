@@ -320,12 +320,23 @@
     <string name="value_source" translatable="false">GitHub</string>
     <string name="diag_license">License</string>
     <string name="value_license" translatable="false">GPL-3.0-or-later</string>
+    <string name="section_help_feedback">Help and feedback</string>
+    <string name="about_report_bug">Report a bug</string>
+    <string name="about_report_bug_body">Tell us what went wrong, on GitHub</string>
+    <string name="about_request_feature">Request a feature</string>
+    <string name="about_request_feature_body">Suggest an idea, on GitHub</string>
+    <string name="about_email">Email the developer</string>
+    <string name="about_email_body">Questions and feedback by email</string>
+    <string name="email_feedback_subject">NavGesture %1$s feedback</string>
     <string name="section_credits">Credits</string>
     <string name="credit_victor" translatable="false">Victor Eduardo</string>
     <string name="credit_victor_body">Circle to Search, Control Center tile</string>
     <string name="credit_cts" translatable="false">MiCTS, CTSLauncher</string>
     <string name="credit_cts_body">How Circle to Search is started</string>
     <string name="url_source" translatable="false">https://github.com/vijayyaso/NavGesture</string>
+    <string name="url_report_bug" translatable="false">https://github.com/vijayyaso/NavGesture/issues/new?labels=bug&amp;title=%5BBug%5D%20</string>
+    <string name="url_request_feature" translatable="false">https://github.com/vijayyaso/NavGesture/issues/new?labels=enhancement&amp;title=%5BFeature%5D%20</string>
+    <string name="value_email" translatable="false">vijayyaso7@gmail.com</string>
     <string name="url_license" translatable="false">https://github.com/vijayyaso/NavGesture/blob/main/LICENSE</string>
     <string name="switcher_loading">Loading apps…</string>
     <string name="switcher_no_recents">No recent apps. Allow usage access in NavGesture.</string>

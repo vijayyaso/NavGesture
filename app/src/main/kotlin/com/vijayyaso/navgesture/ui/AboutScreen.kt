@@ -18,10 +18,12 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
+import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 
 @Composable
@@ -46,6 +48,7 @@ internal fun AboutScreen(model: AppModel) {
             supporting = stringResource(R.string.value_license),
         ) { context.startFirst(Intent(Intent.ACTION_VIEW, licenseUrl.toUri())) }
     }
+    HelpGroup(model.diagnostics.appVersionName ?: BuildConfig.VERSION_NAME)
     SettingsGroup(title = stringResource(R.string.section_credits)) {
         InfoRow(
             title = stringResource(R.string.credit_victor),
@@ -57,3 +60,36 @@ internal fun AboutScreen(model: AppModel) {
         )
     }
 }
+
+/** Ways to reach the developer. Each opens another app; startFirst absorbs a phone without one. */
+@Composable
+private fun HelpGroup(version: String) {
+    val context = LocalContext.current
+    val bugUrl = stringResource(R.string.url_report_bug)
+    val featureUrl = stringResource(R.string.url_request_feature)
+    val address = stringResource(R.string.value_email)
+    val subject = stringResource(R.string.email_feedback_subject, version)
+    SettingsGroup(title = stringResource(R.string.section_help_feedback)) {
+        NavigationRow(
+            title = stringResource(R.string.about_report_bug),
+            supporting = stringResource(R.string.about_report_bug_body),
+            tag = TestTags.ROW_REPORT_BUG,
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, bugUrl.toUri())) }
+        NavigationRow(
+            title = stringResource(R.string.about_request_feature),
+            supporting = stringResource(R.string.about_request_feature_body),
+            tag = TestTags.ROW_REQUEST_FEATURE,
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, featureUrl.toUri())) }
+        NavigationRow(
+            title = stringResource(R.string.about_email),
+            supporting = stringResource(R.string.about_email_body),
+            tag = TestTags.ROW_EMAIL_DEVELOPER,
+        ) { context.startFirst(feedbackEmail(address, subject)) }
+    }
+}
+
+/** A new email with the address and subject filled in; SENDTO offers only email apps. */
+private fun feedbackEmail(address: String, subject: String): Intent =
+    Intent(Intent.ACTION_SENDTO, "mailto:$address?subject=${Uri.encode(subject)}".toUri())
+        .putExtra(Intent.EXTRA_EMAIL, arrayOf(address))
+        .putExtra(Intent.EXTRA_SUBJECT, subject)
