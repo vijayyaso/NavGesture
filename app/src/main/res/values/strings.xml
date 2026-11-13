@@ -225,7 +225,7 @@
     <string name="pair_and">%1$s and %2$s</string>
     <string name="swipe_warning_no_home">No swipe goes Home</string>
     <string name="swipe_warning_no_back">No swipe goes Back</string>
-    <string name="swipe_warning_way_out">To turn gestures off, use the NavGesture tile in Quick Settings.</string>
+    <string name="swipe_warning_way_out">To turn gestures off, use the NavGesture tile in Control Center.</string>
     <string name="label_landscape_confirm">Confirm in landscape</string>
     <string name="label_landscape_confirm_body">Swipe up twice to leave a landscape app</string>
     <string name="section_distance_and_timing">How far and how long</string>
