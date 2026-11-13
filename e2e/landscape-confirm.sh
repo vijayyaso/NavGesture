@@ -153,9 +153,11 @@ case "$(resumed_activity)" in
   *) fail "the app lost focus with neither swipe confirmed" ;;
 esac
 
-# A short rise, then a longer drag sideways: the app-list gesture, as in app-switch.sh.
+# A short rise, then a longer drag sideways: the app-list gesture, as in app-switch.sh. The rise
+# stays under the Recents line (10.4% of the short landscape height), or a slow emulator's gap
+# between the two moves would count as the pause that means Recents.
 L_DRAG_X=$((L_WIDTH / 2))
-L_DRAG_Y=$((L_BOTTOM_Y - 120))
+L_DRAG_Y=$((L_BOTTOM_Y - 60))
 L_DRAG="input motionevent DOWN ${L_DRAG_X} ${L_BOTTOM_Y} && input motionevent MOVE ${L_DRAG_X} ${L_DRAG_Y} && input motionevent MOVE $((L_DRAG_X + 320)) ${L_DRAG_Y} && sleep 0.3 && input motionevent UP $((L_DRAG_X + 320)) ${L_DRAG_Y}"
 
 echo >&2
