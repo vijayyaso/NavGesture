@@ -85,6 +85,8 @@ private fun HelpGroup(version: String) {
             supporting = stringResource(R.string.about_email_body),
             tag = TestTags.ROW_EMAIL_DEVELOPER,
         ) { context.startFirst(feedbackEmail(address, subject)) }
+        // github build only: Play forbids links to outside payment.
+        Store.SupportRow()
     }
 }
 

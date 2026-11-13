@@ -322,7 +322,8 @@ Legend: `[x]` = icon square, `(●)` = switch on, `(○)` = switch off.
 a composable function that returns the Updates tile spec (github) or `null`
 (play). The github version builds the spec from `UpdateViewModel` state with
 `updatesSummary(state)` and the `switch_update_check` toggle. This keeps the
-play build free of updater classes, as today.
+play build free of updater classes, as today. Since 2026-11-13 `Store` also
+has `SupportRow()`: the Buy me a coffee row (github) or nothing (play).
 
 ### Icons
 
@@ -417,7 +418,11 @@ group with no title is written as **(no title)**.
     the developer (`row_email_developer`, `ACTION_SENDTO` to the public
     contact address with the subject "NavGesture <version> feedback"). Each
     opens another app through `startFirst`, so a phone with no browser or
-    no email app gets no crash, the same as the source row.
+    no email app gets no crash, the same as the source row. Last in the
+    card, github build only: Buy me a coffee (`row_support`, "Support the
+    developer", opens buymeacoffee.com/vijayyaso), drawn by
+    `Store.SupportRow()`; the play `Store` draws nothing there, because
+    Google Play's payments policy forbids sending users to pay outside Play.
     **Credits**: the two credit rows.
 *   **Updates** (github only) — **(no title)**: the update switch; *footer:
     switch body*. If on: **(no title)**: the status row with its buttons.

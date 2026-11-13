@@ -19,7 +19,7 @@ package com.vijayyaso.navgesture.ui
 
 import androidx.compose.runtime.Composable
 
-/** The play build's updater hooks; the play build has no updater. */
+/** The play build's hooks: no updater and no support row, so each draws nothing. */
 internal object Store {
 
     /** The play build has no updater. */
@@ -33,4 +33,8 @@ internal object Store {
     /** The play build has no updater. */
     @Composable
     fun UpdatesScreen() {}
+
+    /** Google Play's payments policy forbids sending users to pay outside Play, so no row. */
+    @Composable
+    fun SupportRow() {}
 }

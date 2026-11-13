@@ -66,6 +66,12 @@
     <string name="update_declined">The update was cancelled in the system prompt, and this copy stays as it was.</string>
     <string name="update_installed">Update installed.</string>
 
+    <!-- About: a link to support the developer. Google Play forbids sending users to pay
+         outside Play, so only this build has the row. -->
+    <string name="support_title">Buy me a coffee</string>
+    <string name="support_body">Support the developer</string>
+    <string name="url_support" translatable="false">https://buymeacoffee.com/vijayyaso</string>
+
     <!-- The disclosure, github wording: only this build has bank pause. -->
     <string name="disclosure_reads_body">Only where and when you touch inside thin strips along the left, right and bottom edges of the screen. If you pick bank apps, it also learns when one of them opens, and which app is in front while a bank pause lasts (app names only).</string>
 

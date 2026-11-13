@@ -17,12 +17,15 @@
 
 package com.vijayyaso.navgesture.ui
 
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vijayyaso.navgesture.R
@@ -30,8 +33,8 @@ import com.vijayyaso.navgesture.ui.theme.IconTint
 import com.vijayyaso.navgesture.update.UpdateViewModel
 
 /**
- * The github build's updater hooks. The play copy of this file draws nothing and does nothing,
- * so the play dex has no updater class to strip.
+ * The github build's hooks: the updater and the support row. The play copy of this file draws
+ * nothing and does nothing, so the play dex has no updater class to strip.
  */
 internal object Store {
 
@@ -64,5 +67,17 @@ internal object Store {
     @Composable
     fun UpdatesScreen() {
         UpdatesScreenContent(viewModel())
+    }
+
+    /** The Buy me a coffee row in About's Help and feedback card; none in play. */
+    @Composable
+    fun SupportRow() {
+        val context = LocalContext.current
+        val url = stringResource(R.string.url_support)
+        NavigationRow(
+            title = stringResource(R.string.support_title),
+            supporting = stringResource(R.string.support_body),
+            tag = TestTags.ROW_SUPPORT,
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, url.toUri())) }
     }
 }
