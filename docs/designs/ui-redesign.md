@@ -400,7 +400,13 @@ group with no title is written as **(no title)**.
     **This device**: the device value rows. **Last problems**: the three
     value rows, then the recorded-failure block and the service-history
     block (title plus monospace text each) inside the same card. Then the
-    Refresh button below the cards, then the local-only text as a
+    Refresh button below the cards, then the **Copy diagnostics** button
+    (`diag_copy`, added 2026-11-13: the shared `CopyButton`, reads "Copied").
+    It copies plain text built by `diagnosticsReport` (unit tested): the app
+    name, the version and app build (github or play), every row of the two
+    cards as "label: value", then the two logs under their titles, cut at
+    the same 1200 characters as on screen. The cards and the report are
+    built from one list, so they always agree. Then the local-only text as a
     standalone footnote (it sits after the button, so it is not a group
     footer).
 *   **About** — **(no title)**: version, website, source, license.

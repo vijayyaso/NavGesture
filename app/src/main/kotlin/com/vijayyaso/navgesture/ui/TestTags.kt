@@ -43,6 +43,7 @@ internal object TestTags {
     const val SWITCH_LANDSCAPE_CONFIRM = "switch_landscape_confirm"
     const val USAGE_ACCESS = "usage_access"
     const val DIAG_CIRCLE_TO_SEARCH_FAILURE = "diag_circle_to_search_failure"
+    const val DIAG_COPY = "diag_copy"
     const val SCREEN_UPDATES = "screen_updates"
     const val STATUS_TURN_ON = "status_turn_on"
     const val STATUS_SWITCH = "status_switch"

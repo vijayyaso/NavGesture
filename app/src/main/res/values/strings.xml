@@ -244,7 +244,7 @@
     <string name="gesture_bar_stuck_title">Bring the bar back yourself</string>
     <string name="gesture_bar_stuck_body">Open navigation settings, then pick buttons or show the gesture line again.</string>
     <string name="gesture_bar_stuck_grant">Or give the permission back from a computer:\n%1$s</string>
-    <!-- The copy button under a computer command, here and on Bank apps. -->
+    <!-- The copy button under a computer command, here and on Bank apps; Copied also on Troubleshooting. -->
     <string name="action_copy_command">Copy command</string>
     <string name="label_copied">Copied</string>
     <string name="section_feedback">Feedback</string>
@@ -270,6 +270,8 @@
     <string name="section_this_device">This device</string>
     <string name="section_last_problems">Last problems</string>
     <string name="action_refresh_diagnostics">Refresh</string>
+    <string name="action_copy_diagnostics">Copy diagnostics</string>
+    <string name="diag_app_build">App build</string>
     <string name="diag_android_version">Android version</string>
     <string name="diag_device">Device</string>
     <string name="diag_hyperos">HyperOS / MIUI build</string>

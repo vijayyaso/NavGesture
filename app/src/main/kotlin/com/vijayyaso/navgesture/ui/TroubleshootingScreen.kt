@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.Diagnostics
 import com.vijayyaso.navgesture.navigation.GenericAndroidNavigationIntegration
@@ -64,30 +65,42 @@ internal fun TroubleshootingScreen(model: AppModel) {
         }
     }
 
+    // One list feeds both the cards and the copied report, so the two always agree.
+    val deviceRows = deviceRows(diagnostics)
+    val problemRows = problemRows(diagnostics)
+    val logs = listOfNotNull(
+        diagnostics.lastRecordedFailure?.let { failure ->
+            ShownRow(stringResource(R.string.diag_recorded_failure), failure.take(MAX_FAILURE_CHARS))
+        },
+        diagnostics.serviceHistory?.let { history ->
+            ShownRow(stringResource(R.string.diag_service_history), history.take(MAX_FAILURE_CHARS))
+        },
+    )
+
     SettingsGroup(title = stringResource(R.string.section_this_device)) {
-        DeviceRows(diagnostics)
+        deviceRows.forEach { ValueRow(it.label, it.value, it.tag) }
     }
 
     SettingsGroup(title = stringResource(R.string.section_last_problems)) {
-        val none = stringResource(R.string.diag_none)
-        ValueRow(stringResource(R.string.diag_last_failure), diagnostics.lastGlobalActionFailure ?: none)
-        ValueRow(stringResource(R.string.label_last_app_switch_failure), diagnostics.lastAppSwitchFailure ?: none)
-        ValueRow(
-            label = stringResource(R.string.diag_last_circle_to_search_failure),
-            value = diagnostics.lastCircleToSearchFailure ?: none,
-            valueTag = TestTags.DIAG_CIRCLE_TO_SEARCH_FAILURE,
-        )
-        diagnostics.lastRecordedFailure?.let { failure ->
-            LogBlock(stringResource(R.string.diag_recorded_failure), failure)
-        }
-        diagnostics.serviceHistory?.let { history ->
-            LogBlock(stringResource(R.string.diag_service_history), history)
-        }
+        problemRows.forEach { ValueRow(it.label, it.value, it.tag) }
+        logs.forEach { LogBlock(it.label, it.value) }
     }
 
     TextButton(onClick = model::refresh, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
         Text(stringResource(R.string.action_refresh_diagnostics))
     }
+    // The report starts with the version and build, which this screen does not show.
+    val unknown = stringResource(R.string.diag_unknown)
+    val build = listOf(
+        ShownRow(stringResource(R.string.about_version), diagnostics.appVersionName ?: unknown),
+        ShownRow(stringResource(R.string.diag_app_build), BuildConfig.FLAVOR),
+    )
+    CopyButton(
+        text = diagnosticsReport(stringResource(R.string.app_name), build + deviceRows + problemRows, logs),
+        label = stringResource(R.string.action_copy_diagnostics),
+        tag = TestTags.DIAG_COPY,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+    )
     FootNote(stringResource(R.string.diag_local_only), Modifier.padding(horizontal = 16.dp))
 }
 
@@ -97,7 +110,7 @@ private fun LogBlock(title: String, text: String) {
     Column(modifier = Modifier.padding(bottom = 12.dp)) {
         InfoRow(title = title)
         Text(
-            text = text.take(MAX_FAILURE_CHARS),
+            text = text,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -106,29 +119,45 @@ private fun LogBlock(title: String, text: String) {
 }
 
 @Composable
-private fun DeviceRows(diagnostics: Diagnostics) {
+private fun deviceRows(diagnostics: Diagnostics): List<ShownRow> {
     val none = stringResource(R.string.diag_none)
     val unknown = stringResource(R.string.diag_unknown)
     val yes = stringResource(R.string.value_yes)
     val no = stringResource(R.string.value_no)
     fun yesNo(value: Boolean) = if (value) yes else no
-    ValueRow(
-        stringResource(R.string.diag_android_version),
-        stringResource(R.string.value_android_version, diagnostics.androidRelease ?: unknown, diagnostics.sdkInt),
+    return listOf(
+        ShownRow(
+            stringResource(R.string.diag_android_version),
+            stringResource(R.string.value_android_version, diagnostics.androidRelease ?: unknown, diagnostics.sdkInt),
+        ),
+        ShownRow(
+            stringResource(R.string.diag_device),
+            listOfNotNull(diagnostics.manufacturer, diagnostics.model).joinToString(" ").ifBlank { unknown },
+        ),
+        ShownRow(stringResource(R.string.diag_hyperos), diagnostics.hyperOsVersion ?: diagnostics.miuiVersion ?: none),
+        ShownRow(
+            stringResource(R.string.diag_navigation_mode),
+            stringResource(navigationModeLabel(diagnostics.navigationMode)),
+        ),
+        ShownRow(stringResource(R.string.diag_service_enabled), yesNo(diagnostics.accessibilityServiceSwitchedOn)),
+        ShownRow(stringResource(R.string.diag_service_bound), yesNo(diagnostics.accessibilityServiceEnabled)),
+        ShownRow(stringResource(R.string.diag_service_running), yesNo(diagnostics.accessibilityServiceRunning)),
+        ShownRow(stringResource(R.string.diag_integration), integrationLabel(diagnostics.navigationIntegrationId)),
     )
-    ValueRow(
-        stringResource(R.string.diag_device),
-        listOfNotNull(diagnostics.manufacturer, diagnostics.model).joinToString(" ").ifBlank { unknown },
+}
+
+@Composable
+private fun problemRows(diagnostics: Diagnostics): List<ShownRow> {
+    val none = stringResource(R.string.diag_none)
+    return listOf(
+        ShownRow(stringResource(R.string.diag_last_failure), diagnostics.lastGlobalActionFailure ?: none),
+        ShownRow(stringResource(R.string.label_last_app_switch_failure), diagnostics.lastAppSwitchFailure ?: none),
+        ShownRow(
+            label = stringResource(R.string.diag_last_circle_to_search_failure),
+            value = diagnostics.lastCircleToSearchFailure ?: none,
+            tag = TestTags.DIAG_CIRCLE_TO_SEARCH_FAILURE,
+        ),
     )
-    ValueRow(stringResource(R.string.diag_hyperos), diagnostics.hyperOsVersion ?: diagnostics.miuiVersion ?: none)
-    ValueRow(
-        stringResource(R.string.diag_navigation_mode),
-        stringResource(navigationModeLabel(diagnostics.navigationMode)),
-    )
-    ValueRow(stringResource(R.string.diag_service_enabled), yesNo(diagnostics.accessibilityServiceSwitchedOn))
-    ValueRow(stringResource(R.string.diag_service_bound), yesNo(diagnostics.accessibilityServiceEnabled))
-    ValueRow(stringResource(R.string.diag_service_running), yesNo(diagnostics.accessibilityServiceRunning))
-    ValueRow(stringResource(R.string.diag_integration), integrationLabel(diagnostics.navigationIntegrationId))
 }
 
 private fun navigationModeLabel(mode: NavigationMode): Int = when (mode) {
