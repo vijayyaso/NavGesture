@@ -37,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -289,8 +291,12 @@ private fun EdgeBand(
         topEnd = if (edge == ScreenEdge.RIGHT) 12.dp else 4.dp,
         bottomEnd = if (edge == ScreenEdge.RIGHT) 12.dp else 4.dp,
     )
-    val fill = BAND_FILL.copy(alpha = if (dragging) 0.38f else 0.22f)
-    val stroke = BAND_STROKE.copy(alpha = if (dragging) 1f else 0.7f)
+    // Lights up fast under the finger and lets go slower.
+    val held = tween<Float>(if (dragging) PRESS_IN_MS else PRESS_OUT_MS, easing = EaseOutStrong)
+    val fillAlpha by animateFloatAsState(if (dragging) 0.38f else 0.22f, held, label = "band fill")
+    val strokeAlpha by animateFloatAsState(if (dragging) 1f else 0.7f, held, label = "band stroke")
+    val fill = BAND_FILL.copy(alpha = fillAlpha)
+    val stroke = BAND_STROKE.copy(alpha = strokeAlpha)
 
     Box(
         modifier = modifier

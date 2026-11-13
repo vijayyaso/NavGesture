@@ -237,6 +237,8 @@ internal data class HomeTile(
     val icon: GroupIcon,
     val tag: String,
     val toggle: TileToggle? = null,
+    // True for a tile that came in while this screen was open, so it grows in instead of popping.
+    val arriving: Boolean = false,
     val onOpen: () -> Unit,
 )
 

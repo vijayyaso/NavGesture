@@ -239,6 +239,15 @@ in 150 ms, expand 200 ms, fade out 100 ms, shrink 150 ms, screen change
 phone's animator duration scale, so "Remove animations" turns them off. No
 screen times anything with `delay()`.
 
+*   **Small state changes.** Four more places use the same curve, with
+    their numbers in `Motion.kt`. The Home status badge and icon change
+    colour over 200 ms (`TONE_MS`). The update download bar opens and
+    closes as a block, and its fill moves linearly over 200 ms between two
+    progress reports. The touch-area band lights up over 100 ms when a
+    drag starts and lets go over 200 ms. The Setup tile, when the setup
+    card folds away on the same visit, fades in and grows from 96% over
+    200 ms, starting 150 ms after the fold begins; on any later visit it is
+    simply there.
 *   **Back keeps its place.** A screen opened forward starts at its top.
     Back shows the screen underneath at the scroll it was left at. The back
     stack (`BackStack.kt`) is a list of entries; each holds its screen, an

@@ -71,6 +71,17 @@ internal fun screenChange(forward: Boolean, rtl: Boolean): ContentTransform {
  */
 internal val LocalScreenSettled = staticCompositionLocalOf<() -> Boolean> { { true } }
 
+/** A colour or tint that follows a state, such as the status badge going from amber to green. */
+internal const val TONE_MS = 200
+
+/** A held thing lights up fast and lets go slower. */
+internal const val PRESS_IN_MS = 100
+internal const val PRESS_OUT_MS = 200
+
+/** The Setup tile waits for the setup card above it to start folding, then grows in from this size. */
+internal const val TILE_ARRIVE_DELAY_MS = 150
+internal const val TILE_ARRIVE_SCALE = 0.96f
+
 /** A whole card leaving: slower than a block, as it moves more of the page. */
 internal const val CARD_FADE_OUT_MS = 150
 internal const val CARD_FOLD_MS = 250

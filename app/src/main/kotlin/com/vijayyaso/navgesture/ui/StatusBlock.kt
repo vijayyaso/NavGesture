@@ -18,6 +18,7 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -82,7 +83,9 @@ internal fun StatusBlock(
         ServiceStatus.STOPPED -> R.string.status_stopped_body
         ServiceStatus.WORKING -> workingBody(configuration)
     }
-    val (badge, glyph) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
+    val (badgeNow, glyphNow) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
+    val badge by animateColorAsState(badgeNow, tween(TONE_MS, easing = EaseOutStrong), label = "status badge")
+    val glyph by animateColorAsState(glyphNow, tween(TONE_MS, easing = EaseOutStrong), label = "status glyph")
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
