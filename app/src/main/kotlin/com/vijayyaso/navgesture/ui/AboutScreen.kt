@@ -36,8 +36,6 @@ internal fun AboutScreen(model: AppModel) {
             stringResource(R.string.about_version),
             model.diagnostics.appVersionName ?: stringResource(R.string.diag_unknown),
         )
-        // Plain text until the site is live, so there is nothing to open yet.
-        ValueRow(stringResource(R.string.about_website), stringResource(R.string.value_website))
         // A device with no browser throws ActivityNotFoundException, which startFirst absorbs.
         NavigationRow(
             title = stringResource(R.string.about_source),

@@ -314,8 +314,6 @@
     <string name="section_about">About</string>
     <string name="about_version">Version</string>
     <string name="about_version_summary">Version %1$s</string>
-    <string name="about_website">Website</string>
-    <string name="value_website" translatable="false">hypergesture.h3nc4.com</string>
     <string name="about_source">Source code</string>
     <string name="value_source" translatable="false">GitHub</string>
     <string name="diag_license">License</string>

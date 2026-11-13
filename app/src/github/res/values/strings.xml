@@ -69,7 +69,7 @@
     <!-- About: a link to support the developer. Google Play forbids sending users to pay
          outside Play, so only this build has the row. -->
     <string name="support_title">Buy me a coffee</string>
-    <string name="support_body">Support the developer</string>
+    <string name="support_body">If NavGesture helps you, you can support its developer.</string>
     <string name="url_support" translatable="false">https://buymeacoffee.com/vijayyaso</string>
 
     <!-- The disclosure, github wording: only this build has bank pause. -->

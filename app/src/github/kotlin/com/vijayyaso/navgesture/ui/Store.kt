@@ -18,13 +18,30 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Intent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,15 +86,45 @@ internal object Store {
         UpdatesScreenContent(viewModel())
     }
 
-    /** The Buy me a coffee row in About's Help and feedback card; none in play. */
+    /**
+     * The Buy me a coffee button under About's Help and feedback rows; none in play. It wears the
+     * service's own yellow and black in both themes, so it reads as that button at a glance.
+     */
     @Composable
     fun SupportRow() {
         val context = LocalContext.current
         val url = stringResource(R.string.url_support)
-        NavigationRow(
-            title = stringResource(R.string.support_title),
-            supporting = stringResource(R.string.support_body),
-            tag = TestTags.ROW_SUPPORT,
-        ) { context.startFirst(Intent(Intent.ACTION_VIEW, url.toUri())) }
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Button(
+                onClick = { context.startFirst(Intent(Intent.ACTION_VIEW, url.toUri())) },
+                colors = ButtonDefaults.buttonColors(containerColor = CoffeeYellow, contentColor = Color.Black),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .testTag(TestTags.ROW_SUPPORT),
+            ) {
+                Icon(painterResource(R.drawable.ic_coffee), contentDescription = null)
+                Text(
+                    text = stringResource(R.string.support_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
+            Text(
+                text = stringResource(R.string.support_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
+
+/** The yellow of Buy Me a Coffee's own button. */
+private val CoffeeYellow = Color(0xFFFFDD00)

@@ -323,7 +323,7 @@ a composable function that returns the Updates tile spec (github) or `null`
 (play). The github version builds the spec from `UpdateViewModel` state with
 `updatesSummary(state)` and the `switch_update_check` toggle. This keeps the
 play build free of updater classes, as today. Since 2026-11-13 `Store` also
-has `SupportRow()`: the Buy me a coffee row (github) or nothing (play).
+has `SupportRow()`: the Buy me a coffee button (github) or nothing (play).
 
 ### Icons
 
@@ -411,7 +411,9 @@ group with no title is written as **(no title)**.
     built from one list, so they always agree. Then the local-only text as a
     standalone footnote (it sits after the button, so it is not a group
     footer).
-*   **About** — **(no title)**: version, website, source, license.
+*   **About** — **(no title)**: version, source, license. (The website row
+    went on 2026-11-13: it named the upstream project's site, and this fork
+    has none.)
     **Help and feedback** (added 2026-11-13, both builds): Report a bug
     (`row_report_bug`, opens a new GitHub issue labelled bug), Request a
     feature (`row_request_feature`, a new issue labelled enhancement), Email
@@ -419,8 +421,10 @@ group with no title is written as **(no title)**.
     contact address with the subject "NavGesture <version> feedback"). Each
     opens another app through `startFirst`, so a phone with no browser or
     no email app gets no crash, the same as the source row. Last in the
-    card, github build only: Buy me a coffee (`row_support`, "Support the
-    developer", opens buymeacoffee.com/vijayyaso), drawn by
+    card, github build only: a full-width Buy me a coffee button
+    (`row_support`, yellow `#FFDD00` with black text and a cup icon in both
+    themes, a one-line caption under it, opens buymeacoffee.com/vijayyaso),
+    drawn by
     `Store.SupportRow()`; the play `Store` draws nothing there, because
     Google Play's payments policy forbids sending users to pay outside Play.
     **Credits**: the two credit rows.

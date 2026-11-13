@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A plain coffee cup with a handle and a saucer, drawn for the support button. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M4,5h13v2h1.5a3.5,3.5 0,0 1,0 7H17v0.5A3.5,3.5 0,0 1,13.5 18h-6A3.5,3.5 0,0 1,4 14.5zM17,9v3h1.5a1.5,1.5 0,0 0,0 -3zM3,20h16v2H3z" />
+</vector>
