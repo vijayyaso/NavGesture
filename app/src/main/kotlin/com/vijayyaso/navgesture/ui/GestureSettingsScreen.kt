@@ -39,13 +39,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.navigation.GestureBarHider.BarState
 import kotlin.math.roundToInt
 
 @Composable
-internal fun GestureSettingsScreen(model: AppModel) {
+internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner) -> Unit) {
     val configuration = model.configuration
     var adjustOpen by rememberSaveable { mutableStateOf(false) }
     SettingsGroup(title = stringResource(R.string.gestures_title)) {
@@ -117,6 +118,23 @@ internal fun GestureSettingsScreen(model: AppModel) {
             onCommit = { updated -> model.update { it.copy(edgeWidthDp = updated) } },
             onDismiss = { adjustOpen = false },
         )
+    }
+
+    // Here, not on App switching: a corner runs any action, even with the app list off.
+    SettingsGroup(
+        title = stringResource(R.string.section_corner_shortcuts),
+        footer = stringResource(R.string.corner_shortcuts_body),
+    ) {
+        CornerShortcutRow(
+            title = stringResource(R.string.label_left_corner),
+            shortcut = configuration.leftCornerShortcut,
+            tag = TestTags.ROW_LEFT_CORNER,
+        ) { onOpenCorner(BottomCorner.LEFT) }
+        CornerShortcutRow(
+            title = stringResource(R.string.label_right_corner),
+            shortcut = configuration.rightCornerShortcut,
+            tag = TestTags.ROW_RIGHT_CORNER,
+        ) { onOpenCorner(BottomCorner.RIGHT) }
     }
 
     SettingsGroup(title = stringResource(R.string.section_distance_and_timing)) {

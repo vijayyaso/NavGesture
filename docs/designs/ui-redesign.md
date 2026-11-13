@@ -365,9 +365,7 @@ group with no title is written as **(no title)**.
     steps; *footer: setup footer (HyperOS or generic text)*.
 *   **App switching** — **(no title)**: app-list switch, Favourite apps row.
     **List style**: the three style radio rows, drag step slider, adaptive
-    speed switch. **Corner shortcuts**: left corner row, right corner row;
-    *footer: corner shortcuts body* (moved from above the rows to below).
-    **Needs**: usage access row; *footer: usage access explainer*.
+    speed switch. **Needs**: usage access row; *footer: usage access explainer*.
     **Gestures it adds**: switch-apps info row, last problem row.
 *   **Favourite apps** — **Favourites**: picked apps with move/remove buttons,
     or the empty text inside the card. **All apps**: the checklist.
@@ -379,7 +377,10 @@ group with no title is written as **(no title)**.
     assistant row, last problem row.
 *   **Gesture settings** — **Gestures**: cheat-sheet rows. **Edges**: one
     block (edge width value, its body text, the Adjust button, the hint
-    text), left back switch, right back switch, landscape-confirm switch. **Distance and
+    text), left back switch, right back switch, landscape-confirm switch.
+    **Corner shortcuts**: left corner row, right corner row; *footer: corner
+    shortcuts body*. (Moved here from App switching on 2026-11-13: a corner
+    runs any action and works with the app list off.) **Distance and
     timing**: the four sliders. **Gesture bar**: hide switch, shown under
     the same condition as today (`isHyperOsDevice() && (canHide ||
     !IS_PLAY)`).

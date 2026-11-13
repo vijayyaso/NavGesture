@@ -99,7 +99,7 @@ internal fun AppListStyleChoice(selected: AppListStyle, onChange: (AppListStyle)
     }
 }
 
-/** A corner's row on App switching: shows its shortcut and opens the picker page. */
+/** A corner's row on Gesture settings: shows its shortcut and opens the picker page. */
 @Composable
 internal fun CornerShortcutRow(
     title: String,

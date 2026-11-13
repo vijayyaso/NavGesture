@@ -8,7 +8,8 @@
 
 ## Overview
 
-Two changes to the corner shortcuts on the App switching screen:
+Two changes to the corner shortcuts, whose rows were then on the App
+switching screen (since 2026-11-13 they are on Gesture settings):
 
 1.  The pop-up dialog that picks a corner's shortcut is replaced by a full
     page in the grouped-card look of [ui-redesign.md](ui-redesign.md).
@@ -101,7 +102,8 @@ Two changes to the corner shortcuts on the App switching screen:
 *   Every fixed shortcut that passes the export check can be picked and run
     from a corner.
 *   A stored app shortcut that disappears (app removed, app update dropped
-    it) shows as "App shortcut not found" on the App switching screen. On
+    it) shows as "App shortcut not found" on the corner's row (Gesture
+    settings). On
     the corner it does nothing and sets the corner's last failure (shown on
     Troubleshooting). Every read and launch error is caught, so the service
     does not crash.
@@ -196,8 +198,10 @@ shortcut not found"`, return false. Then `launch`: false →
 Two new `Screen` entries, `LEFT_CORNER` and `RIGHT_CORNER`, titled with the
 existing `label_left_corner` / `label_right_corner`.
 
-*   `AppSwitchingScreen(model, onOpenFavourites, onOpenCorner:
-    (BottomCorner) -> Unit)`; `MainActivity` pushes the matching screen.
+*   `GestureSettingsScreen(model, onOpenCorner: (BottomCorner) -> Unit)`;
+    `MainActivity` pushes the matching screen. (Built on
+    `AppSwitchingScreen`; the corner rows moved to Gesture settings on
+    2026-11-13.)
 *   `CornerShortcutRow` (already a `NavigationRow`, tags `row_left_corner` /
     `row_right_corner` kept) takes `onOpen` instead of `onChange`; the
     dialog code is deleted. `AppListStyleChoice` in the same file stays.
@@ -407,7 +411,7 @@ else, and the fixed shortcuts work as before.
     whole dump (35 KB) took 0.025 s through `adb shell` on the emulator; the
     in-app time was not measured. On time-out the process is destroyed and
     the lookup finds nothing.
-*   **App switching row:** `shortcutLabel` also calls `find` (on
+*   **Corner row (Gesture settings):** `shortcutLabel` also calls `find` (on
     `Dispatchers.IO`), so a stored run-time shortcut costs a one-package
     dump each time that row is shown, and reads "App shortcut not found"
     while the grants are missing.
@@ -500,7 +504,7 @@ lines, from the API 36 emulator with the test app installed:
     the options under "Not chosen in this change".
 *   **Failures look alike.** A missing grant, a refusal, a time-out and a
     format change all end as "shortcut not found" on the corner and "App
-    shortcut not found" on App switching, the same as a removed app. Only
+    shortcut not found" on the corner's row, the same as a removed app. Only
     the picker's hint row tells a missing grant apart.
 *   **Types are guessed.** A String extra that looks like a number or
     `true` is sent as an Int or Boolean; the target then typically reads its

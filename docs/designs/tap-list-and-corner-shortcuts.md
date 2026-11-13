@@ -283,10 +283,14 @@ global settings `navgesture_app_list_style`, `navgesture_left_corner` and
 `navgesture_right_corner`, for the e2e suite.
 
 The **App switching** screen gains a "List style" section (three radio rows,
-tags `list_style_drag|tap|both`), the "Drag step" `ThresholdSlider`, and a
-"Corner shortcuts" section with one `NavigationRow` per corner (tags
-`row_left_corner`, `row_right_corner`) that opens a dialog of choices; "Open
-an app…" lists apps from `rememberLaunchableApps`.
+tags `list_style_drag|tap|both`) and the "Drag step" `ThresholdSlider`. The
+**Gesture settings** screen holds a "Corner shortcuts" section with one
+`NavigationRow` per corner (tags `row_left_corner`, `row_right_corner`) that
+opens the corner's picker page (see
+[corner-picker-and-app-shortcuts.md](corner-picker-and-app-shortcuts.md));
+"Open an app" lists apps from `rememberLaunchableApps`. The section first
+sat on App switching and moved on 2026-11-13, because a corner runs any
+action and works with the app list off.
 
 ## Alternatives considered
 

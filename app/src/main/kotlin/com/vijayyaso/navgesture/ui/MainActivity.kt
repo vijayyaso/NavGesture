@@ -191,6 +191,15 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                     Screen.APP_SWITCHING -> AppSwitchingScreen(
                         model = model,
                         onOpenFavourites = { stack = stack.opening(Screen.FAVOURITE_APPS) },
+                    )
+                    Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = back)
+                    Screen.RIGHT_CORNER -> CornerPickerScreen(BottomCorner.RIGHT, model, onDone = back)
+                    Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
+                    Screen.BANK_APPS -> BankAppsScreen(model)
+                    Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)
+                    Screen.UPDATES -> Store.UpdatesScreen()
+                    Screen.GESTURE_SETTINGS -> GestureSettingsScreen(
+                        model = model,
                         onOpenCorner = { corner ->
                             stack = stack.opening(
                                 when (corner) {
@@ -200,13 +209,6 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                             )
                         },
                     )
-                    Screen.LEFT_CORNER -> CornerPickerScreen(BottomCorner.LEFT, model, onDone = back)
-                    Screen.RIGHT_CORNER -> CornerPickerScreen(BottomCorner.RIGHT, model, onDone = back)
-                    Screen.FAVOURITE_APPS -> FavouriteAppsScreen()
-                    Screen.BANK_APPS -> BankAppsScreen(model)
-                    Screen.CIRCLE_TO_SEARCH -> CircleToSearchScreen(model)
-                    Screen.UPDATES -> Store.UpdatesScreen()
-                    Screen.GESTURE_SETTINGS -> GestureSettingsScreen(model)
                     Screen.TROUBLESHOOTING -> TroubleshootingScreen(model)
                     Screen.ABOUT -> AboutScreen(model)
                     // Back and Not now are the same: nothing is recorded.

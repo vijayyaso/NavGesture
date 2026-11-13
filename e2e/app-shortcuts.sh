@@ -82,12 +82,13 @@ left_corner() {
   if enable_service; then pass "rebound with the left corner on $1"; else fail "rebound with the left corner on $1"; fi
 }
 
-# open_left_picker - App switching, then the left corner's picker page. Twice if need be: just
+# open_left_picker - Gesture settings, then the left corner's picker page. Twice if need be: just
 # after a rebind the app can still be starting, and the first taps land on nothing.
+# Its own counter: open_screen resets open_try, which would make this loop run for ever.
 open_left_picker() {
-  open_try=1
-  while [ "${open_try}" -le 2 ]; do
-    open_screen row_app_switching
+  picker_try=1
+  while [ "${picker_try}" -le 2 ]; do
+    open_screen row_gesture_settings
     if tap_id row_left_corner; then
       sleep 3
       title="$(string_res corner_section_app_shortcuts)"
@@ -95,7 +96,7 @@ open_left_picker() {
         return 0
       fi
     fi
-    open_try=$((open_try + 1))
+    picker_try=$((picker_try + 1))
   done
   return 1
 }
@@ -204,7 +205,8 @@ else
 fi
 if tap_id "corner_shortcut_${FIX}/qr_scanner"; then pass "Scan QR can be picked"; else fail "Scan QR can be picked"; fi
 sleep 2
-# The page closes on a pick; the corner rows sit low on App switching, so scroll to them.
+# The page closes on a pick; the corner rows sit below the touch area on Gesture settings, so
+# scroll to them.
 find_id row_left_corner >/dev/null 2>&1 || true
 if ui_nodes | grep -q "text=\"${FIX_LABEL}: Scan QR\""; then
   pass "the corner row shows the picked shortcut"
