@@ -138,11 +138,14 @@ object ServiceKeeper {
      */
     fun turnOff(context: Context, from: String): Boolean {
         markWanted(context, wanted = false)
-        if (NavGestureAccessibilityService.turnOff(from)) return true
+        // Cleared here, not only by the service: a pause that is starting can take the service
+        // down before its own switch-off runs, and the watcher would then turn it back on.
+        BankPause.consumeGoingAway(context)
         if (BankPause.paused(context) != null) {
             BankPause.clearPause(context)
             BankPause.stopWatcher(context)
         }
+        if (NavGestureAccessibilityService.turnOff(from)) return true
         if (!DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)) return true
         if (!GestureBarHider.canWrite(context)) return false
         val done = runCatching {
@@ -157,7 +160,11 @@ object ServiceKeeper {
                 withServiceUnlisted(current, entry),
             )
         }.onFailure { Log.w(TAG, "Could not switch the service off", it) }.getOrDefault(false)
-        if (done) ServiceLog.add(context, "$from: taken off the Accessibility list")
+        if (done) {
+            ServiceLog.add(context, "$from: taken off the Accessibility list")
+            // No service is left to show a bar it hid, so it is shown from here.
+            GestureBarHider.restoreIfStopped(context, serviceRunning = false, switchedOn = false)
+        }
         return done
     }
 

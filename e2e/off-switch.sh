@@ -85,6 +85,9 @@ echo "== a tap on the tile turns a running service off ==" >&2
 enable_service || true
 # shellcheck disable=SC2310 # reported here
 if service_bound; then pass "the service is back on"; else fail "the service is back on"; fi
+# The app is left behind first, so a tap that opened it would show.
+"${ADB_BIN}" shell input keyevent KEYCODE_HOME >/dev/null
+sleep 1
 # click-tile reaches only a tile that is in the panel, and SystemUI's copy can go stale.
 "${ADB_BIN}" shell cmd statusbar remove-tile "${TILE}" >/dev/null 2>&1 || true
 sleep 1

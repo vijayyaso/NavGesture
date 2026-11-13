@@ -210,7 +210,9 @@ the hold and pauses.
     state, the pause is cleared, the service is switched back on and the
     watcher stops, so no pause is left without something to end it.
 *   A switch-off by the user (tile or Home switch, `ServiceKeeper.turnOff`)
-    clears a pause that is starting and stops its watcher.
+    clears a pause that is starting and stops its watcher, and the service
+    starts no new pause while it is switching off. The tile's Resume now
+    applies only while the tile shows off.
 *   The tile's tap during a live pause calls `BankPause.resumeNow` instead of
     `ServiceKeeper.turnOn`.
 *   `onServiceConnected`, when a pause is saved, clears it (not the hold) and

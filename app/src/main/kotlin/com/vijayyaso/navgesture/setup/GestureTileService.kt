@@ -87,14 +87,16 @@ class GestureTileService : TileService() {
     }
 
     private fun act(disclosureAccepted: Boolean) {
+        val serviceEnabled = currentFace().target == TileTarget.APP
         // During a bank pause the tap is Resume now, not a plain turn-on that the pause's own
-        // watcher would not know about.
-        if (BankPause.resumeNow(this)) {
+        // watcher would not know about. A tile still showing on is a pause just starting, where
+        // the tap means off.
+        if (!serviceEnabled && BankPause.resumeNow(this)) {
             refresh()
             return
         }
         val tap = tileTap(
-            serviceEnabled = currentFace().target == TileTarget.APP,
+            serviceEnabled = serviceEnabled,
             disclosureAccepted = disclosureAccepted,
             canTurnOn = ServiceKeeper.canTurnOn(this) &&
                 !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this),

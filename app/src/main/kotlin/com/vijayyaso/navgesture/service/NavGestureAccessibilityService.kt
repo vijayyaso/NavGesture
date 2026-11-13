@@ -95,6 +95,9 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     private var favourites: List<String> = emptyList()
     private var bankApps: Set<String> = emptySet()
     private var pausing = false
+    /** True from the user's switch-off request until the service is gone or the request fails. */
+    @Volatile
+    private var switchingOff = false
     private var skipLogged = false
 
     /**
@@ -121,6 +124,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         ServiceLog.add(this, "service started")
         ServiceKeeper.markWanted(this, wanted = true)
         pausing = false
+        switchingOff = false
         endBankPause()
         try {
             setUp()
@@ -226,7 +230,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
      * undoes the pause, so the user never ends up with neither gestures nor the bar.
      */
     private fun pauseFor(packageName: String) {
-        if (pausing) return
+        if (pausing || switchingOff) return
         if (!BankPause.canPause(this)) {
             if (!skipLogged) {
                 skipLogged = true
@@ -299,6 +303,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     private fun switchOffByUser(from: String) {
         if (instance == null) return
         ServiceLog.add(this, "$from: switching off")
+        switchingOff = true
         pausing = false
         BankPause.consumeGoingAway(this)
         if (BankPause.paused(this) != null) {
@@ -321,6 +326,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
         if (attempt >= DISABLE_CHECKS) {
             ServiceLog.add(this, "switch-off refused: the system kept the service on")
+            switchingOff = false
             ServiceKeeper.markWanted(this, wanted = true)
             gestureBar?.apply(configuration.hideGestureBar)
             return
@@ -511,6 +517,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         /** Asks the running service to switch itself off for the user. False when none runs. */
         fun turnOff(from: String): Boolean {
             val service = instance ?: return false
+            // Set at once, so a bank app opening before the post runs starts no new pause.
+            service.switchingOff = true
             service.handler.post { service.switchOffByUser(from) }
             return true
         }

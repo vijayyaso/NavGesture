@@ -23,6 +23,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.os.Handler
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.edit
@@ -56,14 +57,30 @@ class GestureBarHider(private val context: Context, private val handler: Handler
 
     private val observer = object : ContentObserver(handler) {
         override fun onChange(selfChange: Boolean) {
-            if (wanted && !isKept(context)) {
-                Log.i(TAG, "GESTURE_BAR_RESET by the system, hiding it again")
-                write(hidden = true)
+            if (!wanted || isKept(context)) return
+            // A system that keeps writing its own value back would otherwise fight this forever.
+            val now = SystemClock.uptimeMillis()
+            if (now - burstStartMs > BURST_MS) {
+                burstStartMs = now
+                burstWrites = 0
             }
+            if (burstWrites >= BURST_LIMIT) {
+                if (burstWrites == BURST_LIMIT) {
+                    burstWrites++
+                    Log.w(TAG, "GESTURE_BAR_RESET too often, leaving it to the system for now")
+                    ServiceLog.add(context, "the system keeps resetting the gesture bar; not hiding it again for now")
+                }
+                return
+            }
+            burstWrites++
+            Log.i(TAG, "GESTURE_BAR_RESET by the system, hiding it again")
+            write(hidden = true)
         }
     }
 
     private var observing = false
+    private var burstStartMs = 0L
+    private var burstWrites = 0
 
     fun canWrite(): Boolean = canWrite(context)
 
@@ -269,6 +286,9 @@ class GestureBarHider(private val context: Context, private val handler: Handler
         private const val KEY_HIDDEN_BY_US = "hidden_by_us"
         private const val FORCE_FSG = "force_fsg_nav_bar"
         private const val HIDE_LINE = "hide_gesture_line"
+        /** At most this many re-hides in one window; a real reset needs one. */
+        private const val BURST_LIMIT = 5
+        private const val BURST_MS = 10_000L
         private const val KEY_MODE_BEFORE = "navigation_mode_before"
         private const val NAV_MODE = "navigation_mode"
         internal const val MODE_GESTURAL = 2
