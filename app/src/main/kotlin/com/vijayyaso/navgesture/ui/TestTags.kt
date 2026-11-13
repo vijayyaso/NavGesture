@@ -43,6 +43,7 @@ internal object TestTags {
     const val DIAG_CIRCLE_TO_SEARCH_FAILURE = "diag_circle_to_search_failure"
     const val SCREEN_UPDATES = "screen_updates"
     const val STATUS_TURN_ON = "status_turn_on"
+    const val STATUS_SWITCH = "status_switch"
     const val STATUS_BAR_STUCK = "status_bar_stuck"
     const val STATUS_OPEN_NAVIGATION = "status_open_navigation"
     const val GESTURE_BAR_STUCK = "gesture_bar_stuck"

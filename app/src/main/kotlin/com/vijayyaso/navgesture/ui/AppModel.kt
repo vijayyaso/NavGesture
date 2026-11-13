@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.diagnostics.Diagnostics
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
+import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.navigation.EnableRequestOutcome
@@ -41,12 +42,15 @@ import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 import com.vijayyaso.navgesture.navigation.NavigationMode
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.settings.GestureSettingsRepository
+import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.setup.SetupChecklist
 import com.vijayyaso.navgesture.setup.SetupFacts
 import com.vijayyaso.navgesture.setup.SetupFlag
 import com.vijayyaso.navgesture.setup.SetupRecord
 import com.vijayyaso.navgesture.setup.SetupStateRepository
+import com.vijayyaso.navgesture.setup.TileTap
 import com.vijayyaso.navgesture.setup.setupState
+import com.vijayyaso.navgesture.setup.tileTap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -138,6 +142,29 @@ internal class AppModel(
     fun requestAccessibility(context: Context) =
         openAccessibilityOrDisclosure(context, record.disclosureAccepted) { disclosureRequested = true }
 
+    /**
+     * The Home switch. Off is at once, for an app that refuses to work while the gestures run.
+     * On follows the tile's rules: one tap with the adb grant, else the Accessibility screen.
+     */
+    fun switchService(context: Context, on: Boolean) {
+        if (!on) {
+            scope.launch {
+                withContext(Dispatchers.IO) { ServiceKeeper.turnOff(this@AppModel.context, "Home switch") }
+                delay(SWITCH_SETTLE_MS)
+                refresh()
+            }
+            return
+        }
+        val canTurnOn = ServiceKeeper.canTurnOn(context) &&
+            !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)
+        val tap = tileTap(serviceEnabled = false, record.disclosureAccepted, canTurnOn)
+        if (tap == TileTap.TURN_ON && ServiceKeeper.turnOn(context)) {
+            scope.launch(Dispatchers.IO) { ServiceLog.add(this@AppModel.context, "Home switch: turned on") }
+        } else {
+            requestAccessibility(context)
+        }
+    }
+
     fun acceptDisclosure() = setFlag(SetupFlag.DISCLOSURE_ACCEPTED, true)
 
     fun setFlag(flag: SetupFlag, value: Boolean) {
@@ -167,6 +194,9 @@ internal class AppModel(
 }
 
 private const val STOP_GRACE_MS = 3_000L
+
+/** The service takes itself down about half a second after a switch-off. */
+private const val SWITCH_SETTLE_MS = 800L
 
 @Composable
 internal fun rememberAppModel(): AppModel {

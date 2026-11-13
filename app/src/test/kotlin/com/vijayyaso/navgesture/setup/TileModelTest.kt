@@ -95,9 +95,9 @@ class TileModelTest {
     }
 
     @Test
-    fun `a running service always opens the app`() {
+    fun `a tap on a running service always turns it off`() {
         for (accepted in listOf(true, false)) for (canTurnOn in listOf(true, false)) {
-            assertEquals(TileTap.OPEN_APP, tileTap(serviceEnabled = true, disclosureAccepted = accepted, canTurnOn = canTurnOn))
+            assertEquals(TileTap.TURN_OFF, tileTap(serviceEnabled = true, disclosureAccepted = accepted, canTurnOn = canTurnOn))
         }
     }
 

@@ -40,6 +40,7 @@
     <string name="status_working_body_right">Back from the right side, Home and Recents from the bottom.</string>
     <string name="status_working_body_bottom">Home and Recents from the bottom.</string>
     <string name="action_turn_on">Turn on</string>
+    <string name="status_switch">Gestures on or off</string>
     <string name="action_fix">Fix</string>
 
     <!-- Setup checklist. -->

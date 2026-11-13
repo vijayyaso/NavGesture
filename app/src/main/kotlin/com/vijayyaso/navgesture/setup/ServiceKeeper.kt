@@ -27,6 +27,7 @@ import com.vijayyaso.navgesture.bankpause.BankPause
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
 import com.vijayyaso.navgesture.diagnostics.withServiceListed
+import com.vijayyaso.navgesture.diagnostics.withServiceUnlisted
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 
@@ -124,6 +125,37 @@ object ServiceKeeper {
                 withServiceListed(current, entry),
             ) && Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
         }.onFailure { Log.w(TAG, "Could not switch the service on", it) }.getOrDefault(false)
+    }
+
+    /**
+     * The user's own switch-off, from the Home switch or the tile. It clears "wanted" first, so
+     * neither boot, the tile nor the app opening turns the service back on. A running service
+     * switches itself off, which needs no permission. One that is listed but not running can only
+     * be taken off the list with the adb grant. False when the switch could not be changed.
+     */
+    fun turnOff(context: Context, from: String): Boolean {
+        markWanted(context, wanted = false)
+        if (NavGestureAccessibilityService.turnOff(from)) return true
+        if (BankPause.paused(context) != null) {
+            BankPause.clearPause(context)
+            BankPause.stopWatcher(context)
+        }
+        if (!DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)) return true
+        if (!GestureBarHider.canWrite(context)) return false
+        val done = runCatching {
+            val resolver = context.contentResolver
+            val entry = ComponentName(context, NavGestureAccessibilityService::class.java)
+                .flattenToString()
+            val current =
+                Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            Settings.Secure.putString(
+                resolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                withServiceUnlisted(current, entry),
+            )
+        }.onFailure { Log.w(TAG, "Could not switch the service off", it) }.getOrDefault(false)
+        if (done) ServiceLog.add(context, "$from: taken off the Accessibility list")
+        return done
     }
 
     private fun prefs(context: Context) =

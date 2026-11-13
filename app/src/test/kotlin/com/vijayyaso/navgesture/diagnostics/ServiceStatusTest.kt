@@ -74,4 +74,13 @@ class ServiceStatusTest {
     private companion object {
         const val PKG = "com.vijayyaso.navgesture"
     }
+
+    @Test
+    fun `taking the service off the list keeps every other service`() {
+        val entry = "com.vijayyaso.navgesture/com.vijayyaso.navgesture.service.NavGestureAccessibilityService"
+        assertEquals("a/.B:c/.D", withServiceUnlisted("a/.B:$entry:c/.D", entry))
+        assertEquals("a/.B", withServiceUnlisted("a/.B", entry))
+        assertEquals("", withServiceUnlisted(entry, entry))
+        assertEquals("", withServiceUnlisted(null, entry))
+    }
 }

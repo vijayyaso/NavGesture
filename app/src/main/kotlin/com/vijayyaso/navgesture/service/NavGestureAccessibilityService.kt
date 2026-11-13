@@ -258,7 +258,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
      * is gone the service takes down its own windows and state rather than wait for it.
      */
     private fun confirmPause(attempt: Int) {
-        if (instance == null) return
+        // A switch-off by the user in the middle of a pause ends the pause's own checks.
+        if (instance == null || !pausing) return
         if (!DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this)) {
             ServiceLog.add(this, "service paused for a bank app")
             teardown()
@@ -288,6 +289,43 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         BankPause.clearPause(this)
         BankPause.stopWatcher(this)
         ServiceLog.add(this, "bank pause over, gestures back")
+    }
+
+    /**
+     * The user's own switch-off, from the Home switch or the tile. [ServiceKeeper.turnOff] has
+     * cleared "wanted" already, so no heal turns the service back on. A bar this app hid comes
+     * back before the gestures go.
+     */
+    private fun switchOffByUser(from: String) {
+        if (instance == null) return
+        ServiceLog.add(this, "$from: switching off")
+        pausing = false
+        BankPause.consumeGoingAway(this)
+        if (BankPause.paused(this) != null) {
+            BankPause.clearPause(this)
+            BankPause.stopWatcher(this)
+        }
+        gestureBar?.restoreForShutdown()
+        disableSelf()
+        confirmOff(attempt = 1)
+    }
+
+    /** As [confirmPause]: the enabled list decides, since onUnbind may never come. */
+    private fun confirmOff(attempt: Int) {
+        if (instance == null) return
+        if (!DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this)) {
+            ServiceLog.add(this, "service switched off")
+            teardown()
+            GestureTileService.requestRefresh(this)
+            return
+        }
+        if (attempt >= DISABLE_CHECKS) {
+            ServiceLog.add(this, "switch-off refused: the system kept the service on")
+            ServiceKeeper.markWanted(this, wanted = true)
+            gestureBar?.apply(configuration.hideGestureBar)
+            return
+        }
+        handler.postDelayed({ confirmOff(attempt + 1) }, DISABLE_CHECK_MS)
     }
 
     override fun onInterrupt() = Unit
@@ -469,6 +507,13 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         private var instance: NavGestureAccessibilityService? = null
 
         fun isRunning(): Boolean = instance != null
+
+        /** Asks the running service to switch itself off for the user. False when none runs. */
+        fun turnOff(from: String): Boolean {
+            val service = instance ?: return false
+            service.handler.post { service.switchOffByUser(from) }
+            return true
+        }
 
         private val runningState = MutableStateFlow(false)
 

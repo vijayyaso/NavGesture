@@ -69,6 +69,7 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
         restrictedSettingsApply = model.restrictedSettingsApply,
         barStuck = model.gestureBar == GestureBarHider.BarState.STUCK_HIDDEN,
         onOpenNavigation = model::openNavigationSettings,
+        onSwitch = { on -> model.switchService(context, on) },
     ) {
         model.requestAccessibility(context)
     }

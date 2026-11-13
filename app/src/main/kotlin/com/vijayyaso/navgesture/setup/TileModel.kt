@@ -46,16 +46,17 @@ internal data class TileFace(
 
 // AOSP guards the details page with a signature permission, and a denied start fails silently.
 /** What one tile tap does. */
-internal enum class TileTap { OPEN_APP, SHOW_DISCLOSURE, TURN_ON, OPEN_SETTINGS }
+internal enum class TileTap { TURN_OFF, SHOW_DISCLOSURE, TURN_ON, OPEN_SETTINGS }
 
 /**
- * The tile's rules, in order. Consent comes before the one-tap turn-on, so no tap can switch the
+ * The tile's rules, in order. A tap on a tile that is on switches the service off at once, for
+ * an app that refuses to work while it runs. Consent comes before the one-tap turn-on, so no tap can switch the
  * service on before the disclosure was agreed to. [canTurnOn] is false in the Play build, without
  * the adb grant, and when the switch is already listed (writing it again would change nothing).
  */
 internal fun tileTap(serviceEnabled: Boolean, disclosureAccepted: Boolean, canTurnOn: Boolean): TileTap =
     when {
-        serviceEnabled -> TileTap.OPEN_APP
+        serviceEnabled -> TileTap.TURN_OFF
         !disclosureAccepted -> TileTap.SHOW_DISCLOSURE
         canTurnOn -> TileTap.TURN_ON
         else -> TileTap.OPEN_SETTINGS

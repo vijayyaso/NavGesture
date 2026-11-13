@@ -43,8 +43,9 @@ import kotlinx.coroutines.withContext
 
 // The way back when HyperOS stops the service with the bar hidden, as Control Center still opens.
 // The system binds the tile even after a force stop, so opening the panel runs ServiceKeeper. What a
-// tap does is tileTap() in TileModel.kt: the disclosure until the user agrees, then the one-tap
-// turn-on in the GitHub build with the adb grant, else Android's Accessibility settings.
+// tap does is tileTap() in TileModel.kt: off at once when the service is on; else the disclosure
+// until the user agrees, then the one-tap turn-on in the GitHub build with the adb grant, else
+// Android's Accessibility settings.
 class GestureTileService : TileService() {
 
     override fun onTileAdded() {
@@ -99,7 +100,12 @@ class GestureTileService : TileService() {
                 !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(this),
         )
         when (tap) {
-            TileTap.OPEN_APP -> open(Intent(this, MainActivity::class.java))
+            // Off cannot be done only for a service that is listed, not running, with no adb grant.
+            TileTap.TURN_OFF -> if (ServiceKeeper.turnOff(this, "tile tap")) {
+                refresh()
+            } else {
+                open(Intent(this, MainActivity::class.java))
+            }
             TileTap.SHOW_DISCLOSURE -> open(
                 Intent(this, MainActivity::class.java)
                     .putExtra(MainActivity.EXTRA_SHOW_DISCLOSURE, true),
