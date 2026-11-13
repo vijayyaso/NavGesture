@@ -278,7 +278,10 @@ the screen that asks for a second swipe.
 
 A missing key falls back to the default, so existing installs move from 56 dp
 to 72 dp. "Reset to defaults" on Gesture settings leaves all four alone: it
-resets only the values that screen shows (upstream #123). Debug builds also read the
+resets only that screen's sliders and switches (upstream #123,
+`withGestureSettingsOf`). Since 2026-11-13 the two corner rows are shown on
+Gesture settings too, and Reset still keeps them; whether it should clear
+them is open for the owner. Debug builds also read the
 global settings `navgesture_app_list_style`, `navgesture_left_corner` and
 `navgesture_right_corner`, for the e2e suite.
 
