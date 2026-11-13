@@ -91,6 +91,37 @@ class BackStackTest {
     }
 
     @Test
+    fun `back from the screen on top pops it`() {
+        val stack = home.open(Screen.GESTURE_SETTINGS, 0).open(Screen.LEFT_CORNER, 0)
+        assertEquals(listOf(Screen.HOME, Screen.GESTURE_SETTINGS), stack.backFrom(stack.top.id).screens)
+    }
+
+    @Test
+    fun `back from a screen that already left does nothing`() {
+        val stack = home.open(Screen.GESTURE_SETTINGS, 0).open(Screen.LEFT_CORNER, 0)
+        val leaving = stack.top.id
+        val popped = stack.backFrom(leaving)
+        assertSame(popped, popped.backFrom(leaving))
+    }
+
+    @Test
+    fun `opening from a screen that already left does nothing`() {
+        val stack = home.open(Screen.GESTURE_SETTINGS, 0)
+        val leaving = stack.top.id
+        val popped = stack.back()
+        assertSame(popped, popped.openFrom(leaving, Screen.ABOUT, 0))
+        assertEquals(Screen.ABOUT, popped.openFrom(popped.top.id, Screen.ABOUT, 0).top.screen)
+    }
+
+    @Test
+    fun `a newer entry arriving is forward, an older one is back`() {
+        val settings = home.open(Screen.GESTURE_SETTINGS, 0)
+        assertEquals(true, opensForward(home.top, settings.top))
+        assertEquals(false, opensForward(settings.top, settings.back().top))
+        assertEquals(true, opensForward(settings.top, settings.replacedBy(Screen.HOME, Screen.DISCLOSURE).top))
+    }
+
+    @Test
     fun `a replaced stack opens every screen at its top with new ids`() {
         val old = home.open(Screen.GESTURE_SETTINGS, 400).open(Screen.LEFT_CORNER, 700)
         val replaced = old.replacedBy(Screen.HOME, Screen.DISCLOSURE)

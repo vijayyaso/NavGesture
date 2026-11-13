@@ -17,6 +17,7 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
@@ -25,8 +26,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 
 // The only motion numbers the screens use. Compose already scales them by the phone's
 // animator duration scale, so "Remove animations" turns them all off.
@@ -39,6 +43,33 @@ internal const val EXPAND_MS = 200
 internal const val FADE_OUT_MS = 100
 internal const val SHRINK_MS = 150
 internal const val SCREEN_CHANGE_MS = 200
+
+/** A new screen slides in from a tenth of the width away. */
+internal const val SCREEN_SLIDE_FRACTION = 10
+
+/**
+ * Where an arriving screen starts, in pixels: forward from the end side, back from the start
+ * side. Offsets are not mirrored for us, so right-to-left flips them here.
+ */
+internal fun screenSlideOffset(width: Int, forward: Boolean, rtl: Boolean): Int {
+    val towardEnd = if (forward) 1 else -1
+    val mirror = if (rtl) -1 else 1
+    return towardEnd * mirror * width / SCREEN_SLIDE_FRACTION
+}
+
+/** Forward or back: the new screen slides a little and fades in; the old one only fades out. */
+internal fun screenChange(forward: Boolean, rtl: Boolean): ContentTransform {
+    val arrive = slideInHorizontally(tween(SCREEN_CHANGE_MS, easing = EaseOutStrong)) {
+        screenSlideOffset(it, forward, rtl)
+    } + fadeIn(tween(SCREEN_CHANGE_MS, easing = EaseOutStrong))
+    return arrive togetherWith fadeOut(tween(FADE_OUT_MS))
+}
+
+/**
+ * True once the screen has fully arrived. A heavy screen waits for it before it builds a long
+ * list, so the list never lands in the middle of the slide.
+ */
+internal val LocalScreenSettled = staticCompositionLocalOf<() -> Boolean> { { true } }
 
 /** A whole card leaving: slower than a block, as it moves more of the page. */
 internal const val CARD_FADE_OUT_MS = 150

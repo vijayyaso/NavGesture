@@ -49,6 +49,12 @@ internal data class BackStack(val entries: List<StackEntry>, val nextId: Int) {
     /** Two Backs can land before one redraw, so the last screen is never popped. */
     fun back(): BackStack = if (canGoBack) copy(entries = entries.dropLast(1)) else this
 
+    /** A screen still fading out must not pop or open anything, so only the top one can. */
+    fun backFrom(id: Int): BackStack = if (top.id == id) back() else this
+
+    fun openFrom(id: Int, screen: Screen, coveredScroll: Int): BackStack =
+        if (top.id == id) open(screen, coveredScroll) else this
+
     /** A whole new stack, as the tile asks for: every screen opens at its top. */
     fun replacedBy(vararg screens: Screen): BackStack =
         BackStack(screens.mapIndexed { index, screen -> StackEntry(screen, nextId + index) }, nextId + screens.size)
@@ -66,6 +72,9 @@ internal data class BackStack(val entries: List<StackEntry>, val nextId: Int) {
             BackStack(screens.mapIndexed { index, screen -> StackEntry(screen, index) }, screens.size)
     }
 }
+
+/** Every opening gets the newest id, so a newer entry arriving means the user went forward. */
+internal fun opensForward(from: StackEntry, to: StackEntry): Boolean = to.id > from.id
 
 /**
  * A name saved by an older build may no longer exist; its id and scroll go with it. The stack

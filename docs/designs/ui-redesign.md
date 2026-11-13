@@ -224,7 +224,9 @@ its rows.
 *   Other screens use a `CenterAlignedTopAppBar` with the back arrow
     (`nav_back` tag kept) and the screen title, always on the page colour.
     The content is padded below the bar, so nothing scrolls under it and no
-    scroll behaviour is needed.
+    scroll behaviour is needed. Each screen draws its own bar above its
+    scrolling column (not the scaffold's `topBar` slot), so the bar comes
+    and goes with its screen during a screen change.
 *   The scaffold background is the page colour.
 
 ### Motion (`ui/Motion.kt`, added 2026-11-13)
@@ -272,6 +274,19 @@ screen times anything with `delay()`.
     90° to point down over 200 ms, the other way in right-to-left. Only a
     tap on an app animates it: starting a search, the search filter,
     ticking an app and "Loading…" turning into the list stay instant.
+*   **Screens change with a short slide.** `MainActivity` shows the stack's
+    top entry through `AnimatedContent`, one slot per entry. The new screen
+    slides in from a tenth of the width away and fades in over 200 ms; the
+    old one fades out over 100 ms. Forward (a newer entry) arrives from the
+    end side, Back from the start side, mirrored in right-to-left
+    (`screenSlideOffset`, unit tested). The bar is part of each slot, so
+    Home's missing bar never pops on its own. The screen fading out takes no
+    touch and is hidden from TalkBack and uiautomator, so test tags are
+    never doubled in a dump and only the new screen can open or close
+    anything (`BackStack.openFrom`/`backFrom`). A Back pressed while a
+    screen is still arriving is swallowed. The app pickers start loading at
+    once but hand their list over only once the screen has arrived
+    (`LocalScreenSettled`), so a long list never builds mid-slide.
 
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 

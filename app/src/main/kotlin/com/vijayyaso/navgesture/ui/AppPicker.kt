@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -49,14 +50,21 @@ import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.service.AppSwitcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-/** The installed apps for a picker, loaded off the main thread; null while loading. */
+/**
+ * The installed apps, loaded off the main thread; null while loading. The load starts at once.
+ * A picker's long list is handed over only once its screen has arrived; a single label need not wait.
+ */
 @Composable
-internal fun rememberLaunchableApps(): State<List<LaunchableApp>?> {
+internal fun rememberLaunchableApps(waitForScreen: Boolean = true): State<List<LaunchableApp>?> {
     val context = LocalContext.current
+    val settled = LocalScreenSettled.current
     return produceState<List<LaunchableApp>?>(initialValue = null) {
-        value = withContext(Dispatchers.IO) { launchableApps(context) }
+        val loaded = withContext(Dispatchers.IO) { launchableApps(context) }
+        if (waitForScreen) snapshotFlow { settled() }.first { it }
+        value = loaded
     }
 }
 

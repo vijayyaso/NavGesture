@@ -129,7 +129,7 @@ internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
     CornerShortcut.PowerMenu -> stringResource(R.string.corner_power_menu)
     CornerShortcut.SplitScreen -> stringResource(R.string.corner_split_screen)
     is CornerShortcut.OpenApp -> {
-        val apps by rememberLaunchableApps()
+        val apps by rememberLaunchableApps(waitForScreen = false)
         val label = apps?.firstOrNull { it.packageName == shortcut.packageName }?.label
             ?: shortcut.packageName
         stringResource(R.string.corner_open_named_app, label)
