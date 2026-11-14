@@ -468,6 +468,7 @@ internal fun ThresholdSlider(
     range: ClosedFloatingPointRange<Float>,
     formatter: @Composable (Int) -> String,
     supporting: String? = null,
+    tag: String? = null,
     onCommit: (Float) -> Unit,
 ) {
     var dragging by remember { mutableStateOf(false) }
@@ -498,7 +499,9 @@ internal fun ThresholdSlider(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        // On the Slider itself: a layout-only node never reaches uiautomator.
         Slider(
+            modifier = Modifier.tagged(tag),
             value = local,
             valueRange = range,
             onValueChange = {

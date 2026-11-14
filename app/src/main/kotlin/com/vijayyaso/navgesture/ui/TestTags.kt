@@ -30,6 +30,9 @@ internal object TestTags {
     const val ROW_LEFT_EDGE = "row_left_edge"
     const val ROW_RIGHT_EDGE = "row_right_edge"
     const val ROW_BOTTOM_EDGE = "row_bottom_edge"
+    const val SWITCH_SPLIT_LEFT = "switch_split_left"
+    const val SWITCH_SPLIT_RIGHT = "switch_split_right"
+    const val SLIDER_LONG_SWIPE = "slider_long_swipe"
     const val WARNING_NO_HOME = "warning_no_home"
     const val WARNING_NO_BACK = "warning_no_back"
     const val ROW_BANK_APPS = "row_bank_apps"
@@ -75,7 +78,7 @@ internal object TestTags {
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"
 
-    /** A swipe's row on its edge page, named by its storage key: `row_slot_left_whole_short`. */
+    /** A swipe's row on its edge page, named by its storage key: `row_slot_left_whole_short`, `row_slot_left_top_long`. */
     fun slotRow(slot: com.vijayyaso.navgesture.gesture.SlotId.Edge): String =
         "row_" + com.vijayyaso.navgesture.gesture.SwipeSlots.keyOf(slot)
 

@@ -185,7 +185,7 @@ internal fun StatusBlock(
     }
 }
 
-/** "Back from the sides, Home and Recents from the bottom.", from what each swipe does. */
+/** "Back from the sides, Home and Recents from the bottom.", from what each swipe does; sides by [sideName]. */
 @Composable
 private fun workingBody(slots: SwipeSlots): String {
     val left = sideName(slots, ScreenEdge.LEFT)
@@ -207,11 +207,4 @@ private fun workingBody(slots: SwipeSlots): String {
     }
     if (parts.isEmpty()) return stringResource(R.string.status_working_body_none)
     return parts.joinToString(", ", postfix = ".")
-}
-
-/** A side in use is named by its short swipe's action; a side with no strip is left out. */
-@Composable
-private fun sideName(slots: SwipeSlots, edge: ScreenEdge): String? {
-    if (!slots.edgeInUse(edge)) return null
-    return shortcutLabel(slots[SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT)])
 }

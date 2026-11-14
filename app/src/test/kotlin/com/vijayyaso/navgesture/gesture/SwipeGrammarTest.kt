@@ -40,10 +40,18 @@ class SwipeGrammarTest {
         val edge: ScreenEdge,
         val slots: Map<SlotId.Edge, SwipeAction>,
         val steps: List<Step>,
+        /** Splits both side edges into halves. */
+        val split: Boolean = false,
+        /** Changes the distances a row is played with. */
+        val tune: (GestureConfiguration) -> GestureConfiguration = { it },
     )
 
     private val leftShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT)
     private val leftLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG)
+    private val topShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT)
+    private val topLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.LONG)
+    private val lowerShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT)
+    private val rightLong = SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.LONG)
     private val rightShort = SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.SHORT)
     private val bottomShort = SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)
     private val bottomPause = SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)
@@ -235,14 +243,281 @@ class SwipeGrammarTest {
                 Step.Up(540f, 2095f, 500L, slotEmpty),
             ),
         ),
+
+        // Long swipes. The long line is 120 dp = 330 px from DOWN, so from x 5 it is at x 335.
+        Row(
+            "past the trigger and under the long line a side swipe is short, even with a long slot",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(330f, 1200f, 90L, TrackerAction.None),
+                Step.Up(330f, 1200f, 100L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "past the long line with the long slot set the long action is pending and runs",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(335f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Move(500f, 1200f, 110L, TrackerAction.None),
+                Step.Up(500f, 1200f, 120L, fire(leftLong, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "past the long line with the long slot empty the short action stays, with no report",
+            ScreenEdge.LEFT,
+            emptyMap(),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(500f, 1200f, 90L, TrackerAction.None),
+                Step.Up(500f, 1200f, 100L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "the right edge measures its long line inward too",
+            ScreenEdge.RIGHT,
+            mapOf(rightLong to SwipeAction.Recents),
+            listOf(
+                Step.Down(1075f, 1200f, 0L),
+                Step.Move(975f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(700f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Recents, SwipeKind.LONG)),
+                Step.Up(700f, 1200f, 100L, fire(rightLong, SwipeAction.Recents)),
+            ),
+        ),
+        Row(
+            "pulled back across the long line the swipe is short again, and long again when pushed out",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Move(200f, 1200f, 120L, TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT)),
+                Step.Move(400f, 1200f, 150L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Up(400f, 1200f, 160L, fire(leftLong, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a long swipe pulled back under the long line and lifted runs the short action",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(400f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Home)),
+                Step.Move(200f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT)),
+                Step.Up(200f, 1200f, 100L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "a long swipe pulled inside the trigger disarms, and pushed out re-arms in the band it reaches",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Move(20f, 1200f, 120L, TrackerAction.Disarmed),
+                Step.Move(400f, 1200f, 150L, TrackerAction.Armed(null, SwipeAction.Home)),
+                Step.Move(20f, 1200f, 180L, TrackerAction.Disarmed),
+                Step.Move(105f, 1200f, 210L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 1200f, 240L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Up(400f, 1200f, 250L, fire(leftLong, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a long swipe released inside the trigger reverts",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(400f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Home)),
+                Step.Up(20f, 1200f, 90L, TrackerAction.Reverted),
+            ),
+        ),
+        Row(
+            "a DOWN then UP past the long line runs the long action",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Up(400f, 1200f, 80L, fire(leftLong, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a DOWN then UP under the long line runs the short action, even with a long slot",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Up(200f, 1200f, 80L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "with only a long slot a long swipe runs it",
+            ScreenEdge.LEFT,
+            mapOf(leftShort to SwipeAction.None, leftLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.None)),
+                Step.Move(400f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG)),
+                Step.Up(400f, 1200f, 100L, fire(leftLong, SwipeAction.Screenshot)),
+            ),
+        ),
+        Row(
+            "with only a long slot a long swipe pulled back under the line goes to the app",
+            ScreenEdge.LEFT,
+            mapOf(leftShort to SwipeAction.None, leftLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(400f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Screenshot)),
+                Step.Move(200f, 1200f, 90L, TrackerAction.Pending(SwipeAction.None, SwipeKind.SHORT)),
+                Step.Up(200f, 1200f, 100L, slotEmpty),
+            ),
+        ),
+        Row(
+            "with only a long slot a DOWN then UP under the line goes to the app",
+            ScreenEdge.LEFT,
+            mapOf(leftShort to SwipeAction.None, leftLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Up(200f, 1200f, 80L, slotEmpty),
+            ),
+        ),
+        Row(
+            "a trigger as far as the long distance puts the long line 24 dp past the trigger",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                // Trigger 150 dp = 412.5 px; the long line is 174 dp = 478.5 px, from x 5 at x 483.5.
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(450f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(480f, 1200f, 80L, TrackerAction.None),
+                Step.Move(490f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Up(490f, 1200f, 100L, fire(leftLong, SwipeAction.Home)),
+            ),
+            tune = { it.copy(sideMinimumSwipeDistanceDp = 150f, longSwipeDp = 120f) },
+        ),
+        Row(
+            "a far swipe distance set further moves the long line with it",
+            ScreenEdge.LEFT,
+            mapOf(leftLong to SwipeAction.Home),
+            listOf(
+                // 200 dp = 550 px, from x 5 at x 555.
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(550f, 1200f, 80L, TrackerAction.None),
+                Step.Move(560f, 1200f, 90L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG)),
+                Step.Up(560f, 1200f, 100L, fire(leftLong, SwipeAction.Home)),
+            ),
+            tune = { it.copy(longSwipeDp = 200f) },
+        ),
+
+        // Halves. The default screen is 2400 px tall, so the strip's centre is y 1200.
+        Row(
+            "on a split edge a DOWN just above the centre reads the top half",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.Home, lowerShort to SwipeAction.Recents),
+            listOf(
+                Step.Down(5f, 1199f, 0L),
+                Step.Move(105f, 1199f, 60L, TrackerAction.Armed(null, SwipeAction.Home)),
+                Step.Up(105f, 1199f, 80L, fire(topShort, SwipeAction.Home)),
+            ),
+            split = true,
+        ),
+        Row(
+            "on a split edge a DOWN at the centre reads the bottom half",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.Home, lowerShort to SwipeAction.Recents),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Recents)),
+                Step.Up(105f, 1200f, 80L, fire(lowerShort, SwipeAction.Recents)),
+            ),
+            split = true,
+        ),
+        Row(
+            "on a split edge a DOWN just below the centre reads the bottom half",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.Home, lowerShort to SwipeAction.Recents),
+            listOf(
+                Step.Down(5f, 1201f, 0L),
+                Step.Up(105f, 1201f, 80L, fire(lowerShort, SwipeAction.Recents)),
+            ),
+            split = true,
+        ),
+        Row(
+            "the half is read at DOWN, so a swipe that drifts across the centre keeps it",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.Home, lowerShort to SwipeAction.Recents),
+            listOf(
+                Step.Down(5f, 1190f, 0L),
+                Step.Move(105f, 1230f, 60L, TrackerAction.Armed(null, SwipeAction.Home)),
+                Step.Up(110f, 1240f, 80L, fire(topShort, SwipeAction.Home)),
+            ),
+            split = true,
+        ),
+        Row(
+            "each half has its own long swipe",
+            ScreenEdge.LEFT,
+            mapOf(topLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 600f, 0L),
+                Step.Move(105f, 600f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 600f, 90L, TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG)),
+                Step.Up(400f, 600f, 100L, fire(topLong, SwipeAction.Screenshot)),
+            ),
+            split = true,
+        ),
+        Row(
+            "the other half's long slot does not reach this half",
+            ScreenEdge.LEFT,
+            mapOf(topLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1800f, 0L),
+                Step.Move(105f, 1800f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 1800f, 90L, TrackerAction.None),
+                Step.Up(400f, 1800f, 100L, fire(lowerShort, SwipeAction.Back)),
+            ),
+            split = true,
+        ),
+        Row(
+            "an edge that is not split reads the whole edge, even when its halves hold actions",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.Home, lowerShort to SwipeAction.Recents, topLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 600f, 0L),
+                Step.Move(105f, 600f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(400f, 600f, 90L, TrackerAction.None),
+                Step.Up(400f, 600f, 100L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "a split half with nothing set never arms, and its swipe goes to the app",
+            ScreenEdge.LEFT,
+            mapOf(topShort to SwipeAction.None),
+            listOf(
+                Step.Down(5f, 600f, 0L),
+                Step.Move(105f, 600f, 60L, TrackerAction.None),
+                Step.Up(105f, 600f, 80L, slotEmpty),
+            ),
+            split = true,
+        ),
     )
 
     @Test fun `every swipe rule holds`() {
         rows.forEach { row ->
-            val slots = row.slots.entries.fold(SwipeSlots()) { all, (slot, action) -> all.with(slot, action) }
+            val slots = row.slots.entries.fold(SwipeSlots(leftSplit = row.split, rightSplit = row.split)) { all, (slot, action) ->
+                all.with(slot, action)
+            }
             val tracker = GestureTracker(
                 row.edge,
-                GestureConfiguration(edgeAppListEnabled = false, slots = slots),
+                row.tune(GestureConfiguration(edgeAppListEnabled = false, slots = slots)),
                 2.75f,
             )
             row.steps.forEachIndexed { index, step ->

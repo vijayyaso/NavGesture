@@ -157,6 +157,48 @@ class HapticGateTest {
         assertTrue(run.ticks.single() is TrackerAction.Armed)
     }
 
+    // Density 3: the trigger is 72 px and the long line 360 px from DOWN.
+    private val leftLongHome = GestureConfiguration(
+        slots = SwipeSlots().with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Home),
+    )
+
+    @Test
+    fun `a far swipe ticks on arming and again on entering the long swipe, and its release stays quiet`() {
+        val run = Run(ScreenEdge.LEFT, leftLongHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        assertEquals(TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG), run.move(500f, 1200f))
+        assertTrue(run.up(500f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, run.ticks.size)
+        assertTrue(run.ticks[0] is TrackerAction.Armed)
+        assertEquals(TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG), run.ticks[1])
+    }
+
+    @Test
+    fun `falling back from the long swipe to the short one is silent`() {
+        val run = Run(ScreenEdge.LEFT, leftLongHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        run.move(500f, 1200f)
+        assertEquals(TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT), run.move(200f, 1200f))
+        assertTrue(run.up(200f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, run.ticks.size)
+        assertTrue(run.ticks.none { it == TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT) })
+    }
+
+    @Test
+    fun `with only a long slot the arm is quiet and entering the long swipe ticks once`() {
+        val longOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Screenshot)
+        val run = Run(ScreenEdge.LEFT, GestureConfiguration(slots = longOnly))
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        run.move(500f, 1200f)
+        assertTrue(run.up(500f, 1200f) is TrackerAction.Fire)
+        assertEquals(listOf<TrackerAction>(TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG)), run.ticks)
+    }
+
     @Test
     fun `an arm with nothing pending stays quiet`() {
         val longOnly = SwipeSlots()

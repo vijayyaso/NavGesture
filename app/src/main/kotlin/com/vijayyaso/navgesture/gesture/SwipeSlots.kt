@@ -63,6 +63,15 @@ class SwipeSlots private constructor(
     /** True when a touch on [edge] can do anything, so its strip is installed. */
     fun edgeInUse(edge: ScreenEdge): Boolean = zonesOf(edge).any { zoneInUse(edge, it) }
 
+    /** True when a slot of [kind] that a touch can reach holds an action. */
+    fun anySet(kind: SwipeKind): Boolean = ScreenEdge.entries.any { edge ->
+        zonesOf(edge).any { zone -> this[SlotId.Edge(edge, zone, kind)] != SwipeAction.None }
+    }
+
+    /** The short actions a touch on [edge] can reach, each once: one, or one per half when split. */
+    fun shortActions(edge: ScreenEdge): List<SwipeAction> =
+        zonesOf(edge).map { this[SlotId.Edge(edge, it, SwipeKind.SHORT)] }.distinct()
+
     /** True when a slot an edge can reach holds [action]. */
     fun holds(action: SwipeAction): Boolean = holds { it == action }
 

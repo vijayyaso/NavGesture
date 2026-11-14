@@ -220,6 +220,16 @@
     <string name="label_bottom_edge">Bottom edge</string>
     <string name="section_swipes">Swipes</string>
     <string name="slot_swipe_in">Swipe in</string>
+    <string name="slot_swipe_far_in">Swipe far in</string>
+    <!-- Picker page titles for one half of a split side edge. -->
+    <string name="slot_top_swipe_in">Top half, swipe in</string>
+    <string name="slot_top_swipe_far_in">Top half, swipe far in</string>
+    <string name="slot_bottom_swipe_in">Bottom half, swipe in</string>
+    <string name="slot_bottom_swipe_far_in">Bottom half, swipe far in</string>
+    <string name="label_split_edge">Top and bottom do different things</string>
+    <string name="label_split_edge_body">The top half and the bottom half each get their own swipes.</string>
+    <string name="section_top_half">Top half</string>
+    <string name="section_bottom_half">Bottom half</string>
     <string name="slot_swipe_up">Swipe up</string>
     <string name="slot_swipe_up_pause">Swipe up and pause</string>
     <string name="pair_and">%1$s and %2$s</string>
@@ -231,6 +241,8 @@
     <string name="section_distance_and_timing">How far and how long</string>
     <string name="label_side_distance">Back swipe distance</string>
     <string name="label_side_distance_body">How far your finger must move before Back works.</string>
+    <string name="label_long_distance">Far swipe distance</string>
+    <string name="label_long_distance_body">How far your finger must move for a far swipe.</string>
     <string name="label_bottom_distance">Home swipe distance</string>
     <string name="label_bottom_distance_body">How far your finger must move before Home works.</string>
     <string name="label_recents_line">Recents height</string>

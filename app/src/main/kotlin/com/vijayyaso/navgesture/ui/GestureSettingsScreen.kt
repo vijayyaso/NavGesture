@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.SwipeKind
 import com.vijayyaso.navgesture.gesture.SwipeWarning
 import com.vijayyaso.navgesture.gesture.swipeWarnings
 import com.vijayyaso.navgesture.navigation.GestureBarHider
@@ -148,6 +149,21 @@ internal fun GestureSettingsScreen(model: AppModel, onOpen: (Screen) -> Unit) {
             formatter = { stringResource(R.string.value_dp, it) },
             supporting = stringResource(R.string.label_side_distance_body),
         ) { updated -> model.update { it.copy(sideMinimumSwipeDistanceDp = updated) } }
+        // Only while a long swipe a touch can reach has an action, so the default page stays as it was.
+        AnimatedVisibility(
+            visible = configuration.slots.anySet(SwipeKind.LONG),
+            enter = BlockEnter,
+            exit = BlockExit,
+        ) {
+            ThresholdSlider(
+                label = stringResource(R.string.label_long_distance),
+                value = configuration.longSwipeDp,
+                range = LONG_SWIPE_RANGE,
+                formatter = { stringResource(R.string.value_dp, it) },
+                supporting = stringResource(R.string.label_long_distance_body),
+                tag = TestTags.SLIDER_LONG_SWIPE,
+            ) { updated -> model.update { it.copy(longSwipeDp = updated) } }
+        }
         ThresholdSlider(
             label = stringResource(R.string.label_bottom_distance),
             value = configuration.bottomMinimumSwipeDistanceDp,
@@ -243,6 +259,9 @@ internal fun warningTitle(warning: SwipeWarning): Int = when (warning) {
 
 /** The same 8 to 64 dp the touch strips have always offered. */
 private val EDGE_WIDTH_RANGE = 8f..64f
+
+/** Far swipe distance, around its 120 dp default; it stays well past most back swipe distances. */
+private val LONG_SWIPE_RANGE = 80f..240f
 
 @Composable
 private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState, model: AppModel) {

@@ -338,6 +338,17 @@ data class GestureConfiguration(
         }
 
     /**
+     * Where a side swipe becomes a long swipe, in dp from DOWN. It always lies past the trigger,
+     * so a short swipe keeps its own band even when the trigger is set as far as [longSwipeDp].
+     */
+    val longLineDp: Float
+        get() = if (longSwipeDp > sideMinimumSwipeDistanceDp) {
+            longSwipeDp
+        } else {
+            sideMinimumSwipeDistanceDp + LONG_LINE_MARGIN_DP
+        }
+
+    /**
      * Takes from [source] only the gesture tunings the Gesture settings screen shows, for its
      * reset and undo. The gesture bar is a system setting the user chose, so it stays.
      */
@@ -353,6 +364,11 @@ data class GestureConfiguration(
         maximumArmDurationMs = source.maximumArmDurationMs,
         hapticFeedbackEnabled = source.hapticFeedbackEnabled,
     )
+
+    companion object {
+        /** How far past the trigger the long line sits when the trigger reaches [longSwipeDp]. */
+        const val LONG_LINE_MARGIN_DP = 24f
+    }
 }
 
 /** Launcher3's numbers for a long press on the navigation handle, at AOSP's defaults. */
@@ -393,7 +409,7 @@ sealed interface TrackerAction {
 
     /**
      * What a release would run changed after arming: a bottom swipe paused past the Recents
-     * line, so the release means Recents.
+     * line, or a side swipe crossed its long line, out (LONG) or back (SHORT).
      */
     data class Pending(val action: SwipeAction, val kind: SwipeKind) : TrackerAction
 

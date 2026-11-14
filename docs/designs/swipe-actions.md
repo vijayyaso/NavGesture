@@ -1,7 +1,7 @@
 # Swipe actions: pick what every swipe does, and three new side swipes
 
 *   **Author:** vijayyaso
-*   **Status:** Phases 0a, 0b and A are built (2026-11-14). Phases B, C
+*   **Status:** Phases 0a, 0b, A and B are built (2026-11-14). Phases C
     and D are `[not built]`.
 *   **Date:** 2026-11-14
 
@@ -211,7 +211,8 @@ model; the three screens that read them ask the slots instead
 *   Debug builds read `navgesture_slot_<key>` global settings in place of a
     stored slot, as the corner overrides do today, so the e2e suites can
     set a slot without the UI. A save starts from the stored values without
-    any override, so an override is never written.
+    any override, so an override is never written. Debug builds also read
+    `navgesture_left_split` and `navgesture_right_split` the same way.
 
 ### Gesture grammar (`gesture/GestureTracker.kt`)
 
@@ -234,7 +235,9 @@ Order of the tests on one stream, first match wins:
 The existing states keep their meaning. `Switcher`, `Fired`, `Corner` and
 `longPressPending` are bottom-only and unchanged. `Rising` and `Retracted`
 gain the band and the still clock described below. `Primed` is the bottom
-pause.
+pause. The band is kept in its own tracker field, beside `Rising`, so the
+many `== Arm.Rising` tests stay as they are; it only tells a band change
+apart, and every lift is judged by the band at its release point.
 
 #### Bottom-edge rules
 
@@ -249,7 +252,9 @@ pause.
 
 *   **Travel.** The trigger distance and the long line are both travel
     from the DOWN point along the swipe axis (`travelFrom`), as the trigger
-    is today.
+    is today. When the back swipe distance is at or past `longSwipeDp`, the
+    long line sits 24 dp past the trigger (`GestureConfiguration.longLineDp`),
+    so a long swipe stays reachable and a short swipe keeps its band.
 *   **Arming.** A side edge arms when any slot of the touched zone is set.
     A whole swipe on a zone with nothing set ends as `Unused(SLOT_EMPTY)`.
 *   **Bands.** The pending action is re-read on every MOVE:
@@ -351,10 +356,12 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
     in" and "Swipe in and wait"; a switch "Top and bottom do different
     things", which shows the three rows twice under "Top half" and "Bottom
     half". Bottom edge: "Swipe up" and "Swipe up and pause". A row shows
-    its action's label and opens the picker.
+    its action's label and opens the picker. The switch sits above the
+    rows, so it does not move under the finger when the rows change.
 *   **Distances** stay on Gesture settings under Distance and timing: two
     new sliders, "Far swipe distance" and "Wait time", shown only while any
-    long or wait slot is set.
+    long or wait slot is set. A slot counts only while a touch can reach
+    it, so a half's far swipe shows the slider only while its edge is split.
 *   **Picker**: `CornerShortcutPicker` becomes `SwipeActionPicker`, taking a
     `SlotId`. Its string names and test tags (`corner_none`,
     `corner_app_...`, `row_left_corner`, ...) stay, because two e2e suites
@@ -370,7 +377,8 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
     phone's own bar back. It never blocks a choice.
 *   The touch-area adjuster and the status card read `edgeInUse`, and name
     each side by its SHORT action's label where they say "Back" today. The
-    status card names the bottom edge's two actions the same way.
+    status card names the bottom edge's two actions the same way. On a
+    split side both halves' SHORT actions are named, each once.
 
 ### Logs
 

@@ -247,6 +247,76 @@ class SwipeSlotsTest {
         assertEquals(500L, read.waitMs)
     }
 
+    @Test fun `a split side is in use by its halves, and an unsplit side by its whole edge`() {
+        val topLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.LONG)
+        // Only the whole edge's short swipe is set.
+        val wholeOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT), SwipeAction.None)
+        assertTrue(wholeOnly.edgeInUse(ScreenEdge.LEFT))
+        assertFalse(wholeOnly.withSplit(ScreenEdge.LEFT, true).edgeInUse(ScreenEdge.LEFT))
+        // A long swipe on one half is enough once split, and nothing while not.
+        val halfLong = wholeOnly.with(leftShort, SwipeAction.None).with(topLong, SwipeAction.Screenshot)
+        assertFalse(halfLong.edgeInUse(ScreenEdge.LEFT))
+        assertTrue(halfLong.withSplit(ScreenEdge.LEFT, true).edgeInUse(ScreenEdge.LEFT))
+        assertTrue(halfLong.withSplit(ScreenEdge.LEFT, true).edgeInUse(ScreenEdge.RIGHT))
+    }
+
+    @Test fun `a long swipe counts only where a touch can reach it`() {
+        val leftLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG)
+        val rightTopLong = SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.LONG)
+        assertFalse(SwipeSlots().anySet(SwipeKind.LONG))
+        assertTrue(SwipeSlots().with(leftLong, SwipeAction.Home).anySet(SwipeKind.LONG))
+        assertFalse(SwipeSlots().with(leftLong, SwipeAction.Home).withSplit(ScreenEdge.LEFT, true).anySet(SwipeKind.LONG))
+        assertFalse(SwipeSlots().with(rightTopLong, SwipeAction.Home).anySet(SwipeKind.LONG))
+        assertTrue(SwipeSlots().with(rightTopLong, SwipeAction.Home).withSplit(ScreenEdge.RIGHT, true).anySet(SwipeKind.LONG))
+    }
+
+    @Test fun `a side's short actions are its whole edge's, or each half's once when split`() {
+        val topShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT)
+        val slots = SwipeSlots().with(topShort, SwipeAction.Home)
+        assertEquals(listOf(SwipeAction.Back), slots.shortActions(ScreenEdge.LEFT))
+        assertEquals(listOf(SwipeAction.Home, SwipeAction.Back), slots.withSplit(ScreenEdge.LEFT, true).shortActions(ScreenEdge.LEFT))
+        assertEquals(listOf(SwipeAction.Back), SwipeSlots(leftSplit = true).shortActions(ScreenEdge.LEFT))
+    }
+
+    @Test fun `the halves keep their actions when the split is turned off and on`() {
+        val topShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT)
+        val lowerLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.LONG)
+        val split = SwipeSlots(leftSplit = true).with(topShort, SwipeAction.Home).with(lowerLong, SwipeAction.Recents)
+        val offAndOn = split.withSplit(ScreenEdge.LEFT, false).withSplit(ScreenEdge.LEFT, true)
+        assertEquals(split, offAndOn)
+        assertEquals(SwipeAction.Home, split.withSplit(ScreenEdge.LEFT, false)[topShort])
+    }
+
+    @Test fun `the halves keep their stored actions when the split is saved off and on`() = runBlocking {
+        val topShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT)
+        val lowerLong = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.LONG)
+        val repository = repositoryWith(mutablePreferencesOf())
+        repository.update {
+            it.copy(slots = it.slots.withSplit(ScreenEdge.LEFT, true).with(topShort, SwipeAction.Home).with(lowerLong, SwipeAction.Recents))
+        }
+
+        repository.update { it.copy(slots = it.slots.withSplit(ScreenEdge.LEFT, false)) }
+        val off = repository.read().slots
+        assertFalse(off.leftSplit)
+        assertEquals(listOf(SwipeAction.Back), off.shortActions(ScreenEdge.LEFT))
+
+        repository.update { it.copy(slots = it.slots.withSplit(ScreenEdge.LEFT, true)) }
+        val on = repository.read().slots
+        assertTrue(on.leftSplit)
+        assertEquals(SwipeAction.Home, on[topShort])
+        assertEquals(SwipeAction.Recents, on[lowerLong])
+    }
+
+    @Test fun `the long line is the far swipe distance, or 24 dp past a trigger that reaches it`() {
+        assertEquals(120f, GestureConfiguration().longLineDp, 0f)
+        assertEquals(200f, GestureConfiguration(longSwipeDp = 200f).longLineDp, 0f)
+        assertEquals(81f, GestureConfiguration(sideMinimumSwipeDistanceDp = 80f, longSwipeDp = 81f).longLineDp, 0f)
+        assertEquals(104f, GestureConfiguration(sideMinimumSwipeDistanceDp = 80f, longSwipeDp = 80f).longLineDp, 0f)
+        assertEquals(174f, GestureConfiguration(sideMinimumSwipeDistanceDp = 150f, longSwipeDp = 120f).longLineDp, 0f)
+    }
+
     @Test fun `reset puts every slot back and undo restores it`() {
         val customised = GestureConfiguration().withAction(bottomShort, SwipeAction.None)
             .withAction(leftShort, SwipeAction.PreviousApp)

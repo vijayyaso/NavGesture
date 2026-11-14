@@ -619,7 +619,7 @@ internal class EdgeTouchOverlay(
                     removeCallbacks(holdRunnable)
                     postDelayed(holdRunnable, action.delayMs)
                 }
-                // The release now means the pause action; the haptic gate ticks for it.
+                // The release now means another action (pause, long or back to short); the gate decides the tick.
                 is TrackerAction.Pending -> Log.d(TAG, "$edge PENDING ${action.kind} ${action.action.id}")
                 is TrackerAction.Fire -> {
                     cancelHold()

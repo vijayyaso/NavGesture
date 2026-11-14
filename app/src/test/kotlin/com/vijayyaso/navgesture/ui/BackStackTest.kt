@@ -188,6 +188,16 @@ class BackStackTest {
             Screen.RIGHT_EDGE to Screen.RIGHT_SWIPE_IN,
             Screen.BOTTOM_EDGE to Screen.BOTTOM_SWIPE_UP,
             Screen.BOTTOM_EDGE to Screen.BOTTOM_SWIPE_UP_PAUSE,
+            Screen.LEFT_EDGE to Screen.LEFT_SWIPE_FAR_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_SWIPE_FAR_IN,
+            Screen.LEFT_EDGE to Screen.LEFT_TOP_SWIPE_IN,
+            Screen.LEFT_EDGE to Screen.LEFT_TOP_SWIPE_FAR_IN,
+            Screen.LEFT_EDGE to Screen.LEFT_BOTTOM_SWIPE_IN,
+            Screen.LEFT_EDGE to Screen.LEFT_BOTTOM_SWIPE_FAR_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_TOP_SWIPE_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_TOP_SWIPE_FAR_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_BOTTOM_SWIPE_IN,
+            Screen.RIGHT_EDGE to Screen.RIGHT_BOTTOM_SWIPE_FAR_IN,
         )
         pages.forEach { (page, picker) ->
             val stack = home.open(Screen.GESTURE_SETTINGS, 300).open(page, 0).open(picker, 120)
@@ -215,7 +225,32 @@ class BackStackTest {
             Screen.RIGHT_SWIPE_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.SHORT),
             Screen.BOTTOM_SWIPE_UP to SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT),
             Screen.BOTTOM_SWIPE_UP_PAUSE to SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE),
+            Screen.LEFT_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG),
+            Screen.RIGHT_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.LONG),
+            Screen.LEFT_TOP_SWIPE_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT),
+            Screen.LEFT_TOP_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.LONG),
+            Screen.LEFT_BOTTOM_SWIPE_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT),
+            Screen.LEFT_BOTTOM_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.LONG),
+            Screen.RIGHT_TOP_SWIPE_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.SHORT),
+            Screen.RIGHT_TOP_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.LONG),
+            Screen.RIGHT_BOTTOM_SWIPE_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT),
+            Screen.RIGHT_BOTTOM_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.LONG),
         )
         Screen.entries.forEach { assertEquals(it.name, pickers[it], it.pickerSlot) }
+    }
+
+    @Test
+    fun `the far swipe and half pickers restore from their saved names, next to the older ones`() {
+        val names = listOf(
+            "HOME", "GESTURE_SETTINGS", "LEFT_EDGE", "LEFT_SWIPE_IN", "LEFT_SWIPE_FAR_IN", "RIGHT_TOP_SWIPE_IN",
+            "RIGHT_BOTTOM_SWIPE_FAR_IN", "BOTTOM_SWIPE_UP_PAUSE", "LEFT_CORNER",
+        )
+        assertEquals(names, backStackOf(names).screens.map { it.name })
+    }
+
+    @Test
+    fun `no two picker pages set the same slot`() {
+        val slots = Screen.entries.mapNotNull { it.pickerSlot }
+        assertEquals(slots.size, slots.toSet().size)
     }
 }

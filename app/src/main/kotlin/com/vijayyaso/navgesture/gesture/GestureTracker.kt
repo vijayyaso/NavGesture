@@ -47,6 +47,9 @@ import kotlin.math.pow
  *
  * Arming has deliberately no minimum-velocity threshold, which would penalise the slow,
  * deliberate swipes a careful user makes.
+ *
+ * Past the long line (travel from DOWN, re-read on every MOVE) a side swipe runs its zone's
+ * long action, when one is set; pulled back under it, the short action again.
  */
 class GestureTracker(
     private val edge: ScreenEdge,
@@ -62,7 +65,7 @@ class GestureTracker(
 
     // What an armed gesture became, as one field.
     private sealed interface Arm {
-        /** Armed for [shortAction]; on the bottom edge Recents is not yet primed. */
+        /** Armed; on the bottom edge Recents is not yet primed, on a side [band] names the action. */
         data object Rising : Arm
 
         /** Paused past the Recents line: the release is Recents unless it is a flick. */
@@ -114,6 +117,9 @@ class GestureTracker(
     // The zone this touch started in, read at DOWN.
     private var zone = SwipeZone.WHOLE
 
+    // The band an armed side swipe was last reported in, so only a change is reported again.
+    private var band = SwipeKind.SHORT
+
     // The bottom always arms, since its pause and app-list drag need the rise. A side arms
     // only when its zone holds an action, the same rule that installs its strip.
     private val armsHere: Boolean
@@ -144,6 +150,9 @@ class GestureTracker(
 
     private val recentsLinePx: Float
         get() = screenHeightPx * configuration.recentsLinePercent / 100f
+
+    private val longLinePx: Float
+        get() = density * configuration.longLineDp
 
     // POCO's pixel constants were written for a 2400px-tall screen, so they scale with it.
     private val tailGapPx: Float get() = screenHeightPx * TAIL_GAP_OF_HEIGHT
@@ -178,6 +187,7 @@ class GestureTracker(
         corner = cornerAt(sample)
         // Side strips are centred on the screen, so its middle splits a side into halves.
         zone = configuration.slots.zoneAt(edge, sample.yPx, screenHeightPx / 2f)
+        band = SwipeKind.SHORT
         armTimedOut = false
         longPressPending = edge == ScreenEdge.BOTTOM &&
             longPressAction != null && overHandle(sample)
@@ -225,9 +235,11 @@ class GestureTracker(
         if (!armsHere || !hasArmed(origin, sample)) return TrackerAction.None
 
         arm = Arm.Rising
+        // One MOVE can land past the long line, so the arm reports the band it lands in.
+        band = bandAt(origin, sample)
         return TrackerAction.Armed(
             scheduleHoldMs = if (pausePolls) FRAME_MS else null,
-            pending = shortAction.action,
+            pending = runFor(band).action,
         )
     }
 
@@ -264,11 +276,18 @@ class GestureTracker(
         val past = isPastTrigger(origin, sample)
         if (retracted && past) {
             arm = Arm.Rising
-            return TrackerAction.Armed(scheduleHoldMs = null, pending = shortAction.action)
+            band = bandAt(origin, sample)
+            return TrackerAction.Armed(scheduleHoldMs = null, pending = runFor(band).action)
         }
         if (!retracted && !past) {
             arm = Arm.Retracted
             return TrackerAction.Disarmed
+        }
+        // Armed and still past the trigger: crossing the long line either way changes the action.
+        val now = bandAt(origin, sample)
+        if (!retracted && now != band) {
+            band = now
+            return TrackerAction.Pending(runFor(now).action, now)
         }
         return TrackerAction.None
     }
@@ -325,7 +344,7 @@ class GestureTracker(
                 val flick = upwardDpPerMs(sample.timestampMs) > configuration.homeFlickDpPerMs
                 return fire(if (flick) shortAction else pauseRun)
             }
-            return fire(shortAction)
+            return fire(runFor(bandAt(origin, sample)))
         }
 
         if (armTimedOut) return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
@@ -333,7 +352,7 @@ class GestureTracker(
         // load does this, and a slow emulator does it reliably. The release is still a
         // swipe if it clears the threshold on its own, so judge it by the same rule.
         if (sample.timestampMs - origin.timestampMs <= configuration.maximumArmDurationMs) {
-            if (armsHere && hasArmed(origin, sample)) return fire(shortAction)
+            if (armsHere && hasArmed(origin, sample)) return fire(runFor(bandAt(origin, sample)))
         }
         return TrackerAction.Unused(rejectionFor(origin, sample))
     }
@@ -345,6 +364,7 @@ class GestureTracker(
         corner = null
         armTimedOut = false
         zone = SwipeZone.WHOLE
+        band = SwipeKind.SHORT
         longPressPending = false
         latest = null
         recent.clear()
@@ -352,6 +372,16 @@ class GestureTracker(
 
     private fun slotRun(slot: SlotId.Edge): GestureAction.Run =
         GestureAction.Run(slot, configuration.slots[slot])
+
+    private fun runFor(kind: SwipeKind): GestureAction.Run = slotRun(SlotId.Edge(edge, zone, kind))
+
+    /** LONG past the long line when this zone has a long action; SHORT otherwise, and always on the bottom. */
+    private fun bandAt(origin: TouchSample, sample: TouchSample): SwipeKind = when {
+        edge == ScreenEdge.BOTTOM -> SwipeKind.SHORT
+        travelFrom(origin, sample) < longLinePx -> SwipeKind.SHORT
+        runFor(SwipeKind.LONG).action == SwipeAction.None -> SwipeKind.SHORT
+        else -> SwipeKind.LONG
+    }
 
     // An empty slot runs nothing, so the touch goes back to the app underneath.
     private fun fire(run: GestureAction.Run): TrackerAction =

@@ -487,19 +487,39 @@ group with no title is written as **(no title)**.
     **Corner shortcuts**: left corner row, right corner row; *footer: corner
     shortcuts body*. (Moved here from App switching on 2026-11-13: a corner
     runs any action and works with the app list off.) **Distance and
-    timing**: the four sliders. **Gesture bar**: hide switch, shown under
+    timing**: the four sliders, and under Back swipe distance a fifth, "Far
+    swipe distance" (added 2026-11-14, `longSwipeDp`, 80-240 dp, default
+    120, `slider_long_swipe` on the slider itself). It shows only while a
+    far swipe that a touch can reach has an action (a half's far swipe
+    counts only while its edge is split), and folds in and out with
+    `BlockEnter`/`BlockExit`. **Gesture bar**: hide switch, shown under
     the same condition as today (`isHyperOsDevice() && (canHide ||
     !IS_PLAY)`).
     **Feedback**: haptics switch. Then the Reset button below the cards.
 *   **Edge pages** (added 2026-11-14, `SwipeEdgeScreen.kt`, screens
-    `LEFT_EDGE`, `RIGHT_EDGE`, `BOTTOM_EDGE`) — **(no title)**: one row per
-    swipe, showing its action and opening the action picker. Left and right:
-    "Swipe in" (`row_slot_left_whole_short`, `row_slot_right_whole_short`).
-    Bottom: "Swipe up" and "Swipe up and pause" (`row_slot_bottom_short`,
-    `row_slot_bottom_pause`).
+    `LEFT_EDGE`, `RIGHT_EDGE`, `BOTTOM_EDGE`) — one row per swipe, showing
+    its action and opening the action picker. Left and right (far swipe and
+    split added 2026-11-14): **(no title)**: the switch "Top and bottom do
+    different things" (`switch_split_left`, `switch_split_right`). Off:
+    **(no title)**: "Swipe in" and "Swipe far in"
+    (`row_slot_left_whole_short`, `row_slot_left_whole_long`, and the same
+    for the right). On: **Top half** and **Bottom half**, each with its own
+    "Swipe in" and "Swipe far in" (`row_slot_left_top_short`,
+    `row_slot_left_top_long`, `row_slot_left_bottom_short`,
+    `row_slot_left_bottom_long`, and the same for the right). The two
+    layouts swap with `BlockEnter`/`BlockExit`; each half keeps its own
+    actions, so turning the switch off and on loses nothing. Bottom: **(no
+    title)**: "Swipe up" and "Swipe up and pause" (`row_slot_bottom_short`,
+    `row_slot_bottom_pause`). The edge's row on Gesture settings sums up the
+    actions a touch can reach, each named once; the status card and the
+    touch-area adjuster name a side by its short swipe, or both halves'.
 *   **Action picker** (`SwipeActionPicker.kt`, one screen per slot:
     `LEFT_CORNER`, `RIGHT_CORNER`, `LEFT_SWIPE_IN`, `RIGHT_SWIPE_IN`,
-    `BOTTOM_SWIPE_UP`, `BOTTOM_SWIPE_UP_PAUSE`) — the corner picker, reused
+    `BOTTOM_SWIPE_UP`, `BOTTOM_SWIPE_UP_PAUSE`, and since 2026-11-14
+    `LEFT_SWIPE_FAR_IN`, `RIGHT_SWIPE_FAR_IN` and, per side,
+    `<SIDE>_TOP_SWIPE_IN`, `<SIDE>_TOP_SWIPE_FAR_IN`,
+    `<SIDE>_BOTTOM_SWIPE_IN`, `<SIDE>_BOTTOM_SWIPE_FAR_IN`, titled "Top
+    half, swipe in" and so on) — the corner picker, reused
     for every slot. Phone actions now start with Back, Home, Recents and
     Previous app. **Previous app** (only while usage access is missing): the
     usage access row with its Grant button.

@@ -36,8 +36,10 @@ class HapticGate {
             armTicked = false
             !ticked
         }
-        // POCO's performEnterRecent tick; the Recents release behind it then stays quiet.
-        is TrackerAction.Pending -> (action.kind == SwipeKind.PAUSE).also { if (it) armTicked = true }
+        // POCO's performEnterRecent tick, and a tick on entering a long swipe; falling back to
+        // the short swipe is silent. The release behind either then stays quiet.
+        is TrackerAction.Pending ->
+            (action.kind == SwipeKind.PAUSE || action.kind == SwipeKind.LONG).also { if (it) armTicked = true }
         // The corner ticks where its diagonal lands; the shortcut's release then stays quiet.
         is TrackerAction.CornerReady -> true.also { armTicked = true }
         is TrackerAction.Disarmed -> {

@@ -31,6 +31,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.SwipeSlots
 import kotlinx.coroutines.flow.Flow
@@ -115,7 +116,8 @@ class GestureSettingsRepository(
                 ?.let(SwipeAction::decode) ?: defaults.leftCornerShortcut,
             rightCornerShortcut = (override(RIGHT_CORNER_OVERRIDE) ?: preferences[RIGHT_CORNER])
                 ?.let(SwipeAction::decode) ?: defaults.rightCornerShortcut,
-            slots = storedSlots(preferences).overriddenBy { key -> override(OVERRIDE_PREFIX + key) },
+            slots = splitOverridden(storedSlots(preferences), override)
+                .overriddenBy { key -> override(OVERRIDE_PREFIX + key) },
             longSwipeDp = preferences[LONG_SWIPE_DP] ?: defaults.longSwipeDp,
             waitMs = preferences[WAIT_MS] ?: defaults.waitMs,
             hapticFeedbackEnabled = preferences[HAPTIC_FEEDBACK] ?: defaults.hapticFeedbackEnabled,
@@ -145,6 +147,11 @@ class GestureSettingsRepository(
         ) { key -> preferences[stringPreferencesKey(key)] }
     }
 
+    /** `navgesture_left_split` and `navgesture_right_split` split a side without the UI. */
+    private fun splitOverridden(slots: SwipeSlots, override: (String) -> String?): SwipeSlots =
+        listOf(ScreenEdge.LEFT to LEFT_SPLIT_OVERRIDE, ScreenEdge.RIGHT to RIGHT_SPLIT_OVERRIDE)
+            .fold(slots) { all, (edge, name) -> override(name)?.let { all.withSplit(edge, isOn(it)) } ?: all }
+
     /** The app-list override spares the debug emulator run a tap on the toggle. */
     private fun isOn(value: String): Boolean = value == "1" || value.equals("true", ignoreCase = true)
 
@@ -160,6 +167,8 @@ class GestureSettingsRepository(
         const val APP_LIST_STYLE_OVERRIDE = "navgesture_app_list_style"
         const val LEFT_CORNER_OVERRIDE = "navgesture_left_corner"
         const val RIGHT_CORNER_OVERRIDE = "navgesture_right_corner"
+        const val LEFT_SPLIT_OVERRIDE = "navgesture_left_split"
+        const val RIGHT_SPLIT_OVERRIDE = "navgesture_right_split"
 
         /** `navgesture_slot_left_whole_short` sets the left short swipe, and so on. */
         const val OVERRIDE_PREFIX = "navgesture_"
