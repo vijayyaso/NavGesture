@@ -198,6 +198,12 @@ class BackStackTest {
             Screen.RIGHT_EDGE to Screen.RIGHT_TOP_SWIPE_FAR_IN,
             Screen.RIGHT_EDGE to Screen.RIGHT_BOTTOM_SWIPE_IN,
             Screen.RIGHT_EDGE to Screen.RIGHT_BOTTOM_SWIPE_FAR_IN,
+            Screen.LEFT_EDGE to Screen.LEFT_SWIPE_IN_WAIT,
+            Screen.RIGHT_EDGE to Screen.RIGHT_SWIPE_IN_WAIT,
+            Screen.LEFT_EDGE to Screen.LEFT_TOP_SWIPE_IN_WAIT,
+            Screen.LEFT_EDGE to Screen.LEFT_BOTTOM_SWIPE_IN_WAIT,
+            Screen.RIGHT_EDGE to Screen.RIGHT_TOP_SWIPE_IN_WAIT,
+            Screen.RIGHT_EDGE to Screen.RIGHT_BOTTOM_SWIPE_IN_WAIT,
         )
         pages.forEach { (page, picker) ->
             val stack = home.open(Screen.GESTURE_SETTINGS, 300).open(page, 0).open(picker, 120)
@@ -235,6 +241,12 @@ class BackStackTest {
             Screen.RIGHT_TOP_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.LONG),
             Screen.RIGHT_BOTTOM_SWIPE_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT),
             Screen.RIGHT_BOTTOM_SWIPE_FAR_IN to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.LONG),
+            Screen.LEFT_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT),
+            Screen.RIGHT_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.WAIT),
+            Screen.LEFT_TOP_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.WAIT),
+            Screen.LEFT_BOTTOM_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT),
+            Screen.RIGHT_TOP_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.WAIT),
+            Screen.RIGHT_BOTTOM_SWIPE_IN_WAIT to SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT),
         )
         Screen.entries.forEach { assertEquals(it.name, pickers[it], it.pickerSlot) }
     }
@@ -244,6 +256,16 @@ class BackStackTest {
         val names = listOf(
             "HOME", "GESTURE_SETTINGS", "LEFT_EDGE", "LEFT_SWIPE_IN", "LEFT_SWIPE_FAR_IN", "RIGHT_TOP_SWIPE_IN",
             "RIGHT_BOTTOM_SWIPE_FAR_IN", "BOTTOM_SWIPE_UP_PAUSE", "LEFT_CORNER",
+        )
+        assertEquals(names, backStackOf(names).screens.map { it.name })
+    }
+
+    @Test
+    fun `the wait pickers restore from their saved names, next to the older ones`() {
+        val names = listOf(
+            "HOME", "GESTURE_SETTINGS", "LEFT_EDGE", "LEFT_SWIPE_IN_WAIT", "RIGHT_SWIPE_IN_WAIT",
+            "LEFT_TOP_SWIPE_IN_WAIT", "LEFT_BOTTOM_SWIPE_IN_WAIT", "RIGHT_TOP_SWIPE_IN_WAIT",
+            "RIGHT_BOTTOM_SWIPE_IN_WAIT", "LEFT_SWIPE_FAR_IN", "BOTTOM_SWIPE_UP_PAUSE",
         )
         assertEquals(names, backStackOf(names).screens.map { it.name })
     }

@@ -492,21 +492,26 @@ group with no title is written as **(no title)**.
     120, `slider_long_swipe` on the slider itself). It shows only while a
     far swipe that a touch can reach has an action (a half's far swipe
     counts only while its edge is split), and folds in and out with
-    `BlockEnter`/`BlockExit`. **Gesture bar**: hide switch, shown under
+    `BlockEnter`/`BlockExit`. Under it a sixth, "Wait time" (added
+    2026-11-14, `waitMs`, 200-800 ms, default 350, `slider_wait`), shows
+    and folds by the same rule for a wait swipe ("Swipe in and wait").
+    **Gesture bar**: hide switch, shown under
     the same condition as today (`isHyperOsDevice() && (canHide ||
     !IS_PLAY)`).
     **Feedback**: haptics switch. Then the Reset button below the cards.
 *   **Edge pages** (added 2026-11-14, `SwipeEdgeScreen.kt`, screens
     `LEFT_EDGE`, `RIGHT_EDGE`, `BOTTOM_EDGE`) — one row per swipe, showing
-    its action and opening the action picker. Left and right (far swipe and
-    split added 2026-11-14): **(no title)**: the switch "Top and bottom do
-    different things" (`switch_split_left`, `switch_split_right`). Off:
-    **(no title)**: "Swipe in" and "Swipe far in"
-    (`row_slot_left_whole_short`, `row_slot_left_whole_long`, and the same
-    for the right). On: **Top half** and **Bottom half**, each with its own
-    "Swipe in" and "Swipe far in" (`row_slot_left_top_short`,
-    `row_slot_left_top_long`, `row_slot_left_bottom_short`,
-    `row_slot_left_bottom_long`, and the same for the right). The two
+    its action and opening the action picker. Left and right (far swipe,
+    split and wait added 2026-11-14): **(no title)**: the switch "Top and
+    bottom do different things" (`switch_split_left`, `switch_split_right`).
+    Off: **(no title)**: "Swipe in", "Swipe far in" and "Swipe in and wait"
+    (`row_slot_left_whole_short`, `row_slot_left_whole_long`,
+    `row_slot_left_whole_wait`, and the same for the right). On: **Top
+    half** and **Bottom half**, each with its own three rows
+    (`row_slot_left_top_short`, `row_slot_left_top_long`,
+    `row_slot_left_top_wait`, `row_slot_left_bottom_short`,
+    `row_slot_left_bottom_long`, `row_slot_left_bottom_wait`, and the same
+    for the right). The two
     layouts swap with `BlockEnter`/`BlockExit`; each half keeps its own
     actions, so turning the switch off and on loses nothing. Bottom: **(no
     title)**: "Swipe up" and "Swipe up and pause" (`row_slot_bottom_short`,
@@ -519,7 +524,9 @@ group with no title is written as **(no title)**.
     `LEFT_SWIPE_FAR_IN`, `RIGHT_SWIPE_FAR_IN` and, per side,
     `<SIDE>_TOP_SWIPE_IN`, `<SIDE>_TOP_SWIPE_FAR_IN`,
     `<SIDE>_BOTTOM_SWIPE_IN`, `<SIDE>_BOTTOM_SWIPE_FAR_IN`, titled "Top
-    half, swipe in" and so on) — the corner picker, reused
+    half, swipe in" and so on; for the wait, `LEFT_SWIPE_IN_WAIT`,
+    `RIGHT_SWIPE_IN_WAIT`, `<SIDE>_TOP_SWIPE_IN_WAIT` and
+    `<SIDE>_BOTTOM_SWIPE_IN_WAIT`) — the corner picker, reused
     for every slot. Phone actions now start with Back, Home, Recents and
     Previous app. **Previous app** (only while usage access is missing): the
     usage access row with its Grant button.

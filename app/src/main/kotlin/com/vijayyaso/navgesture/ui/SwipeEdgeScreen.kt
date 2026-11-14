@@ -38,7 +38,11 @@ private class SlotRow(val slot: SlotId.Edge, val picker: Screen, @param:StringRe
 private fun sideRow(edge: ScreenEdge, zone: SwipeZone, kind: SwipeKind, picker: Screen) = SlotRow(
     SlotId.Edge(edge, zone, kind),
     picker,
-    if (kind == SwipeKind.LONG) R.string.slot_swipe_far_in else R.string.slot_swipe_in,
+    when (kind) {
+        SwipeKind.LONG -> R.string.slot_swipe_far_in
+        SwipeKind.WAIT -> R.string.slot_swipe_in_wait
+        else -> R.string.slot_swipe_in
+    },
 )
 
 /** Every row each edge page can show, in order: a side lists its whole edge, then each half. */
@@ -46,18 +50,24 @@ private fun rowsOf(edge: ScreenEdge): List<SlotRow> = when (edge) {
     ScreenEdge.LEFT -> listOf(
         sideRow(edge, SwipeZone.WHOLE, SwipeKind.SHORT, Screen.LEFT_SWIPE_IN),
         sideRow(edge, SwipeZone.WHOLE, SwipeKind.LONG, Screen.LEFT_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.WHOLE, SwipeKind.WAIT, Screen.LEFT_SWIPE_IN_WAIT),
         sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.SHORT, Screen.LEFT_TOP_SWIPE_IN),
         sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.LONG, Screen.LEFT_TOP_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.WAIT, Screen.LEFT_TOP_SWIPE_IN_WAIT),
         sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT, Screen.LEFT_BOTTOM_SWIPE_IN),
         sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.LONG, Screen.LEFT_BOTTOM_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT, Screen.LEFT_BOTTOM_SWIPE_IN_WAIT),
     )
     ScreenEdge.RIGHT -> listOf(
         sideRow(edge, SwipeZone.WHOLE, SwipeKind.SHORT, Screen.RIGHT_SWIPE_IN),
         sideRow(edge, SwipeZone.WHOLE, SwipeKind.LONG, Screen.RIGHT_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.WHOLE, SwipeKind.WAIT, Screen.RIGHT_SWIPE_IN_WAIT),
         sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.SHORT, Screen.RIGHT_TOP_SWIPE_IN),
         sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.LONG, Screen.RIGHT_TOP_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.TOP_HALF, SwipeKind.WAIT, Screen.RIGHT_TOP_SWIPE_IN_WAIT),
         sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.SHORT, Screen.RIGHT_BOTTOM_SWIPE_IN),
         sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.LONG, Screen.RIGHT_BOTTOM_SWIPE_FAR_IN),
+        sideRow(edge, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT, Screen.RIGHT_BOTTOM_SWIPE_IN_WAIT),
     )
     ScreenEdge.BOTTOM -> listOf(
         SlotRow(SlotId.Edge(edge, SwipeZone.WHOLE, SwipeKind.SHORT), Screen.BOTTOM_SWIPE_UP, R.string.slot_swipe_up),

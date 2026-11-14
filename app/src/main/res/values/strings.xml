@@ -221,11 +221,14 @@
     <string name="section_swipes">Swipes</string>
     <string name="slot_swipe_in">Swipe in</string>
     <string name="slot_swipe_far_in">Swipe far in</string>
+    <string name="slot_swipe_in_wait">Swipe in and wait</string>
     <!-- Picker page titles for one half of a split side edge. -->
     <string name="slot_top_swipe_in">Top half, swipe in</string>
     <string name="slot_top_swipe_far_in">Top half, swipe far in</string>
+    <string name="slot_top_swipe_in_wait">Top half, swipe in and wait</string>
     <string name="slot_bottom_swipe_in">Bottom half, swipe in</string>
     <string name="slot_bottom_swipe_far_in">Bottom half, swipe far in</string>
+    <string name="slot_bottom_swipe_in_wait">Bottom half, swipe in and wait</string>
     <string name="label_split_edge">Top and bottom do different things</string>
     <string name="label_split_edge_body">The top half and the bottom half each get their own swipes.</string>
     <string name="section_top_half">Top half</string>
@@ -243,6 +246,8 @@
     <string name="label_side_distance_body">How far your finger must move before Back works.</string>
     <string name="label_long_distance">Far swipe distance</string>
     <string name="label_long_distance_body">How far your finger must move for a far swipe.</string>
+    <string name="label_wait_time">Wait time</string>
+    <string name="label_wait_time_body">How long your finger must stay still for a swipe in and wait.</string>
     <string name="label_bottom_distance">Home swipe distance</string>
     <string name="label_bottom_distance_body">How far your finger must move before Home works.</string>
     <string name="label_recents_line">Recents height</string>
@@ -264,6 +269,7 @@
     <string name="label_haptics">Vibrate</string>
     <string name="value_dp">%1$d</string>
     <string name="value_seconds">%1$.1f s</string>
+    <string name="value_ms">%1$d ms</string>
     <string name="value_percent">%1$d%% of screen</string>
     <string name="action_reset_defaults">Reset to defaults</string>
     <string name="snackbar_reset">Gesture settings reset</string>

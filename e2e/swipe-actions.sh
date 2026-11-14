@@ -17,11 +17,12 @@
 
 # Swipe actions: each swipe runs the action its slot holds. A left swipe set to Home goes Home,
 # one set to Previous app opens the app used before (Recents without usage access), a far left
-# swipe runs its own action while a short one stays Back, a split left edge runs one action in
-# its top half and another in its bottom half, a bottom swipe set to Notifications opens them,
-# and Gesture settings warns while no swipe goes Home. Last, slots are picked through the
-# screens, as a user would: the short and far left swipes, the split switch and the far swipe
-# slider, each put back after.
+# swipe runs its own action while a short one stays Back, a left swipe held still runs its wait
+# action while a quick one stays Back, a split left edge runs one action in its top half and
+# another in its bottom half, a bottom swipe set to Notifications opens them, and Gesture
+# settings warns while no swipe goes Home. Last, slots are picked through the screens, as a user
+# would: the short, far and wait left swipes, the split switch, and the far swipe and wait time
+# sliders, each put back after.
 #
 # Uses the debug-only overrides (navgesture_slot_<key>, navgesture_left_split), so it needs the
 # debug APK. The exit trap deletes every override, puts back what the screens changed, and
@@ -42,8 +43,8 @@ if ! "${ADB_BIN}" shell dumpsys package "${PKG}" 2>/dev/null | grep -q 'pkgFlags
   exit 0
 fi
 
-OVERRIDES='navgesture_slot_left_whole_short navgesture_slot_left_whole_long navgesture_slot_left_top_short
-navgesture_slot_left_bottom_short navgesture_left_split navgesture_slot_bottom_short'
+OVERRIDES='navgesture_slot_left_whole_short navgesture_slot_left_whole_long navgesture_slot_left_whole_wait
+navgesture_slot_left_top_short navgesture_slot_left_bottom_short navgesture_left_split navgesture_slot_bottom_short'
 
 # Previous app's cases change usage access, so the trap puts back what was there.
 usage_mode="$("${ADB_BIN}" shell appops get "${PKG}" GET_USAGE_STATS 2>/dev/null | tr -d '\r' |
@@ -108,6 +109,7 @@ split_left() {
 # Set while the UI cases have stored a change, so the trap can put it back if a case stopped early.
 picked=''
 picked_far=''
+picked_wait=''
 split_on=''
 
 cleanup() {
@@ -117,7 +119,7 @@ cleanup() {
     # shellcheck disable=SC2310 # the trap puts Back back as best it can
     pick_left "$(string_res gesture_back_name)" || true
   fi
-  # The split goes first: the whole edge's far swipe row shows only while the edge is not split.
+  # The split goes first: the whole edge's far and wait rows show only while the edge is not split.
   if [ -n "${split_on}" ]; then
     # shellcheck disable=SC2310 # the trap turns the split off as best it can
     split_left false || true
@@ -125,6 +127,10 @@ cleanup() {
   if [ -n "${picked_far}" ]; then
     # shellcheck disable=SC2310 # the trap puts Nothing back as best it can
     pick_left "$(string_res corner_none)" row_slot_left_whole_long || true
+  fi
+  if [ -n "${picked_wait}" ]; then
+    # shellcheck disable=SC2310 # the trap puts Nothing back as best it can
+    pick_left "$(string_res corner_none)" row_slot_left_whole_wait || true
   fi
   # shellcheck disable=SC2310 # a failed rebind in the trap is not this suite's verdict
   enable_service >/dev/null 2>&1 || true
@@ -134,21 +140,29 @@ trap cleanup EXIT
 geometry
 warm_input
 
-# swipe_left_until <pattern> [<end x> [<y>]] - a left swipe from the edge (default: to x 300, at
-# mid height), tried again while the fresh input path drops it.
-swipe_left_until() {
+# left_until <pattern> <gesture> [<args>] - runs the gesture over the test app, tried again
+# while the fresh input path drops it.
+left_until() {
+  left_pattern="$1"
+  shift
   left_try=1
   while [ "${left_try}" -le 4 ]; do
     open_test_app
     reset_log
-    swipe 2 "${3:-${MID_Y}}" "${2:-300}" "${3:-${MID_Y}}" 120
+    "$@"
     sleep 2
     # shellcheck disable=SC2310 # a miss is the retry signal, not an error
-    if log_has "$1"; then
+    if log_has "${left_pattern}"; then
       return 0
     fi
     left_try=$((left_try + 1))
   done
+}
+
+# swipe_left_until <pattern> [<end x> [<y>]] - a left swipe from the edge (default: to x 300, at
+# mid height).
+swipe_left_until() {
+  left_until "$1" swipe 2 "${3:-${MID_Y}}" "${2:-300}" "${3:-${MID_Y}}" 120
 }
 
 echo >&2
@@ -198,6 +212,21 @@ assert_no_log "the far swipe is not Back" "GESTURE_FIRED LEFT Back"
 swipe_left_until "GESTURE_FIRED LEFT" "${SHORT_X}"
 assert_log "the short swipe still fires Back" "GESTURE_FIRED LEFT Back"
 assert_no_log "the short swipe is not Home" "GESTURE_FIRED LEFT Home"
+clear_overrides
+
+echo >&2
+echo "== a left swipe held still runs the wait slot, a quick one still goes Back ==" >&2
+slot left_whole_wait home
+# Swipes in past the trigger in one MOVE, holds still about 700 ms (twice the wait time), lifts.
+left_until "GESTURE_FIRED LEFT" swipe_and_hold 2 "${MID_Y}" "${SHORT_X}" "${MID_Y}" 0.7
+assert_log "the waited swipe fires Home" "GESTURE_FIRED LEFT Home"
+assert_log "the wait was reached before the lift" "PENDING WAIT home"
+assert_no_log "the waited swipe is not Back" "GESTURE_FIRED LEFT Back"
+swipe_left_until "GESTURE_FIRED LEFT" "${SHORT_X}"
+assert_log "the quick swipe still fires Back" "GESTURE_FIRED LEFT Back"
+assert_no_log "the quick swipe is not Home" "GESTURE_FIRED LEFT Home"
+assert_no_log "the quick swipe never reached the wait" "PENDING WAIT"
+"${ADB_BIN}" shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
 clear_overrides
 
 echo >&2
@@ -292,12 +321,12 @@ else
   fail "the Swipe in row shows Back again"
 fi
 
-# slider_shown - Gesture settings is open and shows the Far swipe distance slider. The page's
-# own row is checked first, so a missing slider on some other screen proves nothing.
+# slider_shown [<tag>] - Gesture settings is open (its own row is checked first) and shows that
+# slider (default: Far swipe distance).
 slider_shown() {
   # shellcheck disable=SC2310 # a missing row is reported as a failed case
   if find_id row_left_edge >/dev/null; then pass "Gesture settings is open"; else fail "Gesture settings is open"; fi
-  find_id slider_long_swipe >/dev/null
+  find_id "${1:-slider_long_swipe}" >/dev/null
 }
 
 echo >&2
@@ -386,6 +415,56 @@ if slider_shown; then
   fail "the Far swipe distance slider is gone"
 else
   pass "the Far swipe distance slider is gone"
+fi
+
+echo >&2
+echo "== the wait swipe is picked on its edge page, and only then is its time shown ==" >&2
+wait_row="$(string_res slot_swipe_in_wait)"
+wait_name="$(string_res label_wait_time)"
+open_screen row_gesture_settings row_left_edge
+# shellcheck disable=SC2310 # a shown slider is the failed case
+if slider_shown slider_wait; then
+  fail "no Wait time slider while no wait swipe is set"
+else
+  pass "no Wait time slider while no wait swipe is set"
+fi
+# shellcheck disable=SC2310 # a missing page is the failed case
+if open_left_edge && find_text "${wait_row}" >/dev/null && row_shows "${none_label}" row_slot_left_whole_wait; then
+  pass "the page has a ${wait_row} row, showing Nothing"
+else
+  fail "the page has a ${wait_row} row, showing Nothing"
+fi
+picked_wait='1'
+# shellcheck disable=SC2310 # a failed pick is the failed case
+if pick_left "${home_label}" row_slot_left_whole_wait; then
+  pass "Swipe in and wait opens the picker and Home can be picked"
+else
+  fail "Swipe in and wait opens the picker and Home can be picked"
+fi
+# shellcheck disable=SC2310 # a missing row is the failed case
+if row_shows "${home_label}" row_slot_left_whole_wait; then
+  pass "the Swipe in and wait row shows Home"
+else
+  fail "the Swipe in and wait row shows Home"
+fi
+open_screen row_gesture_settings row_left_edge
+# shellcheck disable=SC2310 # a missing slider is the failed case
+if slider_shown slider_wait; then pass "the Wait time slider shows"; else fail "the Wait time slider shows"; fi
+# shellcheck disable=SC2310 # a missing label is the failed case
+if find_text "${wait_name}" >/dev/null; then pass "it is named ${wait_name}"; else fail "it is named ${wait_name}"; fi
+# shellcheck disable=SC2310 # a failed pick is the failed case
+if pick_left "${none_label}" row_slot_left_whole_wait && row_shows "${none_label}" row_slot_left_whole_wait; then
+  picked_wait=''
+  pass "the Swipe in and wait row shows Nothing again"
+else
+  fail "the Swipe in and wait row shows Nothing again"
+fi
+open_screen row_gesture_settings row_left_edge
+# shellcheck disable=SC2310 # a shown slider is the failed case
+if slider_shown slider_wait; then
+  fail "the Wait time slider is gone"
+else
+  pass "the Wait time slider is gone"
 fi
 
 report "SWIPE ACTIONS"

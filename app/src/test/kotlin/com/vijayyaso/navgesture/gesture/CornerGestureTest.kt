@@ -182,7 +182,7 @@ class CornerGestureTest {
     }
 
     @Test fun `the corner ticks once, where it lands`() {
-        val gate = HapticGate()
+        val gate = HapticGate(ScreenEdge.BOTTOM)
         assertTrue(gate.shouldTick(TrackerAction.CornerReady(BottomCorner.LEFT)))
         assertEquals(false, gate.shouldTick(leftFire))
     }

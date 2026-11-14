@@ -42,6 +42,7 @@ import com.vijayyaso.navgesture.gesture.LandscapeConfirm
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SlotId
 import com.vijayyaso.navgesture.gesture.SwipeAction
+import com.vijayyaso.navgesture.gesture.SwipeKind
 import com.vijayyaso.navgesture.gesture.TouchRecording
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
@@ -453,12 +454,12 @@ internal class EdgeTouchOverlay(
         private val samples = TouchRecording(MAX_SAMPLES)
         private var abandoned = false
         private var switching = false
-        private val haptics = HapticGate()
+        private val haptics = HapticGate(edge)
 
-        // MotionEvent times are uptime, so the pause poll reads the same clock.
+        // MotionEvent times are uptime, so the pause and wait polls read the same clock.
         private val holdRunnable = Runnable {
             val action = tracker.onHoldElapsed(SystemClock.uptimeMillis())
-            // The bottom bubble swaps to the Recents icon on the poll that primes it.
+            // The bubble swaps to the pause or wait action's icon on the poll that reaches it.
             samples.last?.let { bubble?.follow(action, it.xPx, it.yPx) }
             handle(action, replayable = false)
         }
@@ -574,6 +575,8 @@ internal class EdgeTouchOverlay(
                 !admitted && buzz -> confirmTick()
                 !admitted || !buzz -> Unit
                 action is TrackerAction.Fire && action.action == GestureAction.CircleToSearch -> longPressTick()
+                // A reached wait is a hold that landed, so it gets the same stronger buzz.
+                action is TrackerAction.Pending && action.kind == SwipeKind.WAIT -> longPressTick()
                 else -> tick()
             }
             when (action) {
@@ -606,7 +609,7 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.Armed -> {
                     // A swipe is under way, so this touch can no longer be a long press.
                     removeCallbacks(longPressRunnable)
-                    Log.d(TAG, "$edge armed (pause poll=${action.scheduleHoldMs})")
+                    Log.d(TAG, "$edge armed (hold poll=${action.scheduleHoldMs})")
                     // The rise is live and a sideways drag opens the app list, so say so: once, and
                     // only when the list is on and the arm did not already buzz (no pause action).
                     if (edge == ScreenEdge.BOTTOM && dragListEnabled && !buzz) confirmTick()
@@ -619,8 +622,15 @@ internal class EdgeTouchOverlay(
                     removeCallbacks(holdRunnable)
                     postDelayed(holdRunnable, action.delayMs)
                 }
-                // The release now means another action (pause, long or back to short); the gate decides the tick.
-                is TrackerAction.Pending -> Log.d(TAG, "$edge PENDING ${action.kind} ${action.action.id}")
+                // The release now means another action (pause, long, wait or back to short); the gate
+                // decides the tick. Moving on from a wait starts the still poll again.
+                is TrackerAction.Pending -> {
+                    Log.d(TAG, "$edge PENDING ${action.kind} ${action.action.id}")
+                    action.scheduleHoldMs?.let {
+                        removeCallbacks(holdRunnable)
+                        postDelayed(holdRunnable, it)
+                    }
+                }
                 is TrackerAction.Fire -> {
                     cancelHold()
                     if (admitted) {

@@ -146,6 +146,12 @@ internal enum class Screen(@param:StringRes val title: Int) {
     RIGHT_TOP_SWIPE_FAR_IN(R.string.slot_top_swipe_far_in),
     RIGHT_BOTTOM_SWIPE_IN(R.string.slot_bottom_swipe_in),
     RIGHT_BOTTOM_SWIPE_FAR_IN(R.string.slot_bottom_swipe_far_in),
+    LEFT_SWIPE_IN_WAIT(R.string.slot_swipe_in_wait),
+    RIGHT_SWIPE_IN_WAIT(R.string.slot_swipe_in_wait),
+    LEFT_TOP_SWIPE_IN_WAIT(R.string.slot_top_swipe_in_wait),
+    LEFT_BOTTOM_SWIPE_IN_WAIT(R.string.slot_bottom_swipe_in_wait),
+    RIGHT_TOP_SWIPE_IN_WAIT(R.string.slot_top_swipe_in_wait),
+    RIGHT_BOTTOM_SWIPE_IN_WAIT(R.string.slot_bottom_swipe_in_wait),
     BANK_APPS(R.string.section_bank_apps),
     CIRCLE_TO_SEARCH(R.string.section_circle_to_search),
     UPDATES(R.string.section_updates),
@@ -296,7 +302,9 @@ private fun ScreenContent(
         Screen.BOTTOM_SWIPE_UP, Screen.BOTTOM_SWIPE_UP_PAUSE, Screen.LEFT_SWIPE_FAR_IN, Screen.RIGHT_SWIPE_FAR_IN,
         Screen.LEFT_TOP_SWIPE_IN, Screen.LEFT_TOP_SWIPE_FAR_IN, Screen.LEFT_BOTTOM_SWIPE_IN,
         Screen.LEFT_BOTTOM_SWIPE_FAR_IN, Screen.RIGHT_TOP_SWIPE_IN, Screen.RIGHT_TOP_SWIPE_FAR_IN,
-        Screen.RIGHT_BOTTOM_SWIPE_IN, Screen.RIGHT_BOTTOM_SWIPE_FAR_IN,
+        Screen.RIGHT_BOTTOM_SWIPE_IN, Screen.RIGHT_BOTTOM_SWIPE_FAR_IN, Screen.LEFT_SWIPE_IN_WAIT,
+        Screen.RIGHT_SWIPE_IN_WAIT, Screen.LEFT_TOP_SWIPE_IN_WAIT, Screen.LEFT_BOTTOM_SWIPE_IN_WAIT,
+        Screen.RIGHT_TOP_SWIPE_IN_WAIT, Screen.RIGHT_BOTTOM_SWIPE_IN_WAIT,
         -> screen.pickerSlot?.let { SwipeActionPickerScreen(it, model, onDone = close) }
         Screen.LEFT_EDGE -> SwipeEdgeScreen(ScreenEdge.LEFT, model, onOpen = open)
         Screen.RIGHT_EDGE -> SwipeEdgeScreen(ScreenEdge.RIGHT, model, onOpen = open)

@@ -48,6 +48,7 @@ import com.vijayyaso.navgesture.gesture.swipeWarnings
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.navigation.GestureBarHider.BarState
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 @Composable
 internal fun GestureSettingsScreen(model: AppModel, onOpen: (Screen) -> Unit) {
@@ -164,6 +165,21 @@ internal fun GestureSettingsScreen(model: AppModel, onOpen: (Screen) -> Unit) {
                 tag = TestTags.SLIDER_LONG_SWIPE,
             ) { updated -> model.update { it.copy(longSwipeDp = updated) } }
         }
+        // The same rule for the wait: shown only while a reachable wait swipe has an action.
+        AnimatedVisibility(
+            visible = configuration.slots.anySet(SwipeKind.WAIT),
+            enter = BlockEnter,
+            exit = BlockExit,
+        ) {
+            ThresholdSlider(
+                label = stringResource(R.string.label_wait_time),
+                value = configuration.waitMs.toFloat(),
+                range = WAIT_RANGE,
+                formatter = { stringResource(R.string.value_ms, it) },
+                supporting = stringResource(R.string.label_wait_time_body),
+                tag = TestTags.SLIDER_WAIT,
+            ) { updated -> model.update { it.copy(waitMs = updated.roundToLong()) } }
+        }
         ThresholdSlider(
             label = stringResource(R.string.label_bottom_distance),
             value = configuration.bottomMinimumSwipeDistanceDp,
@@ -262,6 +278,9 @@ private val EDGE_WIDTH_RANGE = 8f..64f
 
 /** Far swipe distance, around its 120 dp default; it stays well past most back swipe distances. */
 private val LONG_SWIPE_RANGE = 80f..240f
+
+/** Wait time in ms, around its 350 ms default: long enough that a hesitating Back stays Back. */
+private val WAIT_RANGE = 200f..800f
 
 @Composable
 private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState, model: AppModel) {

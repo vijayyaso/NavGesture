@@ -55,9 +55,13 @@ class SwipeGrammarTest {
     private val rightShort = SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.WHOLE, SwipeKind.SHORT)
     private val bottomShort = SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)
     private val bottomPause = SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)
+    private val leftWait = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT)
+    private val topWait = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.WAIT)
+    private val lowerWait = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT)
 
     private val slotEmpty = TrackerAction.Unused(RejectionReason.SLOT_EMPTY)
     private val frame = GestureTracker.FRAME_MS
+    private val poll = TrackerAction.RearmHold(GestureTracker.FRAME_MS)
 
     private fun fire(slot: SlotId.Edge, action: SwipeAction) =
         TrackerAction.Fire(GestureAction.Run(slot, action), slot.edge)
@@ -507,6 +511,269 @@ class SwipeGrammarTest {
                 Step.Up(105f, 600f, 80L, slotEmpty),
             ),
             split = true,
+        ),
+
+        // Swipe and wait. The wait time is 350 ms and the touch slop 8 dp = 22 px; the still
+        // clock runs from the sample that armed, here the MOVE at 60 ms.
+        Row(
+            "still past the trigger for the wait time, the wait action is pending and the lift runs it",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(200L, poll),
+                Step.Hold(409L, poll),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Hold(430L, TrackerAction.None),
+                Step.Up(105f, 1200f, 500L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a lift before the wait time runs the short action",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(300L, poll),
+                Step.Up(105f, 1200f, 400L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "jitter inside the touch slop does not restart the still clock",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Move(120f, 1210f, 200L, TrackerAction.None),
+                Step.Move(95f, 1195f, 300L, TrackerAction.None),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Move(110f, 1205f, 420L, TrackerAction.None),
+                Step.Up(100f, 1200f, 450L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a move past the slop restarts the still clock before the wait is reached",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Move(200f, 1200f, 300L, TrackerAction.None),
+                Step.Hold(410L, poll),
+                Step.Hold(649L, poll),
+                Step.Hold(650L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(200f, 1200f, 660L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "moving on past the slop after the wait returns to the short action, and a new stillness waits again",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Move(200f, 1200f, 450L, TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT, frame)),
+                Step.Move(210f, 1200f, 500L, TrackerAction.None),
+                Step.Hold(700L, poll),
+                Step.Hold(800L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(210f, 1200f, 820L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "moving on after the wait and lifted at once runs the short action",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Move(200f, 1200f, 450L, TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT, frame)),
+                Step.Up(200f, 1200f, 470L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "moving on past the long line after the wait returns to the long action",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home, leftLong to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Move(400f, 1200f, 450L, TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG, frame)),
+                Step.Up(400f, 1200f, 470L, fire(leftLong, SwipeAction.Screenshot)),
+            ),
+        ),
+        Row(
+            "a lift that itself moves past the slop after the wait runs the band at the release point",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(200f, 1200f, 450L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "a retract while waiting stops the poll, and the lift reverts",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(200L, poll),
+                Step.Move(20f, 1200f, 250L, TrackerAction.Disarmed),
+                Step.Hold(700L, TrackerAction.None),
+                Step.Up(20f, 1200f, 720L, TrackerAction.Reverted),
+            ),
+        ),
+        Row(
+            "a retract after the wait is reached disarms it, and the lift reverts",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Move(20f, 1200f, 450L, TrackerAction.Disarmed),
+                Step.Hold(900L, TrackerAction.None),
+                Step.Up(20f, 1200f, 920L, TrackerAction.Reverted),
+            ),
+        ),
+        Row(
+            "a re-arm starts the still clock again, from the re-arm",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Move(20f, 1200f, 200L, TrackerAction.Disarmed),
+                Step.Move(110f, 1200f, 300L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(500L, poll),
+                Step.Hold(650L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(110f, 1200f, 670L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "with the wait slot empty a side arm asks for no poll, and a still finger stays Back",
+            ScreenEdge.LEFT,
+            emptyMap(),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Hold(1000L, TrackerAction.None),
+                Step.Up(105f, 1200f, 1100L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "with the wait slot empty a re-arm asks for no poll either",
+            ScreenEdge.RIGHT,
+            emptyMap(),
+            listOf(
+                Step.Down(1075f, 1200f, 0L),
+                Step.Move(975f, 1200f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Move(1060f, 1200f, 90L, TrackerAction.Disarmed),
+                Step.Move(975f, 1200f, 120L, TrackerAction.Armed(null, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "on a split edge the whole edge's wait slot is out of reach, so nothing polls",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 600f, 0L),
+                Step.Move(105f, 600f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Hold(1000L, TrackerAction.None),
+                Step.Up(105f, 600f, 1100L, fire(topShort, SwipeAction.Back)),
+            ),
+            split = true,
+        ),
+        Row(
+            "a DOWN then UP never runs the wait action, however long it took",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Up(105f, 1200f, 900L, fire(leftShort, SwipeAction.Back)),
+            ),
+        ),
+        Row(
+            "with only a wait slot the arm has nothing pending, and a quick swipe goes to the app",
+            ScreenEdge.LEFT,
+            mapOf(leftShort to SwipeAction.None, leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.None)),
+                Step.Up(105f, 1200f, 100L, slotEmpty),
+            ),
+        ),
+        Row(
+            "with only a wait slot a waited swipe runs it",
+            ScreenEdge.LEFT,
+            mapOf(leftShort to SwipeAction.None, leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L, TrackerAction.Armed(frame, SwipeAction.None)),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(105f, 1200f, 450L, fire(leftWait, SwipeAction.Home)),
+            ),
+        ),
+        Row(
+            "a wait in a half runs that half's wait slot",
+            ScreenEdge.LEFT,
+            mapOf(topWait to SwipeAction.Home, lowerWait to SwipeAction.Screenshot),
+            listOf(
+                Step.Down(5f, 1800f, 0L),
+                Step.Move(105f, 1800f, 60L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.WAIT)),
+                Step.Up(105f, 1800f, 450L, fire(lowerWait, SwipeAction.Screenshot)),
+            ),
+            split = true,
+        ),
+        Row(
+            "the other half's wait slot does not reach this half, so nothing polls",
+            ScreenEdge.LEFT,
+            mapOf(topWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1800f, 0L),
+                Step.Move(105f, 1800f, 60L, TrackerAction.Armed(null, SwipeAction.Back)),
+                Step.Hold(1000L, TrackerAction.None),
+                Step.Up(105f, 1800f, 1100L, fire(lowerShort, SwipeAction.Back)),
+            ),
+            split = true,
+        ),
+        Row(
+            "a wait set further needs that much stillness",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L),
+                Step.Hold(410L, poll),
+                Step.Hold(860L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+            ),
+            tune = { it.copy(waitMs = 800L) },
+        ),
+        Row(
+            "the next touch on the same tracker starts with no wait left over",
+            ScreenEdge.LEFT,
+            mapOf(leftWait to SwipeAction.Home),
+            listOf(
+                Step.Down(5f, 1200f, 0L),
+                Step.Move(105f, 1200f, 60L),
+                Step.Hold(410L, TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)),
+                Step.Up(105f, 1200f, 450L, fire(leftWait, SwipeAction.Home)),
+                Step.Down(5f, 1200f, 1000L),
+                Step.Up(105f, 1200f, 1080L, fire(leftShort, SwipeAction.Back)),
+                Step.Down(5f, 1200f, 2000L),
+                Step.Move(105f, 1200f, 2060L, TrackerAction.Armed(frame, SwipeAction.Back)),
+                Step.Hold(2100L, poll),
+                Step.Up(105f, 1200f, 2120L, fire(leftShort, SwipeAction.Back)),
+            ),
         ),
     )
 

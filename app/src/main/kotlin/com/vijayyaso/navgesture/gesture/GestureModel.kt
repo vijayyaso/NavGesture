@@ -402,16 +402,19 @@ enum class RejectionReason {
 sealed interface TrackerAction {
     data object None : TrackerAction
 
-    /** [pending] is the action a release would run now. */
+    /**
+     * [pending] is the action a release would run now. [scheduleHoldMs] starts the per-frame
+     * poll: the bottom pause, or a side swipe's still clock when its zone has a wait action.
+     */
     data class Armed(val scheduleHoldMs: Long?, val pending: SwipeAction) : TrackerAction
 
     data class RearmHold(val delayMs: Long) : TrackerAction
 
     /**
-     * What a release would run changed after arming: a bottom swipe paused past the Recents
-     * line, or a side swipe crossed its long line, out (LONG) or back (SHORT).
+     * What a release would run changed after arming: a pause, a long-line crossing, or a wait.
+     * [scheduleHoldMs] restarts the still poll when the finger moves on from a reached wait.
      */
-    data class Pending(val action: SwipeAction, val kind: SwipeKind) : TrackerAction
+    data class Pending(val action: SwipeAction, val kind: SwipeKind, val scheduleHoldMs: Long? = null) : TrackerAction
 
     /** Starts the long-press timer, whose expiry is reported through `onLongPressElapsed`. */
     data class ScheduleLongPress(val delayMs: Long) : TrackerAction

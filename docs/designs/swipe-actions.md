@@ -1,8 +1,8 @@
 # Swipe actions: pick what every swipe does, and three new side swipes
 
 *   **Author:** vijayyaso
-*   **Status:** Phases 0a, 0b, A and B are built (2026-11-14). Phases C
-    and D are `[not built]`.
+*   **Status:** Phases 0a, 0b, A, B and C are built (2026-11-14). Phase D
+    (Torch) is `[not built]`.
 *   **Date:** 2026-11-14
 
 --------------------------------------------------------------------------------
@@ -278,7 +278,9 @@ apart, and every lift is judged by the band at its release point.
     It is judged from timestamps only. A new anchor after that (the finger
     moved on) returns to the band rule. A retract stops the poll; a re-arm
     starts it again with a new anchor. With the WAIT slot empty no poll is
-    ever requested.
+    ever requested. The poll stops once WAIT is reached, and a lift that
+    itself lands more than the slop from the anchor runs the band at the
+    release point, as a MOVE there would.
 *   **Lift.** The pending action at the lift point runs. If it is `None`
     (SHORT empty and the finger under the long line) the stream ends as
     `Unused(SLOT_EMPTY)` and is replayed. A stream longer than the replay
@@ -297,6 +299,8 @@ apart, and every lift is judged by the band at its release point.
 *   `TrackerAction.Pending(action, kind)` is sent only for a later change:
     a band change, a wait reached or left, or the bottom pause. It
     replaces `RecentsPrimed`, which becomes `Pending(<pause action>, PAUSE)`.
+    The `Pending` that leaves a reached wait carries `scheduleHoldMs`, so the
+    overlay starts the still poll again.
 *   `Fire` carries `GestureAction.Run`.
 
 The grammar has one table-driven JVM test (`SwipeGrammarTest`) with a row
@@ -317,7 +321,9 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
         `Armed.pending` is `None`.
     *   `Pending` ticks for kind PAUSE (as `RecentsPrimed` does today) and
         for entering LONG; entering WAIT gives the stronger confirm buzz;
-        falling back to SHORT is silent.
+        falling back to SHORT is silent. The gate is built per edge, the WAIT
+        buzz is the overlay's long-press buzz (`HapticFeedbackConstants.LONG_PRESS`,
+        as Circle to Search uses), and leaving WAIT is silent even into LONG.
     *   `Fire` ticks only when nothing ticked before it, as today.
 *   The overlay removes its pending hold callback on `Disarmed` and before
     each new post, so polls never stack.

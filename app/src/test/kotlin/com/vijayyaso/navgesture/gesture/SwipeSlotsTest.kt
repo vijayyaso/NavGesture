@@ -272,6 +272,19 @@ class SwipeSlotsTest {
         assertTrue(SwipeSlots().with(rightTopLong, SwipeAction.Home).withSplit(ScreenEdge.RIGHT, true).anySet(SwipeKind.LONG))
     }
 
+    @Test fun `a wait swipe counts only where a touch can reach it, and alone keeps its side in use`() {
+        val leftWait = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT)
+        val rightLowerWait = SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.BOTTOM_HALF, SwipeKind.WAIT)
+        assertFalse(SwipeSlots().anySet(SwipeKind.WAIT))
+        assertTrue(SwipeSlots().with(leftWait, SwipeAction.Home).anySet(SwipeKind.WAIT))
+        assertFalse(SwipeSlots().with(leftWait, SwipeAction.Home).withSplit(ScreenEdge.LEFT, true).anySet(SwipeKind.WAIT))
+        assertFalse(SwipeSlots().with(rightLowerWait, SwipeAction.Home).anySet(SwipeKind.WAIT))
+        assertTrue(SwipeSlots().with(rightLowerWait, SwipeAction.Home).withSplit(ScreenEdge.RIGHT, true).anySet(SwipeKind.WAIT))
+        assertFalse(SwipeSlots().with(leftWait, SwipeAction.Home).anySet(SwipeKind.LONG))
+        val waitOnly = SwipeSlots().with(leftShort, SwipeAction.None).with(leftWait, SwipeAction.Screenshot)
+        assertTrue(waitOnly.edgeInUse(ScreenEdge.LEFT))
+    }
+
     @Test fun `a side's short actions are its whole edge's, or each half's once when split`() {
         val topShort = SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.SHORT)
         val slots = SwipeSlots().with(topShort, SwipeAction.Home)
