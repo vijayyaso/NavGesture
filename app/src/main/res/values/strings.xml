@@ -348,6 +348,10 @@
     <string name="about_email_body">Questions and feedback by email</string>
     <string name="email_feedback_subject">NavGesture %1$s feedback</string>
     <string name="section_credits">Credits</string>
+    <string name="credits_summary">HyperGesture and others</string>
+    <string name="credit_hypergesture" translatable="false">HyperGesture</string>
+    <string name="credit_hypergesture_body">By Henrique Almeida. NavGesture is built on it.</string>
+    <string name="url_hypergesture" translatable="false">https://github.com/h3nc4/HyperGesture</string>
     <string name="credit_victor" translatable="false">Victor Eduardo</string>
     <string name="credit_victor_body">Circle to Search, Control Center tile</string>
     <string name="credit_cts" translatable="false">MiCTS, CTSLauncher</string>

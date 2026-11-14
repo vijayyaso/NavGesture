@@ -43,6 +43,8 @@ internal object TestTags {
     const val ROW_GESTURE_SETTINGS = "row_gesture_settings"
     const val ROW_TROUBLESHOOTING = "row_troubleshooting"
     const val ROW_ABOUT = "row_about"
+    const val ROW_CREDITS = "row_credits"
+    const val ROW_CREDIT_HYPERGESTURE = "row_credit_hypergesture"
     const val ROW_REPORT_BUG = "row_report_bug"
     const val ROW_REQUEST_FEATURE = "row_request_feature"
     const val ROW_EMAIL_DEVELOPER = "row_email_developer"

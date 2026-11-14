@@ -87,7 +87,7 @@ internal object Store {
     }
 
     /**
-     * The Buy me a coffee button under About's Help and feedback rows; none in play. It wears the
+     * The Buy me a coffee button, on Home and under About's Help rows; none in play. It wears the
      * service's own yellow and black in both themes, so it reads as that button at a glance.
      */
     @Composable

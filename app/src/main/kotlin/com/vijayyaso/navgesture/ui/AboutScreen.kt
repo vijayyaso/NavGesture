@@ -27,7 +27,7 @@ import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
 
 @Composable
-internal fun AboutScreen(model: AppModel) {
+internal fun AboutScreen(model: AppModel, onOpenCredits: () -> Unit) {
     val context = LocalContext.current
     val sourceUrl = stringResource(R.string.url_source)
     val licenseUrl = stringResource(R.string.url_license)
@@ -47,7 +47,27 @@ internal fun AboutScreen(model: AppModel) {
         ) { context.startFirst(Intent(Intent.ACTION_VIEW, licenseUrl.toUri())) }
     }
     HelpGroup(model.diagnostics.appVersionName ?: BuildConfig.VERSION_NAME)
-    SettingsGroup(title = stringResource(R.string.section_credits)) {
+    SettingsGroup {
+        NavigationRow(
+            title = stringResource(R.string.section_credits),
+            supporting = stringResource(R.string.credits_summary),
+            tag = TestTags.ROW_CREDITS,
+            onClick = onOpenCredits,
+        )
+    }
+}
+
+/** The projects NavGesture is built on. HyperGesture, its base, opens its source page. */
+@Composable
+internal fun CreditsScreen() {
+    val context = LocalContext.current
+    val upstreamUrl = stringResource(R.string.url_hypergesture)
+    SettingsGroup {
+        NavigationRow(
+            title = stringResource(R.string.credit_hypergesture),
+            supporting = stringResource(R.string.credit_hypergesture_body),
+            tag = TestTags.ROW_CREDIT_HYPERGESTURE,
+        ) { context.startFirst(Intent(Intent.ACTION_VIEW, upstreamUrl.toUri())) }
         InfoRow(
             title = stringResource(R.string.credit_victor),
             supporting = stringResource(R.string.credit_victor_body),

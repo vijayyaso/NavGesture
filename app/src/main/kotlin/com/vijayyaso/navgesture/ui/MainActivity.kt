@@ -158,6 +158,7 @@ internal enum class Screen(@param:StringRes val title: Int) {
     GESTURE_SETTINGS(R.string.section_gestures),
     TROUBLESHOOTING(R.string.section_troubleshooting),
     ABOUT(R.string.section_about),
+    CREDITS(R.string.section_credits),
     DISCLOSURE(R.string.disclosure_title),
 }
 
@@ -315,7 +316,8 @@ private fun ScreenContent(
         Screen.UPDATES -> Store.UpdatesScreen()
         Screen.GESTURE_SETTINGS -> GestureSettingsScreen(model = model, onOpen = open)
         Screen.TROUBLESHOOTING -> TroubleshootingScreen(model)
-        Screen.ABOUT -> AboutScreen(model)
+        Screen.ABOUT -> AboutScreen(model, onOpenCredits = { open(Screen.CREDITS) })
+        Screen.CREDITS -> CreditsScreen()
         // Back and Not now are the same: nothing is recorded.
         Screen.DISCLOSURE -> DisclosureScreen(onAgree = onAgree, onNotNow = close)
     }

@@ -559,7 +559,13 @@ group with no title is written as **(no title)**.
     drawn by
     `Store.SupportRow()`; the play `Store` draws nothing there, because
     Google Play's payments policy forbids sending users to pay outside Play.
-    **Credits**: the two credit rows.
+    **(no title)**: a Credits row (`row_credits`) that opens the Credits
+    page.
+    The same Buy me a coffee button is also the last thing on Home, under
+    the More card (github build only).
+*   **Credits** — **(no title)**: HyperGesture (`row_credit_hypergesture`,
+    opens its source page), then the two other credit rows. This page is
+    information by purpose, like About.
 *   **Updates** (github only) — **(no title)**: the update switch; *footer:
     switch body*. If on: **(no title)**: the status row with its buttons.
 *   **Disclosure** — the intro text; one card holding the three parts in

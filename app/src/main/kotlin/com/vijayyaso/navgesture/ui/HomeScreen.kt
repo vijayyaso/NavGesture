@@ -178,6 +178,8 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
             icon = GroupIcon(Icons.Filled.Info, IconTint.GREY),
         ) { onOpen(Screen.ABOUT) }
     }
+    // github build only: Play forbids links to outside payment.
+    Store.SupportRow()
 }
 
 /** Fades and grows a tile in, a moment after the card it replaces starts to fold. */

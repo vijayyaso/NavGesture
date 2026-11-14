@@ -252,7 +252,8 @@ private fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
     SwipeAction.Home -> GroupIcon(Icons.Filled.Home, IconTint.BLUE)
     SwipeAction.Recents -> GroupIcon(RecentsGlyph, IconTint.BLUE)
     SwipeAction.PreviousApp -> GroupIcon(Icons.Filled.Refresh, IconTint.BLUE)
-    is SwipeAction.OpenApp, is SwipeAction.AppShortcut, SwipeAction.Torch -> null
+    SwipeAction.Torch -> GroupIcon(TorchGlyph, IconTint.ORANGE)
+    is SwipeAction.OpenApp, is SwipeAction.AppShortcut -> null
 }
 
 /** A row that picks: a check mark marks the current choice, and it reads as a radio button. */
@@ -476,6 +477,21 @@ private val SplitScreenGlyph: ImageVector = ImageVector.Builder(
     path(fill = SolidColor(Color.Black)) {
         moveTo(5f, 3f); horizontalLineTo(19f); verticalLineTo(11f); horizontalLineTo(5f); close()
         moveTo(5f, 13f); horizontalLineTo(19f); verticalLineTo(21f); horizontalLineTo(5f); close()
+    }
+}.build()
+
+private val TorchGlyph: ImageVector = ImageVector.Builder(
+    name = "Torch",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // A hand torch: a wide head over a narrow handle.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(6f, 2f); horizontalLineTo(18f); verticalLineTo(5f); horizontalLineTo(6f); close()
+        moveTo(6f, 6.5f); horizontalLineTo(18f); lineTo(15f, 10.5f); verticalLineTo(22f)
+        horizontalLineTo(9f); verticalLineTo(10.5f); close()
     }
 }.build()
 
