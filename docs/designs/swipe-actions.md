@@ -392,6 +392,14 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
     status card names the bottom edge's two actions the same way. On a
     split side both halves' SHORT actions are named, each once.
 
+### Actions a phone refuses
+
+At start the service reads the system's own list of actions
+(`getSystemActions`). HyperOS 3 leaves split screen out of it (its system
+log says `Invalid action id: 7`), so the picker does not offer Split screen
+there. A slot that already holds it keeps showing it, so it can be changed.
+The service logs `SYSTEM_ACTIONS split_screen=<true|false>`.
+
 ### Logs
 
 `GESTURE_FIRED <EDGE> <id>` keeps its form. The debug line

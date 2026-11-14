@@ -225,6 +225,10 @@ sealed interface SwipeAction {
             )
         }
 
+        /** The picker's list: [fixed] without what this phone refuses, keeping the current choice. */
+        fun offered(unsupported: Set<SwipeAction>, current: SwipeAction): List<SwipeAction> =
+            fixed.filter { it !in unsupported || it == current }
+
         /** An unknown or empty id is [None], so a downgrade never leaves a broken corner. */
         fun decode(stored: String?): SwipeAction {
             if (stored == null) return None

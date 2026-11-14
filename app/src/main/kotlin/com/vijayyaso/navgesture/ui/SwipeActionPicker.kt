@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,6 +74,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.SlotId
 import com.vijayyaso.navgesture.gesture.SwipeAction
@@ -183,7 +185,8 @@ internal fun SwipeActionPickerScreen(slot: SlotId, model: AppModel, onDone: () -
     }
 
     // The fixed choices keep the order of SwipeAction.fixed, split into three cards.
-    val fixed = SwipeAction.fixed.groupBy(::fixedSection)
+    val unsupported by NavGestureAccessibilityService.unsupported.collectAsState()
+    val fixed = SwipeAction.offered(unsupported, current).groupBy(::fixedSection)
     FixedGroup(null, fixed[FixedSection.NOTHING].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_app_lists), fixed[FixedSection.LISTS].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_phone_actions), fixed[FixedSection.ACTIONS].orEmpty(), current, pick)

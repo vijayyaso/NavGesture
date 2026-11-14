@@ -40,6 +40,7 @@ import com.vijayyaso.navgesture.bankpause.BankPause
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.FailureLog
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.PlatformDefaults
@@ -121,6 +122,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         super.onServiceConnected()
         instance = this
         runningState.value = true
+        unsupportedState.value = unsupportedActions()
         ServiceLog.add(this, "service started")
         ServiceKeeper.markWanted(this, wanted = true)
         pausing = false
@@ -132,6 +134,14 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             FailureLog.record(this, "onServiceConnected", t)
         }
         GestureTileService.requestRefresh(this)
+    }
+
+    /** The system lists the actions it can run; split screen is missing from that list on HyperOS. */
+    private fun unsupportedActions(): Set<SwipeAction> {
+        val ids = runCatching { systemActions.map { it.id } }.getOrElse { return emptySet() }
+        val split = AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN in ids
+        Log.i(TAG, "SYSTEM_ACTIONS split_screen=$split")
+        return if (split) emptySet() else setOf(SwipeAction.SplitScreen)
     }
 
     private fun setUp() {
@@ -531,6 +541,10 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
 
         private val runningState = MutableStateFlow(false)
+        private val unsupportedState = MutableStateFlow<Set<SwipeAction>>(emptySet())
+
+        /** Actions this phone's system refuses (HyperOS drops split screen); empty until the service starts. */
+        val unsupported: StateFlow<Set<SwipeAction>> = unsupportedState.asStateFlow()
 
         /** Lets an open screen see the service start or stop without waiting for a resume. */
         val running: StateFlow<Boolean> = runningState.asStateFlow()

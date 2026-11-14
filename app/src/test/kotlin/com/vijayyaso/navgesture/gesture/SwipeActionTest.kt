@@ -23,6 +23,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SwipeActionTest {
+    @Test fun `an action the phone refuses is not offered`() {
+        val offered = SwipeAction.offered(setOf(SwipeAction.SplitScreen), SwipeAction.Back)
+        assertEquals(SwipeAction.fixed - SwipeAction.SplitScreen, offered)
+    }
+
+    @Test fun `a refused action stays listed while it is the current choice`() {
+        val offered = SwipeAction.offered(setOf(SwipeAction.SplitScreen), SwipeAction.SplitScreen)
+        assertEquals(SwipeAction.fixed, offered)
+    }
+
+    @Test fun `with nothing refused the whole list is offered`() {
+        assertEquals(SwipeAction.fixed, SwipeAction.offered(emptySet(), SwipeAction.None))
+    }
+
     @Test fun `every fixed choice round trips through its id`() {
         SwipeAction.fixed.forEach { assertEquals(it, SwipeAction.decode(it.id)) }
     }
