@@ -138,6 +138,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         if (!scope.isActive) scope = newScope()
         settings = GestureSettingsRepository(applicationContext)
         performer = GestureActionPerformer(this)
+        performer.torch.start()
         windowManager = getSystemService(WindowManager::class.java)
         overlay = EdgeTouchOverlay(
             context = this,
@@ -372,7 +373,10 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
         overlay?.remove()
         // A failed setUp can get here before the performer exists.
-        if (::performer.isInitialized) performer.close()
+        if (::performer.isInitialized) {
+            performer.torch.stop()
+            performer.close()
+        }
         gestureBar?.release()
         gestureBar = null
         overlay = null

@@ -35,6 +35,13 @@ class GestureActionPerformer(private val service: AccessibilityService) {
 
     val switcher = AppSwitcher(service)
 
+    // Listens to the camera service from start() to stop(); a failure goes to lastFailure.
+    internal val torch = Torch(
+        cameras = AndroidTorchCameras(service),
+        record = { lastFailure = it },
+        log = { Log.i(TAG, it) },
+    )
+
     /** One at a time, so two quick corner swipes start their shortcuts in order. */
     private val shortcutThread = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
         Thread(task, "NavGesture-shortcut").apply { isDaemon = true }
@@ -68,8 +75,8 @@ class GestureActionPerformer(private val service: AccessibilityService) {
             }
             SwipeAction.PreviousApp -> return previousApp()
             SwipeAction.Torch -> {
-                lastFailure = "${action.id}: not available yet"
-                return false
+                Log.i(TAG, "SWIPE_ACTION ${action.id}")
+                return torch.toggle()
             }
             SwipeAction.None, SwipeAction.RecentsList, SwipeAction.FavouritesList,
             is SwipeAction.AppShortcut,

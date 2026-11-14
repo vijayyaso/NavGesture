@@ -143,8 +143,7 @@ internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
         stringResource(R.string.corner_open_named_app, label)
     }
     is SwipeAction.AppShortcut -> appShortcutLabel(shortcut)
-    // Not in the picker yet, so it reads as its stored id.
-    SwipeAction.Torch -> shortcut.id
+    SwipeAction.Torch -> stringResource(R.string.corner_torch)
 }
 
 /** "App: Shortcut", read off the main thread; says so when the app no longer offers it. */
@@ -251,8 +250,7 @@ private fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
     SwipeAction.Home -> GroupIcon(Icons.Filled.Home, IconTint.BLUE)
     SwipeAction.Recents -> GroupIcon(RecentsGlyph, IconTint.BLUE)
     SwipeAction.PreviousApp -> GroupIcon(Icons.Filled.Refresh, IconTint.BLUE)
-    is SwipeAction.OpenApp, is SwipeAction.AppShortcut -> null
-    SwipeAction.Torch -> null
+    is SwipeAction.OpenApp, is SwipeAction.AppShortcut, SwipeAction.Torch -> null
 }
 
 /** A row that picks: a check mark marks the current choice, and it reads as a radio button. */

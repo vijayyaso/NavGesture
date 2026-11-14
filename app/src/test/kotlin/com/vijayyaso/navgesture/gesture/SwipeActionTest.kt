@@ -27,7 +27,7 @@ class SwipeActionTest {
         SwipeAction.fixed.forEach { assertEquals(it, SwipeAction.decode(it.id)) }
     }
 
-    @Test fun `the five new actions decode, and the picker offers all but Torch`() {
+    @Test fun `the five new actions decode, and the picker offers all of them`() {
         val added = listOf(
             "back" to SwipeAction.Back,
             "home" to SwipeAction.Home,
@@ -38,7 +38,7 @@ class SwipeActionTest {
         added.forEach { (id, action) ->
             assertEquals(id, action.id)
             assertEquals(action, SwipeAction.decode(id))
-            assertEquals(action != SwipeAction.Torch, action in SwipeAction.fixed)
+            assertEquals(id, 1, SwipeAction.fixed.count { it == action })
         }
     }
 

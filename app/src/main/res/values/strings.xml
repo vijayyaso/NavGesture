@@ -147,6 +147,7 @@
     <string name="corner_home">Home</string>
     <string name="corner_recents">Recents</string>
     <string name="corner_previous_app">Previous app</string>
+    <string name="corner_torch">Torch</string>
     <string name="corner_open_app">Open an app</string>
     <string name="corner_open_named_app">Open %1$s</string>
     <string name="corner_section_app_lists">App lists</string>

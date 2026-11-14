@@ -17,7 +17,8 @@
 
 # Swipe actions: each swipe runs the action its slot holds. A left swipe set to Home goes Home,
 # one set to Previous app opens the app used before (Recents without usage access), a far left
-# swipe runs its own action while a short one stays Back, a left swipe held still runs its wait
+# swipe runs its own action while a short one stays Back, a left swipe set to Torch toggles the
+# flash (or records that the phone has none), a left swipe held still runs its wait
 # action while a quick one stays Back, a split left edge runs one action in its top half and
 # another in its bottom half, a bottom swipe set to Notifications opens them, and Gesture
 # settings warns while no swipe goes Home. Last, slots are picked through the screens, as a user
@@ -194,6 +195,32 @@ swipe_left_until "GESTURE_FIRED LEFT"
 assert_log "with no app list to read, it opens Recents" "PREVIOUS_APP none, opening Recents"
 "${ADB_BIN}" shell appops set "${PKG}" GET_USAGE_STATS "${usage_mode:-default}" >/dev/null
 "${ADB_BIN}" shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+clear_overrides
+
+echo >&2
+echo "== a left swipe set to Torch toggles the flash, or records that there is none ==" >&2
+slot left_whole_short torch
+swipe_left_until "GESTURE_FIRED LEFT"
+assert_log "the left swipe fires Torch" "GESTURE_FIRED LEFT torch"
+assert_log "the swipe runs the Torch action" "SWIPE_ACTION torch"
+# The emulator may have no flash: exactly one of the two outcomes must be logged.
+torch_outcomes=0
+# shellcheck disable=SC2310 # a missing line is a count of zero, not an error
+if log_has "TORCH on"; then torch_outcomes=$((torch_outcomes + 1)); fi
+# shellcheck disable=SC2310 # a missing line is a count of zero, not an error
+if log_has "TORCH failed: no flash on this phone"; then torch_outcomes=$((torch_outcomes + 1)); fi
+if [ "${torch_outcomes}" -eq 1 ]; then
+  pass "exactly one of the torch-on line and the no-flash failure line is logged"
+else
+  fail "exactly one of the torch-on line and the no-flash failure line is logged (found ${torch_outcomes})"
+  gesture_log | sed 's/^/        /' >&2
+fi
+# A torch that went on is switched off again, so no later run starts with it lit.
+# shellcheck disable=SC2310 # a missing line means the torch is still off
+if log_has "TORCH on"; then
+  swipe_left_until "TORCH off"
+  assert_log "a second left swipe switches the torch off" "TORCH off"
+fi
 clear_overrides
 
 # Swipe lengths in dp, turned into pixels here: short stays under the 120 dp long line, far

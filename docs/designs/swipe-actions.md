@@ -1,8 +1,7 @@
 # Swipe actions: pick what every swipe does, and three new side swipes
 
 *   **Author:** vijayyaso
-*   **Status:** Phases 0a, 0b, A, B and C are built (2026-11-14). Phase D
-    (Torch) is `[not built]`.
+*   **Status:** All phases (0a, 0b, A, B, C and D) are built (2026-11-14).
 *   **Date:** 2026-11-14
 
 --------------------------------------------------------------------------------
@@ -347,8 +346,12 @@ values: `GestureAction.X` becomes `Run(slot, SwipeAction.X)` and
     starts and removes it when the service ends. It remembers the first
     back camera whose `FLASH_INFO_AVAILABLE` is true and the last reported
     on/off state. `toggle()` calls `setTorchMode(id, !on)`; a
-    `CameraAccessException` or a phone with no flash is recorded as the
-    last failure and does nothing else. No manifest permission is added.
+    `CameraAccessException`, an `IllegalArgumentException` or a phone with
+    no flash is recorded as the last failure and does nothing else. No
+    manifest permission is added. The camera calls sit behind a small
+    interface (`TorchCameras`), so the rule is unit-tested with a fake. It
+    logs `TORCH on`, `TORCH off` or `TORCH failed: <reason>`, which the e2e
+    case reads because an emulator may have no flash.
 
 ### Screens (`ui/`)
 

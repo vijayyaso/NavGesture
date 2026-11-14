@@ -221,11 +221,9 @@ sealed interface SwipeAction {
                 LockScreen,
                 PowerMenu,
                 SplitScreen,
+                Torch,
             )
         }
-
-        // Read from storage but not offered by the picker yet.
-        private val extra: List<SwipeAction> by lazy { listOf(Torch) }
 
         /** An unknown or empty id is [None], so a downgrade never leaves a broken corner. */
         fun decode(stored: String?): SwipeAction {
@@ -243,7 +241,7 @@ sealed interface SwipeAction {
                 val shortcutId = rest.substring(slash + 1)
                 return if (packageName.isBlank() || shortcutId.isBlank()) None else AppShortcut(packageName, shortcutId)
             }
-            return (fixed + extra).firstOrNull { it.id == stored } ?: None
+            return fixed.firstOrNull { it.id == stored } ?: None
         }
     }
 }
