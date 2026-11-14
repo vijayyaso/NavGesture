@@ -568,6 +568,8 @@ group with no title is written as **(no title)**.
     (Agree filled, Not now outlined), now full width and stacked; the
     footnote. No text changes (Play policy text, mirrored in
     `docs/play-store/disclosure.md`).
+Like Last problem, the "No swipe goes Home" and "No swipe goes Back" rows
+show only while the problem exists.
 
 The `usage_access` node shows only the "missing" status string (the explainer
 stays a separate footer), so `status-refresh.sh` still matches it exactly;

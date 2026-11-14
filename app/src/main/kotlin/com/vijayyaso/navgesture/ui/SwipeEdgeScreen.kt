@@ -161,7 +161,7 @@ internal fun sideName(slots: SwipeSlots, edge: ScreenEdge): String? {
 /** "Home and Recents": the actions that are set, joined; null when none is. */
 @Composable
 internal fun actionsName(actions: List<SwipeAction>): String? {
-    val names = actions.filter { it != SwipeAction.None }.map { shortcutLabel(it) }
+    val names = actions.filter { it != SwipeAction.None }.distinct().map { shortcutLabel(it) }
     return when (names.size) {
         0 -> null
         1 -> names[0]

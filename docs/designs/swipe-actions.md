@@ -8,7 +8,7 @@
 
 ## Overview
 
-Today the code fixes what each swipe does: a side swipe is Back, a bottom
+Before 2026-11-14 the code fixed what each swipe did: a side swipe is Back, a bottom
 swipe is Home, a bottom swipe that pauses is Recents. Only the two bottom
 corners can be given another action. This design lets the user pick the
 action for every swipe, adds five actions to the list, and adds three new
@@ -71,7 +71,10 @@ here and listed again for the owner at hand-over:
 9.  Installing an older build over a newer one is not supported. The old
     Back switches are read once, to migrate, and never written again.
 
-## Constraints found in the code
+## Constraints found in the code before this change
+
+This section records the code as it was on 2026-11-14, before any phase
+was built. The names and line numbers below no longer match.
 
 Paths are under `app/src/main/kotlin/com/vijayyaso/navgesture/`.
 
@@ -420,6 +423,53 @@ Recents or an opened app), so that phase adds no log line.
 *   **Halves split only the short swipe.** Rejected: the owner picked
     halves with their own actions; the split switch keeps the default page
     at three rows.
+
+## Rules found while building
+
+*   **Wait beats long.** A wait can be reached in any band: a finger still
+    for `waitMs` past the long line runs WAIT, not LONG.
+*   **Icons.** Back, Home and Recents have their own bubble icon; every
+    other action shares one. A lift more than the slop from the still
+    point runs the band at the lift point.
+*   **Side swipes are never guarded in landscape**, whatever their action.
+    A side slot set to Home or an app can leave a landscape game in one
+    swipe. Accepted risk.
+*   **Swap the two lists** changes only the sideways bottom drag. A slot or
+    corner set to a list opens the list it names.
+*   **A slot whose app is gone** keeps its value, still arms, and does
+    nothing at lift. The failure is recorded, and the row reads "App not
+    installed".
+*   **The way out needs the grant.** Turning gestures off brings the
+    phone's bar back while the secure-settings grant is held. If the grant
+    was revoked, the bar stays hidden and `GESTURE_BAR_STUCK` is logged.
+*   **An over-long unused stream** is thinned while recording
+    (`service/TouchRecording.kt`) and its replay is cut to 3 s
+    (`MAX_REPLAY_MS` in `NavGestureAccessibilityService.kt`); it is not
+    dropped.
+*   **Sliders.** "Far swipe distance" shows while a reachable far slot is
+    set; "Wait time" while a reachable wait slot is set.
+*   **Split flags** live inside `slots`. Reset leaves the corners alone.
+*   **Debug overrides** are named `navgesture_<stored key>`, for example
+    `navgesture_slot_left_whole_short`.
+*   **Torch** has three states (on, off, unknown) and turns the torch on
+    unless the state is on. A torch left on stays on when gestures are
+    turned off.
+*   **Picker pages.** `Screen` has one entry per slot's picker page (20),
+    listed in `ui-redesign.md`.
+*   **Logs.** `SWIPE_ACTION <id>` is written for the actions that wrote
+    `CORNER_SHORTCUT` before, and for Torch. Back, Home, Recents, open app
+    and the two lists do not write it. Others: `<EDGE> PENDING <kind> <id>`,
+    `PREVIOUS_APP ...`, `TORCH on|off|failed`.
+*   **Extra ticks.** A bottom arm while the app-list drag is on, and a fire
+    held behind the landscape pill, each tick once. The wait buzz is the
+    `LONG_PRESS` haptic.
+
+## What was built
+
+All phases (0a, 0b, A, B, C, D) on 2026-11-14. Checked by
+`SwipeGrammarTest`, `SwipeSlotsTest`, `HapticGateTest`, `TorchTest`,
+`SwipeActionTest` and `e2e/swipe-actions.sh`. Phone test by the owner:
+pending.
 
 ## Risks
 

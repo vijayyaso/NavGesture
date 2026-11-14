@@ -157,6 +157,7 @@
     <string name="corner_search_apps">Search apps</string>
     <string name="corner_app_shortcut_named">%1$s: %2$s</string>
     <string name="corner_app_shortcut_missing">App shortcut not found</string>
+    <string name="corner_app_missing">App not installed</string>
     <string name="corner_expanded">Shown</string>
     <string name="corner_collapsed">Hidden</string>
     <string name="section_favourite_apps">Favourite apps</string>
@@ -239,7 +240,7 @@
     <string name="pair_and">%1$s and %2$s</string>
     <string name="swipe_warning_no_home">No swipe goes Home</string>
     <string name="swipe_warning_no_back">No swipe goes Back</string>
-    <string name="swipe_warning_way_out">To turn gestures off, use the NavGesture tile in Control Center.</string>
+    <string name="swipe_warning_way_out">To turn gestures off, use the NavGesture tile in Control Center. The phone\'s own bar comes back.</string>
     <string name="label_landscape_confirm">Confirm in landscape</string>
     <string name="label_landscape_confirm_body">Swipe up twice to leave a landscape app</string>
     <string name="section_distance_and_timing">How far and how long</string>

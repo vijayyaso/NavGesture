@@ -70,7 +70,7 @@ class GestureActionPerformer(private val service: AccessibilityService) {
             SwipeAction.SplitScreen -> AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN
             is SwipeAction.OpenApp -> {
                 val launched = switcher.launch(action.packageName)
-                if (!launched) lastFailure = "corner ${action.id}: ${AppSwitcher.lastFailure}"
+                if (!launched) lastFailure = "${action.id}: ${AppSwitcher.lastFailure}"
                 return launched
             }
             SwipeAction.PreviousApp -> return previousApp()
@@ -100,16 +100,16 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 if (closed) return@execute
                 val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
                 if (found == null) {
-                    lastFailure = "corner ${shortcut.id}: shortcut not found"
+                    lastFailure = "${shortcut.id}: shortcut not found"
                     Log.w(TAG, lastFailure.orEmpty())
                     return@execute
                 }
                 if (closed) return@execute
                 if (!ShortcutCatalog.launch(service, found)) {
-                    lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
+                    lastFailure = "${shortcut.id}: ${ShortcutCatalog.lastFailure}"
                 }
             }
-        }.onFailure { Log.w(TAG, "corner ${shortcut.id}: dropped, the service is stopping") }
+        }.onFailure { Log.w(TAG, "${shortcut.id}: dropped, the service is stopping") }
         return true
     }
 

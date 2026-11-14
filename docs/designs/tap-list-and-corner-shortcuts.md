@@ -218,7 +218,7 @@ of the screen, minus 4 dp, kept between 12 and 32 dp
     `CornerReady(corner)`: one haptic tick, the bubble released. A diagonal
     that arms Home before it reaches the corner trigger also gives the arm
     tick when "Bottom app switcher" is on (see App-list trigger), so two
-    light ticks are possible. The release returns `Fire(GestureAction.Corner(side))`, id
+    light ticks are possible. The release returns `Fire(GestureAction.Run(side))`, id
     `CornerLEFT` or `CornerRIGHT`. The overlay posts the shortcut **80 ms**
     later, after the strips' return to visible has settled (the launch rule
     needs a visible overlay) and the bubble is gone (screenshot). CANCEL or a
@@ -240,10 +240,10 @@ of the screen, minus 4 dp, kept between 12 and 32 dp
 
     `decode()` maps null, empty, unknown and `app:` with no package to
     `none`. All constants are at or below `minSdk` 30; lint `NewApi` passes.
-*   **One runner.** `EdgeTouchOverlay.runCorner()` reads the corner's current
+*   **One runner.** `EdgeTouchOverlay` reads the corner's current
     shortcut: the two list choices go to `EdgeSwitcherController.openForTouch`
     (which runs its own list lookup, the same code as the drag list), every
-    other choice to `GestureActionPerformer.performShortcut`, which reuses
+    other choice to `GestureActionPerformer.perform`, which reuses
     the existing failure recording (`lastFailure`, diagnostics panel).
 *   The list shortcuts work even when "Bottom app switcher" is off; the panel
     is then built for them alone.
@@ -344,7 +344,7 @@ action and works with the app list off.
     grid), `CornerGestureTest` (16 cases: both corners, slow past 1000 ms,
     batched DOWN/UP, steep, flat, 30–75° bounds, short, zone edge, centre,
     `none`, no width, cancel, beats the app list, haptics),
-    `CornerShortcutTest`, `LandscapeConfirmTest` (corner guarded; the app
+    `SwipeActionTest`, `LandscapeConfirmTest` (corner guarded; the app
     list held back, confirmed, and confirmed by a pill a Home swipe raised;
     the pill shown again after the window; portrait and setting-off open at
     once; no timer under a held confirming touch; a confirming touch whose
@@ -366,3 +366,6 @@ action and works with the app list off.
     screenshot without the bubble, the cancel distance near the bottom edge
     (the 4 dp margin), the arm tick and the "held back" buzz, the landscape
     app list.
+
+See `swipe-actions.md` for the full `SwipeAction` list and the single
+`perform(SwipeAction)` runner.

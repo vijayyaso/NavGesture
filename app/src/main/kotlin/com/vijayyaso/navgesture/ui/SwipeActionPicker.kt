@@ -138,8 +138,10 @@ internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
     SwipeAction.PreviousApp -> stringResource(R.string.corner_previous_app)
     is SwipeAction.OpenApp -> {
         val apps by rememberLaunchableApps(waitForScreen = false)
-        val label = apps?.firstOrNull { it.packageName == shortcut.packageName }?.label
-            ?: shortcut.packageName
+        // Null while the list loads; a loaded list without the app means it was removed.
+        val loaded = apps ?: return stringResource(R.string.corner_open_named_app, shortcut.packageName)
+        val label = loaded.firstOrNull { it.packageName == shortcut.packageName }?.label
+            ?: return stringResource(R.string.corner_app_missing)
         stringResource(R.string.corner_open_named_app, label)
     }
     is SwipeAction.AppShortcut -> appShortcutLabel(shortcut)
