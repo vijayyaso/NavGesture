@@ -1,7 +1,19 @@
 # First-run practice demo
 
 *   **Author:** vijayyaso (the owner; one person)
-*   **Status:** Approved (owner's answers of 2026-11-15); not built
+*   **Status:** Implemented 2026-11-15 on `play-store-release`. Tested:
+    `gradle test` (all unit tests, with the new `DemoEngineTest`,
+    `DemoProgressTest` and `FirstRunTest`), lint on both debug flavors, both
+    debug builds, shellcheck, the device suites `demo` and `disclosure` and
+    the regression suites `navigation`, `status-refresh` and `off-switch` on
+    an API 36 emulator (1080 × 2400, 420 dpi), and by hand on that emulator:
+    all seven steps to the finish card with the service on, rotation at
+    step 4, "Skip this step" after two tries, the dark theme, 200 % font
+    and landscape, and a 64 dp edge width with the service on. Not yet run
+    on a real phone (the Poco F5 check is the owner's). Where the build
+    differs from this text, the text says "As built" or "Deviation". One
+    open limit needs the owner: a scrolled page can put the drawn bottom
+    band on the service's real bottom strip ("Known limit", section 1).
 *   **Date:** 2026-11-15
 *   **Revised:** 2026-11-15, after the design review. Changes: settings per
     step, real-size Recents line, runtime inset, one result per touch, the
@@ -136,7 +148,9 @@ the Home row (CUJ 6).
 *   **When:** the user taps "Try the gestures".
 *   **Then:** the demo opens at step 1. The finish card shows "Set up now"
     only while setup is not done. With the service on, a practice swipe runs
-    no real action, whatever the saved edge width.
+    no real action, whatever the saved edge width. (As built, this holds for
+    the side edges always, and for the bottom edge while the page does not
+    scroll; see "Known limit" in section 1.)
 
 ### CUJ 6: Tile opens the disclosure on a fresh install
 
@@ -186,15 +200,44 @@ tests).
 ### 1. The drawn phone, its place and its coordinates
 
 *   The drawn phone is a rounded box, 9 wide to 19 high. Width =
-    `min(320 dp, window width − 2 × inset)`, and at least 200 dp. Its size
-    does not depend on the hint text: the text area above it has a fixed
-    minimum height of three lines.
+    `min(320 dp, window width − 2 × inset, height cap)`, and at least
+    200 dp. Its size does not depend on the hint text: the text area above
+    it has a fixed minimum height of three lines.
+*   **Deviation (built 2026-11-15): the height cap.** Sized by width alone,
+    a 320 dp phone is 675 dp tall. On the test emulator (411 × 914 dp, a
+    common phone size) that plus the top bar, the text and the buttons did
+    not fit, so the page scrolled at the default font. Then `demo_skip` is
+    below the fold, the device suite cannot reach it without scrolling, and
+    a scrolled phone can put its bottom band on the service's real bottom
+    strip. So the width is also capped to what fits the screen's own room:
+    the window height less the system bars, the 64 dp top bar, the 24 dp
+    column padding and a fixed reserve for the text and buttons (step line,
+    title, three instruction lines, three hint lines and the button row, at
+    the current font size). The 200 dp floor still wins, so landscape and a
+    large font scroll as planned. On the emulator in portrait the phone is
+    222 dp wide; the long line there is `0.45 × 222` = 100 dp.
 *   **Inset** (the gap to the real left and right edges), computed at
     runtime, per side: `max(40 dp, system gesture inset, strip) + 8 dp`.
     `strip` is the saved `edgeWidthDp` plus the navigation-bar inset on that
     side when the service is not `OFF`, else 0. Reason: on a replay the
     service's own strips are live under the demo, up to 64 dp wide, and a
     practice swipe that starts on one would run a real Back.
+*   **Known limit, found when built (open, the owner's decision).** The
+    inset covers the side strips only. The service's bottom strip (the
+    edge width plus the navigation bar, over the bottom of the screen) is
+    a window above the app, so it takes any touch that starts on it. When
+    the page scrolls (200 % font, landscape, split screen) the drawn
+    phone's bottom band can sit on that strip, and a practice bottom swipe
+    there runs the real gesture. Seen on the emulator with the service on:
+    at 200 % font in portrait, not scrolled, the drawn bottom band lay over
+    the strip and a practice Home logged `GESTURE_FIRED BOTTOM Home` and
+    left the app; in landscape, scrolled so the drawn bottom met the
+    screen's bottom, the service showed its landscape confirm pill for
+    Home. At the default font in portrait the phone fits above the strip
+    and this cannot happen. The layout cannot fix it, because the strip
+    takes the touch before the app sees it. Choices: pause the service's
+    strips while the demo shows, drop the 200 dp floor so the phone always
+    fits, or accept it.
 *   The demo stays in the shared `verticalScroll` column of `MainActivity`,
     so a short window (landscape, split screen, large font) scrolls and no
     button is cut off. The drawn phone consumes every pointer change it gets,
@@ -276,7 +319,10 @@ never arrives and is ignored.)
     list, by the same `SwitcherCancel` rule the real list uses, and gives
     `Missed(CANCELLED)`. If `recents` is false (a drag to the
     left, which opens favourites for real), UP gives
-    `Performed(FavouritesOpened)`.
+    `Performed(FavouritesOpened)`. As built, the `SwitcherCancel` rule is
+    given the drawn height, not the real one: it measures the room left
+    below the open point, in the same pixels as the samples, and the
+    samples are the drawing's own.
 
 Events returned (a list per call, usually empty or one item):
 
@@ -284,11 +330,17 @@ Events returned (a list per call, usually empty or one item):
     `CornerReady` (the corner's action). The UI names the action a release
     would run.
 *   `Unready`: from `Disarmed`. The UI clears that name.
-*   `ListOpened`, `ListMoved(index)`: the UI shows and moves the icon row.
+*   `ListOpened(recents)`, `ListMoved(index)`: the UI shows and moves the
+    icon row. (As built, `ListOpened` carries `recents`, so a drag to the
+    left shows star icons for the favourites.)
 *   `Performed(result)`: `result` is a `DemoResult`: `Ran(run:
     GestureAction.Run)`, `AppPicked(index)` or `FavouritesOpened`.
-*   `Missed(reason)`: `reason` is a `DemoMiss`: `NOT_ON_EDGE`, `CANCELLED`,
-    `PULLED_BACK` (from `Reverted`), or `Rejected(RejectionReason)`.
+*   `Missed(reason)`: `reason` is a `DemoMiss`: `NotOnEdge`, `Cancelled`,
+    `PulledBack` (from `Reverted`), or `Rejected(RejectionReason)`. (As
+    built, Kotlin names; the doc first wrote them in capitals.)
+*   As built, a step change reaches the engine through `configure(...)`; a
+    change that arrives while a finger is down waits until it lifts. The
+    second finger reaches it through `extraFinger()`.
 
 ### 4. Steps and `DemoProgress`
 
@@ -305,7 +357,12 @@ Events returned (a list per call, usually empty or one item):
 Each effect is drawn with plain Compose shapes and the app's existing icons.
 On each step the start band (or corner) is highlighted and a still arrow
 shows the path. The arrow hides while a finger is down. There is no looping
-animation.
+animation. As built, step 3 also draws the real Recents line as a dashed
+line, and step 7 draws the long line; step 7's arrow and line show on the
+left side only, because on a narrow drawing the two sides' arrows cross in
+the middle (both edges still work). The action icons come from
+`fixedIcon` in `ui/SwipeActionPicker.kt`, made `internal` for this (that
+file was not in the file table).
 
 `DemoProgress` is an immutable value:
 
@@ -331,6 +388,11 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     when touch exploration (a screen reader such as TalkBack) is on, because
     that user cannot draw these swipes.
 *   `step` and `tries` are saved across rotation with `rememberSaveable`.
+    As built, a pass that is still playing its effect is saved as passed
+    (the next step), so a rotation never asks for it again.
+*   As built, "Skip" and "Skip this step" sit side by side in one row, so
+    the row's height, and so the phone's place, does not change when "Skip
+    this step" appears.
 
 ### 5. First-run rule and navigation
 
@@ -352,6 +414,12 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     needed because `serviceEverEnabled` is only written later, by
     `AppModel.refresh`, so a service turned on in Settings (or by the device
     tests) would otherwise get the demo.
+
+    As built, `demo/FirstRun.firstStack(...)` returns a `FirstStack` value
+    (`HOME`, `DEMO` or `DISCLOSURE`) and `MainActivity` turns it into the
+    screens, because `Screen` lives in `ui/` and `demo/` stays free of the
+    UI. The "save `DEMO_SEEN`?" rule below is the pure
+    `FirstRun.marksDemoSeen(record, stack)`, also unit tested.
 *   In `NavGestureApp` the saved stack becomes nullable. While it is null and
     `model.recordLoaded` is false, only the background is drawn. When the
     record has loaded, the stack is set from `firstScreens`, the tile request
@@ -360,7 +428,9 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     the tile request is read at the moment of the decision, not before. A
     stack restored after rotation is not null and shows at once. The existing
     tile effect (`replacedBy(HOME, DISCLOSURE)`) runs only when the stack is
-    not null.
+    not null. As built, `BackStackSaver` in `ui/BackStack.kt` became a
+    saver of `BackStack?`: it saves nothing for null, so a restore before
+    the decision decides again. (`BackStack.kt` was not in the file table.)
 *   Marking the demo as seen when it first shows means a process killed
     during the demo does not show it again. The Home row covers that case.
     This avoids writing the flag from a disposal, which also runs on
@@ -436,6 +506,8 @@ start with another folder. Test paths are under
 | `ui/MainActivity.kt` | Modify | `Screen.DEMO`; nullable first stack and the decision from section 5; `ScreenContent` branch. |
 | `ui/HomeScreen.kt` | Modify | "Try the gestures" row in "More". |
 | `ui/TestTags.kt` | Modify | `ROW_DEMO` (`row_demo`), `DEMO_PHONE` (`demo_phone`), `DEMO_STEP` (`demo_step`), `DEMO_SKIP` (`demo_skip`), `DEMO_SKIP_STEP` (`demo_skip_step`), `DEMO_DONE` (`demo_done`). |
+| `ui/BackStack.kt` | Modify (added when built) | `BackStackSaver` saves a `BackStack?`, for the nullable first stack. |
+| `ui/SwipeActionPicker.kt` | Modify (added when built) | `fixedIcon` made `internal`, so the drawn phone reuses the action icons (torch, screenshot). |
 | `setup/SetupStateRepository.kt` | Modify | `DEMO_SEEN` flag and `demoSeen` field. The existing `AppModel.setFlag` saves it; `AppModel.kt` does not change. |
 | `app/src/main/res/values/strings.xml` | Modify | Title, seven step titles and instructions, hints, buttons, finish card, row label. |
 | `demo/DemoEngineTest.kt` (test) | Create | See the list below. |

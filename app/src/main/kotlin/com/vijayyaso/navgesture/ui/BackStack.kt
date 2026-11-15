@@ -103,7 +103,11 @@ internal fun backStackFromSaved(saved: List<Any?>): BackStack = backStackOf(
     nextId = saved.getOrNull(3) as? Int ?: 0,
 )
 
-internal val BackStackSaver = Saver<BackStack, ArrayList<Any>>(
-    save = { it.toSaved() },
+/**
+ * Null is the stack before the first-run decision. Nothing is saved for it, so a restore
+ * decides again.
+ */
+internal val BackStackSaver = Saver<BackStack?, ArrayList<Any>>(
+    save = { it?.toSaved() },
     restore = ::backStackFromSaved,
 )

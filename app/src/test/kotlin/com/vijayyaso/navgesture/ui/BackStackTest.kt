@@ -156,6 +156,11 @@ class BackStackTest {
     }
 
     @Test
+    fun `the practice demo restores from its saved name`() {
+        assertEquals(listOf(Screen.HOME, Screen.DEMO), backStackOf(listOf("HOME", "DEMO")).screens)
+    }
+
+    @Test
     fun `an unknown saved name is skipped`() {
         assertEquals(
             listOf(Screen.HOME, Screen.SETUP),

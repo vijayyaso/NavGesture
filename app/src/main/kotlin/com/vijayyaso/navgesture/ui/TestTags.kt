@@ -77,6 +77,12 @@ internal object TestTags {
     const val UPDATE_ALLOW_INSTALLS = "update_allow_installs"
     const val RUNTIME_SHORTCUTS_HINT = "runtime_shortcuts_hint"
     const val RUNTIME_SHORTCUTS_COPY = "runtime_shortcuts_copy"
+    const val ROW_DEMO = "row_demo"
+    const val DEMO_PHONE = "demo_phone"
+    const val DEMO_STEP = "demo_step"
+    const val DEMO_SKIP = "demo_skip"
+    const val DEMO_SKIP_STEP = "demo_skip_step"
+    const val DEMO_DONE = "demo_done"
 
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"

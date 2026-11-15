@@ -113,6 +113,52 @@
     <string name="feature_needs_assistant">Needs Google as assistant</string>
     <string name="action_navigate_up">Back</string>
 
+    <!-- Practice demo: a phone drawn in the app that the user swipes on. Nothing real runs. -->
+    <string name="demo_title">Try the gestures</string>
+    <string name="demo_row_summary">Practise each swipe on a drawn phone</string>
+    <string name="demo_step_count">Step %1$d of %2$d</string>
+    <string name="demo_phone_description">Practice phone for step %1$d: %2$s</string>
+    <string name="demo_step_back">Back</string>
+    <string name="demo_step_home">Home</string>
+    <string name="demo_step_recents">Recent apps</string>
+    <string name="demo_step_app_list">App list</string>
+    <string name="demo_step_corner">Corner shortcut</string>
+    <string name="demo_step_wait">Swipe and wait</string>
+    <string name="demo_step_long">Long swipe</string>
+    <string name="demo_do_back">Start at the left or right edge of the drawn phone. Swipe in a little, then lift.</string>
+    <string name="demo_do_home">Start at the bottom edge. Swipe up and lift while your finger still moves.</string>
+    <string name="demo_do_recents">Start at the bottom edge. Swipe up past the line, stop, then lift.</string>
+    <string name="demo_do_app_list">Start at the bottom edge. Swipe up a little, then slide right. Lift on any app.</string>
+    <string name="demo_do_corner">Start in a bottom corner. Swipe up and in at a slant. Here it opens notifications.</string>
+    <string name="demo_do_wait">Swipe in from a side edge, then hold still until the name changes. Here it takes a screenshot.</string>
+    <string name="demo_do_long">Swipe in from a side edge, past the line. Here it turns on the torch.</string>
+    <string name="demo_ready">Lift now: %1$s</string>
+    <string name="demo_name_app_list">the app list</string>
+    <string name="demo_name_favourites">your favourite apps</string>
+    <string name="demo_hint_other">That was %1$s. Try the swipe above.</string>
+    <string name="demo_hint_recents_home">That was Home. Swipe up, then stop before you lift.</string>
+    <string name="demo_hint_wait_back">That was Back. Hold still a moment before you lift.</string>
+    <string name="demo_hint_long_back">That was Back. Swipe further in before you lift.</string>
+    <string name="demo_hint_favourites">Drag to the right. Left opens your favourite apps.</string>
+    <string name="demo_hint_not_on_edge">Start right at the edge of the drawn phone.</string>
+    <string name="demo_hint_not_in_corner">Start in a bottom corner of the drawn phone.</string>
+    <string name="demo_hint_list_closed">The list closed. Use one finger, and slide sideways, not down.</string>
+    <string name="demo_hint_cancelled">Use one finger only.</string>
+    <string name="demo_hint_pulled_back">You came back to the edge, so nothing ran. Lift further in.</string>
+    <string name="demo_hint_tap">That was a tap. Swipe instead.</string>
+    <string name="demo_hint_short">Too short. Swipe a little further.</string>
+    <string name="demo_hint_wrong_way">Wrong way. Swipe away from the edge.</string>
+    <string name="demo_hint_slow">Too slow. Start moving sooner.</string>
+    <string name="demo_hint_slanted">Too slanted. Swipe straighter.</string>
+    <string name="demo_hint_nothing">That swipe does nothing here. Try the swipe above.</string>
+    <string name="demo_skip">Skip</string>
+    <string name="demo_skip_step">Skip this step</string>
+    <string name="demo_finish_title">All done</string>
+    <string name="demo_finish_body_setup">You know the gestures. Set up NavGesture to use them anywhere on your phone.</string>
+    <string name="demo_finish_body_done">You know the gestures. They work anywhere on your phone.</string>
+    <string name="demo_set_up_now">Set up now</string>
+    <string name="demo_done">Done</string>
+
     <!-- App switching. -->
     <string name="section_app_switch">App switching</string>
     <string name="label_edge_app_list">Bottom app switcher</string>

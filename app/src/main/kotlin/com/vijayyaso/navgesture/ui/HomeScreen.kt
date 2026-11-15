@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
@@ -164,6 +165,12 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     TileGrid(tiles)
 
     SettingsGroup(title = stringResource(R.string.section_more)) {
+        NavigationRow(
+            title = stringResource(R.string.demo_title),
+            supporting = stringResource(R.string.demo_row_summary),
+            tag = TestTags.ROW_DEMO,
+            icon = GroupIcon(Icons.Filled.PlayArrow, IconTint.GREEN),
+        ) { onOpen(Screen.DEMO) }
         NavigationRow(
             title = stringResource(R.string.section_troubleshooting),
             tag = TestTags.ROW_TROUBLESHOOTING,

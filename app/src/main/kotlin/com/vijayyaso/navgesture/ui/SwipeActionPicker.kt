@@ -241,7 +241,7 @@ private fun FixedGroup(
     }
 }
 
-private fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
+internal fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
     SwipeAction.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
     SwipeAction.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
     SwipeAction.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)

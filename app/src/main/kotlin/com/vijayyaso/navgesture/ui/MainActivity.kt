@@ -28,6 +28,8 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,8 +72,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.demo.FirstRun
+import com.vijayyaso.navgesture.demo.FirstStack
+import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.setup.ServiceKeeper
+import com.vijayyaso.navgesture.setup.SetupFlag
 import com.vijayyaso.navgesture.ui.theme.NavGestureTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -160,6 +166,13 @@ internal enum class Screen(@param:StringRes val title: Int) {
     ABOUT(R.string.section_about),
     CREDITS(R.string.section_credits),
     DISCLOSURE(R.string.disclosure_title),
+    DEMO(R.string.demo_title),
+}
+
+private fun FirstStack.screens(): Array<Screen> = when (this) {
+    FirstStack.HOME -> arrayOf(Screen.HOME)
+    FirstStack.DEMO -> arrayOf(Screen.HOME, Screen.DEMO)
+    FirstStack.DISCLOSURE -> arrayOf(Screen.HOME, Screen.DISCLOSURE)
 }
 
 @Composable
@@ -167,19 +180,50 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     val model = rememberAppModel()
     val context = LocalContext.current
     Store.Bind()
-    var stack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(BackStack.of(Screen.HOME)) }
+    var saved by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf<BackStack?>(null) }
+    val stack = saved
+    if (stack == null) {
+        // Undecided until the saved record has loaded. Only the background shows, so no Home frame
+        // flashes before the demo, and the tile's request is read at the moment of the decision.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        )
+        if (model.recordLoaded) {
+            LaunchedEffect(Unit) {
+                val record = model.record
+                val first = FirstRun.firstStack(
+                    record,
+                    serviceOn = model.status != ServiceStatus.OFF,
+                    tileAskedDisclosure = openDisclosure.value,
+                )
+                saved = BackStack.of(*first.screens())
+                openDisclosure.value = false
+                // Saved now, not when the demo closes: a rotation also disposes it.
+                if (FirstRun.marksDemoSeen(record, first)) model.setFlag(SetupFlag.DEMO_SEEN, true)
+            }
+        }
+        return
+    }
+
+    // Every change starts from the newest stack, since a lambda can outlive the frame that made it.
+    fun update(change: (BackStack) -> BackStack) {
+        saved = saved?.let(change)
+    }
+
     val screens = updateTransition(stack.top, label = "screen")
     // A Back while a screen is still arriving is swallowed, so one quick double press never
     // pops twice, and never closes the app on its way home.
     val arriving = screens.currentState != screens.targetState
     BackHandler(enabled = stack.canGoBack || arriving) {
-        if (!arriving) stack = stack.back()
+        if (!arriving) update { it.back() }
     }
 
     // From the tile: home with the disclosure on top, whatever was showing before.
     if (openDisclosure.value) {
         LaunchedEffect(Unit) {
-            stack = stack.replacedBy(Screen.HOME, Screen.DISCLOSURE)
+            update { it.replacedBy(Screen.HOME, Screen.DISCLOSURE) }
             openDisclosure.value = false
         }
     }
@@ -200,8 +244,9 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
         ) { entry ->
             val leaving = screens.targetState.id != entry.id
             val scroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(entry.scroll) }
-            val open: (Screen) -> Unit = { stack = stack.openFrom(entry.id, it, scroll.value) }
-            val close = { stack = stack.backFrom(entry.id) }
+            val open: (Screen) -> Unit = { screen -> update { it.openFrom(entry.id, screen, scroll.value) } }
+            val close = { update { it.backFrom(entry.id) } }
+            val replace: (List<Screen>) -> Unit = { screens -> update { it.replacedBy(*screens.toTypedArray()) } }
             // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
             if (model.disclosureRequested && !leaving) {
                 LaunchedEffect(Unit) {
@@ -234,8 +279,9 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                             model = model,
                             open = open,
                             close = close,
+                            replace = replace,
                             onAgree = {
-                                if (stack.top.id == entry.id) {
+                                if (saved?.top?.id == entry.id) {
                                     model.acceptDisclosure()
                                     close()
                                     openAccessibility(context)
@@ -290,6 +336,7 @@ private fun ScreenContent(
     model: AppModel,
     open: (Screen) -> Unit,
     close: () -> Unit,
+    replace: (List<Screen>) -> Unit,
     onAgree: () -> Unit,
 ) {
     when (screen) {
@@ -320,5 +367,11 @@ private fun ScreenContent(
         Screen.CREDITS -> CreditsScreen()
         // Back and Not now are the same: nothing is recorded.
         Screen.DISCLOSURE -> DisclosureScreen(onAgree = onAgree, onNotNow = close)
+        // Set up now opens Setup with Home under it; Done and Skip go back to Home.
+        Screen.DEMO -> DemoScreen(
+            model = model,
+            onClose = close,
+            onSetUp = { replace(listOf(Screen.HOME, Screen.SETUP)) },
+        )
     }
 }

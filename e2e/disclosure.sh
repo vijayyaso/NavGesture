@@ -20,7 +20,8 @@
 # Google Play's prominent disclosure: every Turn on shows it until the user agrees, Not now
 # opens nothing, and the tile's intent lands on it. Switches the service off and clears the
 # app's data first (status-refresh.sh's sequence), so run it last; it binds the service again
-# at the end.
+# at the end. On that fresh install it also checks the first-run practice demo: it opens once,
+# and the tile's intent opens the disclosure instead.
 
 # Every predicate below is a test result that pass or fail reports, never an error to exit on,
 # and the front activity in a failure message is diagnostic text only.
@@ -40,6 +41,10 @@ on_disclosure() {
   find_id disclosure_agree >/dev/null 2>&1
 }
 
+demo_shown() {
+  ui_nodes | grep -q 'resource-id="demo_phone"'
+}
+
 our_app_in_front() {
   resumed_activity | grep -q "${PKG}/"
 }
@@ -48,6 +53,35 @@ echo >&2
 echo "== a fresh install has no consent and the service is off ==" >&2
 "${ADB_BIN}" shell settings delete secure enabled_accessibility_services >/dev/null 2>&1 || true
 "${ADB_BIN}" shell pm clear "${PKG}" >/dev/null
+sleep 2
+
+echo >&2
+echo "== a fresh install opens on the practice demo, and only once ==" >&2
+# Read without scrolling: a scroll swipe on the demo lands on its drawn phone.
+open_test_app
+if demo_shown; then pass "the first open shows the demo"; else fail "the first open shows the demo"; fi
+tap_node "$(ui_nodes | grep -m1 'resource-id="nav_back"' || true)"
+sleep 2
+if ! demo_shown; then pass "the back arrow closes the demo"; else fail "the back arrow closes the demo"; fi
+"${ADB_BIN}" shell input keyevent KEYCODE_HOME >/dev/null
+sleep 2
+open_test_app
+if ! demo_shown; then pass "the demo does not open by itself again"; else fail "the demo does not open by itself again"; fi
+
+echo >&2
+echo "== the tile's intent on a fresh install opens the disclosure, not the demo ==" >&2
+"${ADB_BIN}" shell pm clear "${PKG}" >/dev/null
+sleep 2
+"${ADB_BIN}" shell am start -n "${PKG}/.ui.MainActivity" \
+  --ez com.vijayyaso.navgesture.SHOW_DISCLOSURE true >/dev/null 2>&1
+sleep 3
+if ! demo_shown && on_disclosure; then
+  pass "the tile intent shows the disclosure over the demo's first run"
+else
+  fail "the tile intent shows the disclosure over the demo's first run"
+fi
+# Back to home, where the checks below start, as before.
+"${ADB_BIN}" shell input keyevent KEYCODE_BACK >/dev/null
 sleep 2
 open_home
 shown="$(text_of_id service_status || true)"

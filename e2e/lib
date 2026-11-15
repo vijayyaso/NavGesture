@@ -343,6 +343,13 @@ ui_nodes() {
   printf '%s\n' "${nodes}"
 }
 
+# bounds_of_id <tag> - the left, top, right and bottom of that node, from one dump and without
+# scrolling: on the practice demo a scroll swipe would land on the drawn phone and count as a try.
+bounds_of_id() {
+  ui_nodes | grep -m1 "resource-id=\"$1\"" |
+    sed -n 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]".*/\1 \2 \3 \4/p'
+}
+
 # string_res <name> [source set] - the default-locale text of an app string (default: main).
 string_res() {
   sed -n "s/.*name=\"$1\">\(.*\)<\/string>.*/\1/p" "app/src/${2:-main}/res/values/strings.xml"
