@@ -81,6 +81,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.unit.max
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.demo.DemoConfiguration
@@ -96,6 +97,7 @@ import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.RejectionReason
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.TouchSample
+import com.vijayyaso.navgesture.service.StripPause
 import com.vijayyaso.navgesture.ui.theme.IconTint
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -112,6 +114,12 @@ internal fun DemoScreen(model: AppModel, onClose: () -> Unit, onSetUp: () -> Uni
     if (step == null) {
         FinishCard(setupDone = model.checklist.essentialsDone, onClose = onClose, onSetUp = onSetUp)
         return
+    }
+    // The service's strips sit above the app and would run a practice swipe for real, so they
+    // let touches through while the drawn phone is in front.
+    LifecycleResumeEffect(Unit) {
+        StripPause.set(true)
+        onPauseOrDispose { StripPause.set(false) }
     }
     // A screen reader user cannot draw these swipes, so every step can be skipped at once.
     val touchExploration = rememberTouchExploration()

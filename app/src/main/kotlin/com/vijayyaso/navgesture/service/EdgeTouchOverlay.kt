@@ -145,10 +145,12 @@ internal class EdgeTouchOverlay(
             }
             addStrip(edge, configuration, geometry)
         }
+        StripPause.listen(::applyInteractivity)
         applyInteractivity()
     }
 
     fun remove() {
+        StripPause.listen(null)
         switcherController?.cancel()
         switcherController = null
         switcherPanel?.remove()
@@ -413,7 +415,8 @@ internal class EdgeTouchOverlay(
 
     /** See the class comment for why this is alpha 0 as well as non-touchable. */
     private fun applyInteractivity() {
-        val interactive = !hold.held
+        // The practice demo is in front: its swipes belong to the drawn phone.
+        val interactive = !hold.held && !StripPause.paused
         strips.values.forEach { view ->
             val params = view.layoutParams as? WindowManager.LayoutParams ?: return@forEach
             val flags = if (interactive) {

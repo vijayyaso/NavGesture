@@ -11,9 +11,9 @@
     step 4, "Skip this step" after two tries, the dark theme, 200 % font
     and landscape, and a 64 dp edge width with the service on. Not yet run
     on a real phone (the Poco F5 check is the owner's). Where the build
-    differs from this text, the text says "As built" or "Deviation". One
-    open limit needs the owner: a scrolled page can put the drawn bottom
-    band on the service's real bottom strip ("Known limit", section 1).
+    differs from this text, the text says "As built" or "Deviation". The
+    service's strips are paused while the demo steps show ("Strip pause",
+    section 1).
 *   **Date:** 2026-11-15
 *   **Revised:** 2026-11-15, after the design review. Changes: settings per
     step, real-size Recents line, runtime inset, one result per touch, the
@@ -148,9 +148,7 @@ the Home row (CUJ 6).
 *   **When:** the user taps "Try the gestures".
 *   **Then:** the demo opens at step 1. The finish card shows "Set up now"
     only while setup is not done. With the service on, a practice swipe runs
-    no real action, whatever the saved edge width. (As built, this holds for
-    the side edges always, and for the bottom edge while the page does not
-    scroll; see "Known limit" in section 1.)
+    no real action, whatever the saved edge width. (See "Strip pause" in section 1.)
 
 ### CUJ 6: Tile opens the disclosure on a fresh install
 
@@ -222,22 +220,19 @@ tests).
     side when the service is not `OFF`, else 0. Reason: on a replay the
     service's own strips are live under the demo, up to 64 dp wide, and a
     practice swipe that starts on one would run a real Back.
-*   **Known limit, found when built (open, the owner's decision).** The
-    inset covers the side strips only. The service's bottom strip (the
-    edge width plus the navigation bar, over the bottom of the screen) is
-    a window above the app, so it takes any touch that starts on it. When
-    the page scrolls (200 % font, landscape, split screen) the drawn
-    phone's bottom band can sit on that strip, and a practice bottom swipe
-    there runs the real gesture. Seen on the emulator with the service on:
-    at 200 % font in portrait, not scrolled, the drawn bottom band lay over
-    the strip and a practice Home logged `GESTURE_FIRED BOTTOM Home` and
-    left the app; in landscape, scrolled so the drawn bottom met the
-    screen's bottom, the service showed its landscape confirm pill for
-    Home. At the default font in portrait the phone fits above the strip
-    and this cannot happen. The layout cannot fix it, because the strip
-    takes the touch before the app sees it. Choices: pause the service's
-    strips while the demo shows, drop the 200 dp floor so the phone always
-    fits, or accept it.
+*   **Strip pause (added when built).** The inset covers the side strips
+    only. The service's bottom strip is a window above the app, so it takes
+    any touch that starts on it. When the page scrolls (200 % font,
+    landscape, split screen) the drawn phone's bottom band can sit on that
+    strip, and a practice Home swipe ran the real Home. So while the demo
+    steps are in front, the strips let touches through:
+    `service/StripPause` is a flag in memory that `DemoScreen` sets from a
+    `LifecycleResumeEffect` (on while resumed, off on pause or when the
+    screen leaves). `EdgeTouchOverlay.applyInteractivity` reads it and makes
+    every strip non-touchable, the same way it does while a finger holds a
+    strip. The service and the app share one process, so a killed process
+    cannot leave the strips paused. The inset stays, as a second guard and
+    for the phone's own system gestures.
 *   The demo stays in the shared `verticalScroll` column of `MainActivity`,
     so a short window (landscape, split screen, large font) scrolls and no
     button is cut off. The drawn phone consumes every pointer change it gets,
@@ -497,6 +492,8 @@ start with another folder. Test paths are under
 
 | File | Action | Change and reason |
 | :--- | :--- | :--- |
+| `service/StripPause.kt` | Create | The in-memory flag from section 1. |
+| `service/EdgeTouchOverlay.kt` | Modify | Reads the flag in `applyInteractivity`; listens for changes while strips are installed. |
 | `demo/DemoConfiguration.kt` | Create | `forStep(step, widthDp)` from section 2. |
 | `demo/DemoEngine.kt` | Create | Engine, `DemoEvent`, `DemoMiss`, `DemoResult` from section 3. |
 | `demo/DemoProgress.kt` | Create | `DemoStep`, `DemoHint`, `DemoProgress` from section 4. |
