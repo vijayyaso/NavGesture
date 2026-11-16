@@ -9,7 +9,17 @@
     an API 36 emulator (1080 × 2400, 420 dpi), and by hand on that emulator:
     all seven steps to the finish card with the service on, rotation at
     step 4, "Skip this step" after two tries, the dark theme, 200 % font
-    and landscape, and a 64 dp edge width with the service on. Not yet run
+    and landscape, and a 64 dp edge width with the service on. After the
+    strip pause was added (built 2026-11-15, with `StripPauseTest`), one
+    by-hand check was repeated on the emulator: at 200 % font a practice
+    Home swipe ran no real Home. The other by-hand checks were not
+    repeated, and a re-run of `gradle test` and lint after the pause is not
+    recorded. On 2026-11-16 and 2026-11-17 all 13 device suites ran on that
+    emulator with the final debug build: each passed at least once, but no
+    single full run was clean (`landscape-confirm`, `swipe-actions` and
+    `disclosure` failed on some runs and passed on others; cause not
+    proved, and there is no run of these suites from just before the pause
+    to compare with). Not yet run
     on a real phone (the Poco F5 check is the owner's). Where the build
     differs from this text, the text says "As built" or "Deviation". The
     service's strips are paused while the demo steps show ("Strip pause",
@@ -17,7 +27,8 @@
 *   **Date:** 2026-11-15
 *   **Revised:** 2026-11-15, after the design review. Changes: settings per
     step, real-size Recents line, runtime inset, one result per touch, the
-    first-run decision, when the demo is marked as seen.
+    first-run decision, when the demo is marked as seen. 2026-11-17: as-built
+    notes, the strip pause's effect on the service, and the test status.
 
 --------------------------------------------------------------------------------
 
@@ -95,8 +106,10 @@ The seven gestures, as the real defaults and the demo both define them:
 
 *   No real action runs. The demo never presses Back, never opens an app, and
     never turns the real flash on.
-*   The demo does not change any saved setting. It reads one: the edge width,
-    for layout only.
+*   The demo does not change any saved gesture setting. It reads the edge
+    width and whether the service is on, for layout only. It writes one
+    flag, `demo_seen` (section 5). While a step shows, it pauses the
+    service's strips, in memory only (section 1, "Strip pause").
 *   The demo does not replace the setup checklist or the disclosure.
 *   No Circle to Search step and no landscape "swipe twice" step.
 *   The demo does not draw the real fluid bubble or the real app-list panel.
@@ -105,10 +118,25 @@ The seven gestures, as the real defaults and the demo both define them:
 
 ## Open Questions
 
-None. Decisions made during review are in the text: the demo is marked as
-seen when the first screen is decided (section 5); after the tile path the demo does not
-show later, because that user accepts or declines the disclosure and can use
-the Home row (CUJ 6).
+Open after the 2026-11-17 review (the owner decides):
+
+*   **Split screen.** The strip pause follows "resumed", not window focus.
+    On Android 10 and later both split-screen apps are resumed, so the
+    strips may stay paused over the other app while the demo half shows
+    (inferred, not run).
+*   **Two demo screens overlapping.** `StripPause` is one true/false flag.
+    Closing the demo and re-opening it within the exit animation could let
+    the old screen's "off" land after the new screen's "on" (not run).
+*   **The `Lift now` chip** names what a release would run right now, so on
+    steps 3, 6 and 7 it first shows Home or Back before the hold or the line.
+*   **Release gate:** whether the three flaky device suites or the Poco F5
+    check block a release.
+
+Decided earlier:
+Decisions made during review are in the text: the demo is marked as seen
+when the first screen is decided (section 5); after the tile path the demo
+does not show later, because the first-screen decision saves `demo_seen`,
+and that user can use the Home row (CUJ 6).
 
 ## Critical User Journeys (CUJs)
 
@@ -147,8 +175,11 @@ the Home row (CUJ 6).
 *   **Given:** any state, Home showing.
 *   **When:** the user taps "Try the gestures".
 *   **Then:** the demo opens at step 1. The finish card shows "Set up now"
-    only while setup is not done. With the service on, a practice swipe runs
-    no real action, whatever the saved edge width. (See "Strip pause" in section 1.)
+    only while setup is not done. With the service on, the strips are paused
+    while a step shows, so a practice swipe runs no real action, whatever
+    the saved edge width. The user's own edge swipes do nothing until the
+    demo closes or the finish card shows; the top-bar arrow and "Skip"
+    always leave. (See "Strip pause" in section 1.)
 
 ### CUJ 6: Tile opens the disclosure on a fresh install
 
@@ -195,6 +226,11 @@ The engine copies three small rules from it (hold poll, second-finger
 cancel, app-list hand-off). A parity test guards the recogniser itself (see
 tests).
 
+The demo touches the service in one place only: while a step shows, it sets
+an in-memory flag that makes the strips non-touchable, through the path the
+service already uses while a finger holds a strip. The recogniser and the
+touch path are not shared or refactored.
+
 ### 1. The drawn phone, its place and its coordinates
 
 *   The drawn phone is a rounded box, 9 wide to 19 high. Width =
@@ -217,9 +253,10 @@ tests).
 *   **Inset** (the gap to the real left and right edges), computed at
     runtime, per side: `max(40 dp, system gesture inset, strip) + 8 dp`.
     `strip` is the saved `edgeWidthDp` plus the navigation-bar inset on that
-    side when the service is not `OFF`, else 0. Reason: on a replay the
-    service's own strips are live under the demo, up to 64 dp wide, and a
-    practice swipe that starts on one would run a real Back.
+    side when the service is not `OFF`, else 0. Reason: this is the second
+    guard behind the strip pause (below). If a side strip, up to 64 dp
+    wide, were live under the demo, a practice swipe that starts on it
+    would run a real Back.
 *   **Strip pause (added when built).** The inset covers the side strips
     only. The service's bottom strip is a window above the app, so it takes
     any touch that starts on it. When the page scrolls (200 % font,
@@ -227,8 +264,9 @@ tests).
     strip, and a practice Home swipe ran the real Home. So while the demo
     steps are in front, the strips let touches through:
     `service/StripPause` is a flag in memory that `DemoScreen` sets from a
-    `LifecycleResumeEffect` (on while resumed, off on pause or when the
-    screen leaves). `EdgeTouchOverlay.applyInteractivity` reads it and makes
+    `LifecycleResumeEffect` (on while resumed and a step shows; off on
+    pause, when the screen leaves, or when the finish card replaces the
+    steps). `EdgeTouchOverlay.applyInteractivity` reads it and makes
     every strip non-touchable, the same way it does while a finger holds a
     strip. The service and the app share one process, so a killed process
     cannot leave the strips paused. The inset stays, as a second guard and
@@ -288,9 +326,9 @@ never arrives and is ignored.)
 
 *   `down(sample)`: picks the edge. Bottom band first (y ≥ height − band),
     then left (x ≤ band), then right (x ≥ width − band). A touch elsewhere
-    gives `Missed(NOT_ON_EDGE)`.
+    gives `Missed(NotOnEdge)`.
 *   `move(sample)`, `up(sample)`, `cancel()`: forwarded to the active tracker.
-    A second finger gives `Missed(CANCELLED)`.
+    A second finger gives `Missed(Cancelled)`.
 *   **One result per touch:** after the first `Performed` or `Missed`, the
     engine ignores everything until all fingers are up and a new DOWN comes.
     The tracker itself can report `Unused` twice for one slow swipe (once
@@ -312,7 +350,7 @@ never arrives and is ignored.)
     `Performed(AppPicked(index))`; the tracker returns nothing on that UP,
     so the engine makes the event itself. A slide back down cancels the
     list, by the same `SwitcherCancel` rule the real list uses, and gives
-    `Missed(CANCELLED)`. If `recents` is false (a drag to the
+    `Missed(Cancelled)`. If `recents` is false (a drag to the
     left, which opens favourites for real), UP gives
     `Performed(FavouritesOpened)`. As built, the `SwitcherCancel` rule is
     given the drawn height, not the real one: it measures the room left
@@ -323,7 +361,7 @@ Events returned (a list per call, usually empty or one item):
 
 *   `Ready(action)`: from `Armed.pending`, `Pending.action`, and
     `CornerReady` (the corner's action). The UI names the action a release
-    would run, in a "Lift now: <action>" chip on the drawn phone.
+    would run, in a `Lift now: <action>` chip on the drawn phone.
 *   `Unready`: from `Disarmed`. The UI clears that name.
 *   `ListOpened(recents)`, `ListMoved(index)`: the UI shows and moves the
     icon row. (As built, `ListOpened` carries `recents`, so a drag to the
@@ -374,8 +412,9 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
 *   A `Performed` that passes the step: `celebrating` is set. The UI plays
     the effect for 900 ms, then calls `advance()`. While `celebrating` is
     set, the UI sends no touches to the engine.
-*   Any other `Performed`: `tries + 1`. The UI plays that effect briefly and
-    the hint names it. `DemoHint.Other(result)`.
+*   Any other `Performed`: `tries + 1`. The UI plays that effect for the same
+    900 ms (touches are accepted meanwhile, the guide stays hidden) and the
+    hint names it. `DemoHint.Other(result)`.
 *   A `Missed`: `tries + 1`, `DemoHint.Miss(reason)`.
 *   Hint text is chosen in the UI by one `when` over the hint and the step.
     Per-step texts exist for the common cases (Home in step 3; Back in steps
@@ -398,7 +437,7 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
 *   One pure function decides the first stack:
 
     ```text
-    firstScreens(record, serviceOn, tileAskedDisclosure): List<Screen>
+    FirstRun.firstStack(record, serviceOn, tileAskedDisclosure): FirstStack (the stack it opens)
       tileAskedDisclosure            -> HOME, DISCLOSURE
       record.demoSeen                -> HOME
       serviceOn                      -> HOME
@@ -419,7 +458,7 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     `FirstRun.marksDemoSeen(record, stack)`, also unit tested.
 *   In `NavGestureApp` the saved stack becomes nullable. While it is null and
     `model.recordLoaded` is false, only the background is drawn. When the
-    record has loaded, the stack is set from `firstScreens`, the tile request
+    record has loaded, the stack is set from `FirstRun.firstStack`, the tile request
     is cleared, and `DEMO_SEEN` is saved in every case except plain `HOME`
     for an already-seen record. So no Home frame shows before the demo, and
     the tile request is read at the moment of the decision, not before. A
@@ -465,7 +504,8 @@ screen size as arguments.
 ### Alternative D: Full-screen practice on the real edges
 
 Rejected: before setup the phone's own navigation takes those touches, and
-after setup the app's own strips do.
+the app cannot pause that. After setup the strips can be paused (section 1,
+"Strip pause"), but that cannot help a first-run user.
 
 ### Alternative E: One fixed demo configuration for all steps
 
@@ -501,7 +541,7 @@ start with another folder. Test paths are under
 | `demo/DemoConfiguration.kt` | Create | `forStep(step, widthDp)` from section 2. |
 | `demo/DemoEngine.kt` | Create | Engine, `DemoEvent`, `DemoMiss`, `DemoResult` from section 3. |
 | `demo/DemoProgress.kt` | Create | `DemoStep`, `DemoHint`, `DemoProgress` from section 4. |
-| `demo/FirstRun.kt` | Create | `firstScreens` logic from section 5 as a pure function that returns whether to open the demo, the disclosure or Home. |
+| `demo/FirstRun.kt` | Create | `FirstRun.firstStack` (returns `FirstStack`) and `marksDemoSeen` from section 5 as a pure function that returns whether to open the demo, the disclosure or Home. |
 | `ui/DemoScreen.kt` | Create | The screen: step text, "Step n of 7" (tag `demo_step`), hint, drawn phone with pointer input and frame poll, buttons, finish card. |
 | `ui/DemoPhone.kt` | Create | The drawn phone's pages, start-band highlight, path arrow and the seven effects. |
 | `ui/MainActivity.kt` | Modify | `Screen.DEMO`; nullable first stack and the decision from section 5; `ScreenContent` branch. |
@@ -513,7 +553,7 @@ start with another folder. Test paths are under
 | `app/src/main/res/values/strings.xml` | Modify | Title, seven step titles and instructions, hints, buttons, finish card, row label. |
 | `demo/DemoEngineTest.kt` (test) | Create | See the list below. |
 | `demo/DemoProgressTest.kt` (test) | Create | Pass, other gesture, miss, skip after two tries, celebrate, advance, finish. |
-| `demo/FirstRunTest.kt` (test) | Create | Each row of `firstScreens`, including tile plus fresh install. |
+| `demo/FirstRunTest.kt` (test) | Create | Each row of `FirstRun.firstStack`, including tile plus fresh install. |
 | `service/StripPauseTest.kt` (test) | Create | Not paused by default; a change tells the installed overlay once; a pause set with no strips installed is kept for the next install. |
 | `setup/SetupStateRepositoryTest.kt` (test) | Modify | Its flag map must list every `SetupFlag`; add `DEMO_SEEN to SetupRecord::demoSeen`. |
 | `ui/BackStackTest.kt` (test) | Modify | A saved `DEMO` name restores. |
@@ -535,9 +575,9 @@ density 3, real height 800 dp:
     it (default configuration, real width and height).
 *   Step 1: a Back swipe that pauses 400 ms, and one that travels 150 dp,
     are both still Back.
-*   A touch in the middle gives `NOT_ON_EDGE`.
+*   A touch in the middle gives `Missed(NotOnEdge)`.
 *   A swipe slower than the arm time gives exactly one `Missed`.
-*   A second finger gives exactly one `Missed(CANCELLED)`, and the UP that
+*   A second finger gives exactly one `Missed(Cancelled)`, and the UP that
     follows gives nothing.
 *   A drag to the left in step 4 gives `FavouritesOpened`.
 *   The app list reaches all four indexes on the 200 dp drawing.
@@ -559,8 +599,9 @@ screen the suite reads `ui_nodes` directly, with `bounds_of_id` and
 5.  Home: `input swipe` at the drawn phone's centre x, from 10 dp above its
     bottom edge, 150 dp up, 120 ms. Poll for "3".
 6.  After each swipe `demo_phone` must still be on screen. The suite runs
-    with the service on, so this proves a practice swipe runs no real Back
-    or Home.
+    with the service on, so this shows, at the default font and unscrolled,
+    that a practice swipe runs no real Back or Home. It does not cover a
+    scrolled page (see the by-hand row).
 7.  Tap `demo_skip` with `tap_node`. Check that `demo_phone` is gone and
     `row_demo` shows.
 
@@ -569,8 +610,9 @@ screen the suite reads `ui_nodes` directly, with `bounds_of_id` and
 1.  `open_test_app`; `ui_nodes` must have `demo_phone` (first open shows the
     demo).
 2.  Tap `nav_back` with `tap_node`; `demo_phone` must be gone.
-3.  Press the Home key, `open_test_app` again; no `demo_phone` (not shown
-    twice).
+3.  Press the device Home key, stop the app (`am force-stop`),
+    `open_test_app` again; `demo_phone` must not show (the saved
+    `demo_seen` flag, not the live back stack, is under test).
 4.  Tile path (CUJ 6): `pm clear` again, then `am start` of the main
     activity with `--ez com.vijayyaso.navgesture.SHOW_DISCLOSURE true`;
     `disclosure_agree` must show and `demo_phone` must not. Press Back, so
@@ -582,10 +624,10 @@ Commands run in the build container, as `docs/development.md` describes.
 
 | What | How | Covers |
 | :--- | :--- | :--- |
-| Unit tests | `gradle test` | Engine, progress, first-run rule (CUJ 3, 4, 6), back stack. |
+| Unit tests | `gradle test` | Engine, progress, first-run rule (CUJ 3, 4, 6), back stack, strip-pause flag, setup flags. |
 | Lint | `gradle lint` | Code checks. |
 | Both builds | `gradle assembleGithubDebug assemblePlayDebug` | Both flavors compile. |
 | Scripts | `shellcheck -o all` on the changed scripts | Script checks. |
-| Device suites | `./e2e/run.sh demo disclosure` on the emulator | CUJ 1 (first open), CUJ 2, CUJ 5. |
-| By hand on the emulator | All seven steps to the finish card; rotate at step 4 (CUJ 7); two failed tries show "Skip this step" (CUJ 3); dark theme; 200 % font and landscape: every button reachable; edge width set to 64 dp with the service on: a practice Back does not leave the demo | CUJ 1, 3, 5, 7 and the small-window rule. |
+| Device suites | `./e2e/run.sh demo disclosure`, then `./e2e/run.sh` (all 13) because the service's touch path changed | CUJ 1 (first open), CUJ 2 (back arrow), CUJ 5, CUJ 6 (tile path). |
+| By hand on the emulator | All seven steps to the finish card; rotate at step 4 (CUJ 7); two failed tries show "Skip this step" (CUJ 3); dark theme; 200 % font and landscape: every button reachable; edge width set to 64 dp with the service on: a practice Back does not leave the demo; service on at 200 % font (or landscape), scrolled until the drawn phone's bottom band is over the real bottom edge: a practice Home swipe leaves the demo open and runs no real Home, and after Back to Home a real bottom swipe works again (strip pause); TalkBack on: "Skip this step" shows at step 1 and is absent during the 900 ms effect after a pass | CUJ 1, 3, 5, 7 and the small-window rule. |
 | Phone | Poco F5, clean install, all seven steps | Real fingers. Not done by the build job; the owner does it. |

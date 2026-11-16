@@ -65,6 +65,9 @@ sleep 2
 if ! demo_shown; then pass "the back arrow closes the demo"; else fail "the back arrow closes the demo"; fi
 "${ADB_BIN}" shell input keyevent KEYCODE_HOME >/dev/null
 sleep 2
+# Stopped first, so the saved flag is under test and not the back stack still in memory.
+"${ADB_BIN}" shell am force-stop "${PKG}" >/dev/null
+sleep 1
 open_test_app
 if ! demo_shown; then pass "the demo does not open by itself again"; else fail "the demo does not open by itself again"; fi
 
