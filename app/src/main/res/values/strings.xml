@@ -132,7 +132,7 @@
     <string name="demo_do_corner">Start in a bottom corner. Swipe up and in at a slant. Here it opens notifications.</string>
     <string name="demo_do_wait">Swipe in from a side edge, then hold still until the name changes. Here it takes a screenshot.</string>
     <string name="demo_do_long">Swipe in from a side edge, past the line. Here it turns on the torch.</string>
-    <string name="demo_ready">Lift now: %1$s</string>
+    <string name="demo_ready">On lift: %1$s</string>
     <string name="demo_name_app_list">the app list</string>
     <string name="demo_name_favourites">your favourite apps</string>
     <string name="demo_hint_other">That was %1$s. Try the swipe above.</string>

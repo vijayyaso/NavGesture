@@ -19,7 +19,12 @@
     single full run was clean (`landscape-confirm`, `swipe-actions` and
     `disclosure` failed on some runs and passed on others; cause not
     proved, and there is no run of these suites from just before the pause
-    to compare with). Not yet run
+    to compare with). On 2026-11-17 the focus rule (Open Questions) was
+    added and checked: `gradle test` (1048 tests, both flavors), lint on
+    both debug flavors, both debug builds, the `demo` suite, and by hand
+    with `dumpsys window`: the three live strips turn non-touchable when
+    the demo opens, touchable again while the notification shade has
+    focus, and touchable after Back to Home. Not yet run
     on a real phone (the Poco F5 check is the owner's). Where the build
     differs from this text, the text says "As built" or "Deviation". The
     service's strips are paused while the demo steps show ("Strip pause",
@@ -118,19 +123,22 @@ The seven gestures, as the real defaults and the demo both define them:
 
 ## Open Questions
 
-Open after the 2026-11-17 review (the owner decides):
+None open. Decided by the owner after the 2026-11-17 review:
 
-*   **Split screen.** The strip pause follows "resumed", not window focus.
-    On Android 10 and later both split-screen apps are resumed, so the
-    strips may stay paused over the other app while the demo half shows
-    (inferred, not run).
-*   **Two demo screens overlapping.** `StripPause` is one true/false flag.
-    Closing the demo and re-opening it within the exit animation could let
-    the old screen's "off" land after the new screen's "on" (not run).
-*   **The `Lift now` chip** names what a release would run right now, so on
-    steps 3, 6 and 7 it first shows Home or Back before the hold or the line.
-*   **Release gate:** whether the three flaky device suites or the Poco F5
-    check block a release.
+*   **Split screen:** the strip pause also needs window focus
+    (`LocalWindowInfo.isWindowFocused`). On Android 10 and later both
+    split-screen apps stay resumed, so without focus the strips would stay
+    paused over the other app. Cost accepted: while the demo half is not
+    focused, its strips are live again.
+*   **Two demo screens overlapping:** a known small gap, not fixed.
+    `StripPause` is one true/false flag, so closing the demo and re-opening
+    it within the exit animation could let the old screen's "off" land
+    after the new screen's "on". It matters only on a scrolled page.
+*   **The chip** reads `On lift: <action>`. It names what a release would
+    run right now, so on steps 3, 6 and 7 it first names Home or Back and
+    changes as the finger stops, holds or passes the line.
+*   **Release gate:** the Poco F5 check blocks a release; the three flaky
+    device suites do not.
 
 Decided earlier:
 Decisions made during review are in the text: the demo is marked as seen
@@ -264,7 +272,7 @@ touch path are not shared or refactored.
     strip, and a practice Home swipe ran the real Home. So while the demo
     steps are in front, the strips let touches through:
     `service/StripPause` is a flag in memory that `DemoScreen` sets from a
-    `LifecycleResumeEffect` (on while resumed and a step shows; off on
+    `LifecycleResumeEffect` keyed on window focus (on while resumed, focused and a step shows; off on
     pause, when the screen leaves, or when the finish card replaces the
     steps). `EdgeTouchOverlay.applyInteractivity` reads it and makes
     every strip non-touchable, the same way it does while a finger holds a
@@ -361,7 +369,7 @@ Events returned (a list per call, usually empty or one item):
 
 *   `Ready(action)`: from `Armed.pending`, `Pending.action`, and
     `CornerReady` (the corner's action). The UI names the action a release
-    would run, in a `Lift now: <action>` chip on the drawn phone.
+    would run, in an `On lift: <action>` chip on the drawn phone.
 *   `Unready`: from `Disarmed`. The UI clears that name.
 *   `ListOpened(recents)`, `ListMoved(index)`: the UI shows and moves the
     icon row. (As built, `ListOpened` carries `recents`, so a drag to the

@@ -116,9 +116,11 @@ internal fun DemoScreen(model: AppModel, onClose: () -> Unit, onSetUp: () -> Uni
         return
     }
     // The service's strips sit above the app and would run a practice swipe for real, so they
-    // let touches through while the drawn phone is in front.
-    LifecycleResumeEffect(Unit) {
-        StripPause.set(true)
+    // let touches through while the drawn phone is in front. In split screen both apps stay
+    // resumed, so window focus decides: the strips work again over the other app.
+    val focused = LocalWindowInfo.current.isWindowFocused
+    LifecycleResumeEffect(focused) {
+        StripPause.set(focused)
         onPauseOrDispose { StripPause.set(false) }
     }
     // A screen reader user cannot draw these swipes, so every step can be skipped at once.
