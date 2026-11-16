@@ -317,6 +317,17 @@ and nowhere hidden:
     (the real default strip is 20 dp). The band only chooses the edge; the
     tracker does not read it. The bands run the full length of each drawn
     edge; real side strips cover the middle 80 %.
+*   **Touch margin (found on the Poco F5, 2026-11-17).** A real thumb that
+    starts on a drawn edge often lands a little past it, and a touch that
+    started outside the drawing reached nothing: no try, no hint, so the
+    step looked dead. Now `demo/DemoTouchZone` accepts a first finger up to
+    24 dp outside the left, right and bottom edges (not the top, where the
+    step text is) and moves every point of that touch onto the drawing's
+    border, inside the start band. The touch handler sits on the phone's
+    whole row with a 24 dp margin below the drawing (counted in the height
+    reserve); a touch that starts outside the zone is not consumed, so it
+    can still scroll the page. 24 dp stays inside the 48 dp minimum gap to
+    a real edge.
 *   **Long line:** `longSwipeDp = min(120, 0.45 × widthDp)`, so a long swipe
     fits on a 200 dp drawing. At 267 dp and wider it is the real 120.
 
@@ -561,6 +572,8 @@ start with another folder. Test paths are under
 | `app/src/main/res/values/strings.xml` | Modify | Title, seven step titles and instructions, hints, buttons, finish card, row label. |
 | `demo/DemoEngineTest.kt` (test) | Create | See the list below. |
 | `demo/DemoProgressTest.kt` (test) | Create | Pass, other gesture, miss, skip after two tries, celebrate, advance, finish. |
+| `demo/DemoTouchZone.kt` | Create (added after the Poco check) | The touch margin from section 2. |
+| `demo/DemoTouchZoneTest.kt` (test) | Create (added after the Poco check) | On the drawing, left, right and below the margin, a corner, past the margin, no top margin, and a margin touch landing in the engine's start band. |
 | `demo/FirstRunTest.kt` (test) | Create | Each row of `FirstRun.firstStack`, including tile plus fresh install. |
 | `service/StripPauseTest.kt` (test) | Create | Not paused by default; a change tells the installed overlay once; a pause set with no strips installed is kept for the next install. |
 | `setup/SetupStateRepositoryTest.kt` (test) | Modify | Its flag map must list every `SetupFlag`; add `DEMO_SEEN to SetupRecord::demoSeen`. |

@@ -92,6 +92,7 @@ import com.vijayyaso.navgesture.demo.DemoMiss
 import com.vijayyaso.navgesture.demo.DemoProgress
 import com.vijayyaso.navgesture.demo.DemoResult
 import com.vijayyaso.navgesture.demo.DemoStep
+import com.vijayyaso.navgesture.demo.DemoTouchZone
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.RejectionReason
@@ -249,8 +250,9 @@ private fun StepText(step: DemoStep, hint: DemoHint?) {
 }
 
 /**
- * The drawn phone with its touch handling. Every pointer change on it is consumed, so a swipe
- * never scrolls the page. While a finger is down the hold poll runs once a frame.
+ * The drawn phone with its touch handling. A touch that starts on the drawing or in its margin
+ * is consumed, so that swipe never scrolls the page. While a finger is down the hold poll runs
+ * once a frame.
  */
 @Composable
 private fun PracticePhone(
@@ -291,7 +293,72 @@ private fun PracticePhone(
     }
 
     val description = stringResource(R.string.demo_phone_description, step.number, stringResource(step.title))
-    Box(contentAlignment = AbsoluteAlignment.TopLeft, modifier = Modifier.fillMaxWidth()) {
+    val zone = remember(layout.widthPx, layout.heightPx, density.density) {
+        DemoTouchZone(layout.widthPx.toFloat(), layout.heightPx.toFloat(), DemoTouchZone.MARGIN_DP * density.density)
+    }
+    val offsetX = layout.offsetXPx.toFloat()
+    // The touch area is the phone's whole row plus a margin below it, so a thumb that starts a
+    // little past a drawn edge still counts (DemoTouchZone). A touch that starts outside the zone
+    // is left alone, so it can still scroll the page.
+    Box(
+        contentAlignment = AbsoluteAlignment.TopLeft,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(engine, zone, offsetX) {
+                // A node still sliding in reports a still finger as moving, so a touch that
+                // starts before the screen settles, or while a pass plays, is not judged.
+                awaitPointerEventScope {
+                    var primary: PointerId? = null
+                    var judging = false
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.count { it.pressed }
+                            event.changes.forEach { change ->
+                                val x = change.position.x - offsetX
+                                val y = change.position.y
+                                val (drawnX, drawnY) = zone.onDrawing(x, y)
+                                val sample = TouchSample(drawnX, drawnY, change.uptimeMillis)
+                                val isPrimary = change.id == primary
+                                val firstDown = change.changedToDownIgnoreConsumed() && primary == null && pressed == 1
+                                if (firstDown && !zone.accepts(x, y)) return@forEach
+                                if (primary == null && !firstDown) return@forEach
+                                when {
+                                    firstDown -> {
+                                        primary = change.id
+                                        judging = settled() && latestAccepts()
+                                        if (judging) {
+                                            latestFinger(true)
+                                            latestEvents(engine.down(sample))
+                                        }
+                                    }
+                                    change.changedToDownIgnoreConsumed() ->
+                                        if (judging) latestEvents(engine.extraFinger())
+                                    isPrimary && change.changedToUpIgnoreConsumed() -> {
+                                        if (judging) {
+                                            latestEvents(engine.up(sample))
+                                            latestFinger(false)
+                                        }
+                                        primary = null
+                                        judging = false
+                                    }
+                                    isPrimary && change.positionChangeIgnoreConsumed() != Offset.Zero ->
+                                        if (judging) latestEvents(engine.move(sample))
+                                }
+                                change.consume()
+                            }
+                        }
+                    } finally {
+                        // The engine was replaced (a new size) or the screen left mid-touch.
+                        if (judging) {
+                            engine.cancel()
+                            latestFinger(false)
+                        }
+                    }
+                }
+            }
+            .padding(bottom = DemoTouchZone.MARGIN_DP.dp),
+    ) {
         DemoPhone(
             state = state,
             recentsLinePx = layout.screenHeightPx * GestureConfiguration().recentsLinePercent / 100f,
@@ -302,53 +369,6 @@ private fun PracticePhone(
                 .clearAndSetSemantics {
                     contentDescription = description
                     testTag = TestTags.DEMO_PHONE
-                }
-                .pointerInput(engine) {
-                    // A node still sliding in reports a still finger as moving, so a touch that
-                    // starts before the screen settles, or while a pass plays, is not judged.
-                    awaitPointerEventScope {
-                        var primary: PointerId? = null
-                        var judging = false
-                        try {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val pressed = event.changes.count { it.pressed }
-                                event.changes.forEach { change ->
-                                    val sample = TouchSample(change.position.x, change.position.y, change.uptimeMillis)
-                                    val isPrimary = change.id == primary
-                                    when {
-                                        change.changedToDownIgnoreConsumed() && primary == null && pressed == 1 -> {
-                                            primary = change.id
-                                            judging = settled() && latestAccepts()
-                                            if (judging) {
-                                                latestFinger(true)
-                                                latestEvents(engine.down(sample))
-                                            }
-                                        }
-                                        change.changedToDownIgnoreConsumed() ->
-                                            if (judging) latestEvents(engine.extraFinger())
-                                        isPrimary && change.changedToUpIgnoreConsumed() -> {
-                                            if (judging) {
-                                                latestEvents(engine.up(sample))
-                                                latestFinger(false)
-                                            }
-                                            primary = null
-                                            judging = false
-                                        }
-                                        isPrimary && change.positionChangeIgnoreConsumed() != Offset.Zero ->
-                                            if (judging) latestEvents(engine.move(sample))
-                                    }
-                                    change.consume()
-                                }
-                            }
-                        } finally {
-                            // The engine was replaced (a new size) or the screen left mid-touch.
-                            if (judging) {
-                                engine.cancel()
-                                latestFinger(false)
-                            }
-                        }
-                    }
                 },
         )
     }
@@ -413,7 +433,7 @@ private fun reservedHeight(): Dp {
     return with(LocalDensity.current) {
         TEXT_TOP + typography.labelLarge.lineHeight.toDp() + TEXT_GAP + typography.titleLarge.lineHeight.toDp() +
             TEXT_GAP + typography.bodyMedium.lineHeight.toDp() * (INSTRUCTION_LINES + HINT_LINES) + HINT_GAP +
-            PHONE_GAP * 2 + buttonRowHeight()
+            PHONE_GAP * 2 + DemoTouchZone.MARGIN_DP.dp + buttonRowHeight()
     }
 }
 
