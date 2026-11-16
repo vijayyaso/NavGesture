@@ -106,7 +106,7 @@ The seven gestures, as the real defaults and the demo both define them:
 ## Open Questions
 
 None. Decisions made during review are in the text: the demo is marked as
-seen when it first shows (section 5); after the tile path the demo does not
+seen when the first screen is decided (section 5); after the tile path the demo does not
 show later, because that user accepts or declines the disclosure and can use
 the Home row (CUJ 6).
 
@@ -323,7 +323,7 @@ Events returned (a list per call, usually empty or one item):
 
 *   `Ready(action)`: from `Armed.pending`, `Pending.action`, and
     `CornerReady` (the corner's action). The UI names the action a release
-    would run.
+    would run, in a "Lift now: <action>" chip on the drawn phone.
 *   `Unready`: from `Disarmed`. The UI clears that name.
 *   `ListOpened(recents)`, `ListMoved(index)`: the UI shows and moves the
     icon row. (As built, `ListOpened` carries `recents`, so a drag to the
@@ -351,8 +351,10 @@ Events returned (a list per call, usually empty or one item):
 
 Each effect is drawn with plain Compose shapes and the app's existing icons.
 On each step the start band (or corner) is highlighted and a still arrow
-shows the path. The arrow hides while a finger is down. There is no looping
-animation. As built, step 3 also draws the real Recents line as a dashed
+shows the path. The arrow hides while a finger is down, and the whole guide
+(band, arrow, lines) hides while an effect plays. There is no looping
+animation. As built, steps 3 and 6 draw a small ring at the arrow's end, where
+the finger must stop and hold; step 3 also draws the real Recents line as a dashed
 line, and step 7 draws the long line; step 7's arrow and line show on the
 left side only, because on a narrow drawing the two sides' arrows cross in
 the middle (both edges still work). The action icons come from
@@ -426,8 +428,8 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     not null. As built, `BackStackSaver` in `ui/BackStack.kt` became a
     saver of `BackStack?`: it saves nothing for null, so a restore before
     the decision decides again. (`BackStack.kt` was not in the file table.)
-*   Marking the demo as seen when it first shows means a process killed
-    during the demo does not show it again. The Home row covers that case.
+*   Marking the demo as seen at the first-screen decision means a process
+    killed during the demo does not show it again. The Home row covers that case.
     This avoids writing the flag from a disposal, which also runs on
     rotation.
 *   New `Screen.DEMO`, title "Try the gestures". It uses the shared top bar,
@@ -438,7 +440,9 @@ DemoProgress(step: DemoStep?, tries: Int, hint: DemoHint?, celebrating: DemoResu
     stack with `replacedBy`. "Set up now" calls it with `HOME, SETUP`; it
     shows while `!model.checklist.essentialsDone`. "Done" and "Skip" call
     `onClose` (back to Home).
-*   Home gets a "Try the gestures" row at the top of the "More" group.
+*   Home gets a "Try the gestures" row at the top of the "More" group, with a
+    green play icon and the line "Practise each swipe on a drawn phone".
+*   "Skip this step" hides during the 900 ms effect after a pass.
 
 ## Alternatives Considered
 
@@ -510,6 +514,7 @@ start with another folder. Test paths are under
 | `demo/DemoEngineTest.kt` (test) | Create | See the list below. |
 | `demo/DemoProgressTest.kt` (test) | Create | Pass, other gesture, miss, skip after two tries, celebrate, advance, finish. |
 | `demo/FirstRunTest.kt` (test) | Create | Each row of `firstScreens`, including tile plus fresh install. |
+| `service/StripPauseTest.kt` (test) | Create | Not paused by default; a change tells the installed overlay once; a pause set with no strips installed is kept for the next install. |
 | `setup/SetupStateRepositoryTest.kt` (test) | Modify | Its flag map must list every `SetupFlag`; add `DEMO_SEEN to SetupRecord::demoSeen`. |
 | `ui/BackStackTest.kt` (test) | Modify | A saved `DEMO` name restores. |
 | `e2e/demo.sh` | Create | See below. |
