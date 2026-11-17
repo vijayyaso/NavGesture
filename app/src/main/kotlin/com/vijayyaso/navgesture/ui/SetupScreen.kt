@@ -22,10 +22,12 @@ import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
 
 @Composable
-internal fun SetupScreen(model: AppModel) {
+internal fun SetupScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     val checklist = model.checklist
+    val practice = rememberPracticeOrDemo(model)
+    val onPractise = { onOpen(practice) }
     SettingsGroup(title = stringResource(R.string.setup_group_required)) {
-        SetupRows(checklist.required, model)
+        SetupRows(checklist.required, model, onPractise)
     }
     SettingsGroup(
         title = stringResource(R.string.setup_group_recommended),
@@ -37,6 +39,6 @@ internal fun SetupScreen(model: AppModel) {
             },
         ),
     ) {
-        SetupRows(checklist.recommended, model)
+        SetupRows(checklist.recommended, model, onPractise)
     }
 }

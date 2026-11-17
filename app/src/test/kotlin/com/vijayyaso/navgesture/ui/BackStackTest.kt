@@ -280,4 +280,33 @@ class BackStackTest {
         val slots = Screen.entries.mapNotNull { it.pickerSlot }
         assertEquals(slots.size, slots.toSet().size)
     }
+
+    @Test
+    fun `a swap replaces the top with a new entry and a new id`() {
+        val stack = home.open(Screen.SETUP, 40).open(Screen.PRACTICE, 120)
+        val swapped = stack.swapTopFrom(stack.top.id, Screen.DEMO)
+        assertEquals(listOf(Screen.HOME, Screen.SETUP, Screen.DEMO), swapped.screens)
+        assertNotEquals(stack.top.id, swapped.top.id)
+        assertEquals(stack.nextId, swapped.top.id)
+        assertEquals(stack.nextId + 1, swapped.nextId)
+        assertEquals(0, swapped.top.scroll)
+        // Back from the drawn demo returns to the screen under the page, where it was left.
+        assertEquals(StackEntry(Screen.SETUP, stack.entries[1].id, 120), swapped.back().top)
+    }
+
+    @Test
+    fun `a swap from a screen that is no longer on top changes nothing`() {
+        val stack = home.open(Screen.PRACTICE, 0)
+        val practiceId = stack.top.id
+        val covered = stack.open(Screen.ABOUT, 0)
+        assertSame(covered, covered.swapTopFrom(practiceId, Screen.DEMO))
+        assertSame(stack, stack.swapTopFrom(home.top.id, Screen.DEMO))
+    }
+
+    @Test
+    fun `the live practice page restores from its saved name`() {
+        assertEquals(listOf(Screen.HOME, Screen.PRACTICE), backStackOf(listOf("HOME", "PRACTICE")).screens)
+        val stack = home.open(Screen.PRACTICE, 0)
+        assertEquals(stack, backStackFromSaved(stack.toSaved()))
+    }
 }

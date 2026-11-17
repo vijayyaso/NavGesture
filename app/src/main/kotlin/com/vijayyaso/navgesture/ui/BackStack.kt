@@ -55,6 +55,16 @@ internal data class BackStack(val entries: List<StackEntry>, val nextId: Int) {
     fun openFrom(id: Int, screen: Screen, coveredScroll: Int): BackStack =
         if (top.id == id) open(screen, coveredScroll) else this
 
+    /**
+     * Replaces the top entry with [screen], as a new entry with a new id, but only while the
+     * entry [id] is still on top, the same guard as [openFrom]. The live practice page hands off
+     * to the drawn demo this way, so Back from the drawn demo returns to the screen under it.
+     */
+    fun swapTopFrom(id: Int, screen: Screen): BackStack {
+        if (top.id != id) return this
+        return BackStack(entries.dropLast(1) + StackEntry(screen, nextId), nextId + 1)
+    }
+
     /** A whole new stack, as the tile asks for: every screen opens at its top. */
     fun replacedBy(vararg screens: Screen): BackStack =
         BackStack(screens.mapIndexed { index, screen -> StackEntry(screen, nextId + index) }, nextId + screens.size)

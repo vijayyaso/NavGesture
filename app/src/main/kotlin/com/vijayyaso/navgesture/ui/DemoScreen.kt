@@ -19,8 +19,6 @@ package com.vijayyaso.navgesture.ui
 
 import android.os.SystemClock
 import android.view.WindowManager
-import android.view.accessibility.AccessibilityManager
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +42,10 @@ import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -88,14 +85,12 @@ import com.vijayyaso.navgesture.demo.DemoConfiguration
 import com.vijayyaso.navgesture.demo.DemoEngine
 import com.vijayyaso.navgesture.demo.DemoEvent
 import com.vijayyaso.navgesture.demo.DemoHint
-import com.vijayyaso.navgesture.demo.DemoMiss
 import com.vijayyaso.navgesture.demo.DemoProgress
 import com.vijayyaso.navgesture.demo.DemoResult
 import com.vijayyaso.navgesture.demo.DemoStep
 import com.vijayyaso.navgesture.demo.DemoTouchZone
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
-import com.vijayyaso.navgesture.gesture.RejectionReason
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.service.StripPause
@@ -110,7 +105,11 @@ import kotlin.math.roundToInt
  */
 @Composable
 internal fun DemoScreen(model: AppModel, onClose: () -> Unit, onSetUp: () -> Unit) {
-    var progress by rememberSaveable(stateSaver = DemoProgressSaver) { mutableStateOf(DemoProgress()) }
+    // A hand-off from the live practice page starts at its step; read once, then cleared.
+    var progress by rememberSaveable(stateSaver = DemoProgressSaver) {
+        mutableStateOf(model.demoStartStep?.let { DemoProgress(step = it) } ?: DemoProgress())
+    }
+    LaunchedEffect(Unit) { model.demoStartStep = null }
     val step = progress.step
     if (step == null) {
         FinishCard(setupDone = model.checklist.essentialsDone, onClose = onClose, onSetUp = onSetUp)
@@ -443,7 +442,7 @@ private fun buttonRowHeight(): Dp = with(LocalDensity.current) {
 }
 
 @Composable
-private fun FinishCard(setupDone: Boolean, onClose: () -> Unit, onSetUp: () -> Unit) {
+internal fun FinishCard(setupDone: Boolean, onClose: () -> Unit, onSetUp: () -> Unit) {
     SettingsGroup {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -486,87 +485,6 @@ private fun FinishCard(setupDone: Boolean, onClose: () -> Unit, onSetUp: () -> U
     }
 }
 
-/** Whether a screen reader drives the screen by touch, kept current while the demo shows. */
-@Composable
-private fun rememberTouchExploration(): Boolean {
-    val context = LocalContext.current
-    val manager = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
-    var on by remember(manager) { mutableStateOf(manager?.isTouchExplorationEnabled == true) }
-    DisposableEffect(manager) {
-        val listener = AccessibilityManager.TouchExplorationStateChangeListener { on = it }
-        manager?.addTouchExplorationStateChangeListener(listener)
-        onDispose { manager?.removeTouchExplorationStateChangeListener(listener) }
-    }
-    return on
-}
-
-/** The hint for a try that did not pass, by what happened and the step it happened in. */
-@Composable
-private fun hintText(hint: DemoHint, step: DemoStep): String = when (hint) {
-    is DemoHint.Other -> {
-        val action = (hint.result as? DemoResult.Ran)?.run?.action
-        when {
-            step == DemoStep.RECENTS && action == SwipeAction.Home -> stringResource(R.string.demo_hint_recents_home)
-            step == DemoStep.WAIT && action == SwipeAction.Back -> stringResource(R.string.demo_hint_wait_back)
-            step == DemoStep.LONG && action == SwipeAction.Back -> stringResource(R.string.demo_hint_long_back)
-            step == DemoStep.APP_LIST && hint.result == DemoResult.FavouritesOpened ->
-                stringResource(R.string.demo_hint_favourites)
-            else -> stringResource(R.string.demo_hint_other, resultName(hint.result))
-        }
-    }
-    is DemoHint.Miss -> when (val reason = hint.reason) {
-        DemoMiss.NotOnEdge -> stringResource(
-            if (step == DemoStep.CORNER) R.string.demo_hint_not_in_corner else R.string.demo_hint_not_on_edge,
-        )
-        DemoMiss.Cancelled -> stringResource(
-            if (step == DemoStep.APP_LIST) R.string.demo_hint_list_closed else R.string.demo_hint_cancelled,
-        )
-        DemoMiss.PulledBack -> stringResource(R.string.demo_hint_pulled_back)
-        is DemoMiss.Rejected -> stringResource(
-            when (reason.reason) {
-                RejectionReason.NO_MOVEMENT -> R.string.demo_hint_tap
-                RejectionReason.INSUFFICIENT_MOVEMENT -> R.string.demo_hint_short
-                RejectionReason.WRONG_DIRECTION -> R.string.demo_hint_wrong_way
-                RejectionReason.TOO_SLOW_TO_ARM -> R.string.demo_hint_slow
-                RejectionReason.OFF_AXIS -> R.string.demo_hint_slanted
-                RejectionReason.SLOT_EMPTY -> R.string.demo_hint_nothing
-            },
-        )
-    }
-}
-
-@Composable
-private fun resultName(result: DemoResult): String = when (result) {
-    is DemoResult.Ran -> shortcutLabel(result.run.action)
-    is DemoResult.AppPicked -> stringResource(R.string.demo_name_app_list)
-    DemoResult.FavouritesOpened -> stringResource(R.string.demo_name_favourites)
-    DemoResult.CircleToSearch -> stringResource(R.string.section_circle_to_search)
-}
-
-@get:StringRes
-private val DemoStep.title: Int
-    get() = when (this) {
-        DemoStep.BACK -> R.string.demo_step_back
-        DemoStep.HOME -> R.string.demo_step_home
-        DemoStep.RECENTS -> R.string.demo_step_recents
-        DemoStep.APP_LIST -> R.string.demo_step_app_list
-        DemoStep.CORNER -> R.string.demo_step_corner
-        DemoStep.WAIT -> R.string.demo_step_wait
-        DemoStep.LONG -> R.string.demo_step_long
-    }
-
-@get:StringRes
-private val DemoStep.instruction: Int
-    get() = when (this) {
-        DemoStep.BACK -> R.string.demo_do_back
-        DemoStep.HOME -> R.string.demo_do_home
-        DemoStep.RECENTS -> R.string.demo_do_recents
-        DemoStep.APP_LIST -> R.string.demo_do_app_list
-        DemoStep.CORNER -> R.string.demo_do_corner
-        DemoStep.WAIT -> R.string.demo_do_wait
-        DemoStep.LONG -> R.string.demo_do_long
-    }
-
 /** Only the step and the tries are kept; a pass still playing is kept as passed. */
 private val DemoProgressSaver = Saver<DemoProgress, ArrayList<Int>>(
     save = { progress ->
@@ -577,9 +495,6 @@ private val DemoProgressSaver = Saver<DemoProgress, ArrayList<Int>>(
         DemoProgress(step = DemoStep.entries.getOrNull(saved.getOrElse(0) { 0 }), tries = saved.getOrElse(1) { 0 })
     },
 )
-
-/** A pass shows its effect this long before the next step. */
-private const val EFFECT_SHOWN_MS = 900L
 
 private const val PHONE_WIDE = 9f
 private const val PHONE_HIGH = 19f

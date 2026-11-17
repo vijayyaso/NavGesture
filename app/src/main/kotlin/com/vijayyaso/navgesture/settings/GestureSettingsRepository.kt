@@ -41,6 +41,16 @@ import kotlinx.coroutines.flow.map
 internal val Context.gestureDataStore: DataStore<Preferences> by
     resettingPreferencesDataStore("gesture_configuration")
 
+/**
+ * A global setting the e2e suites set in place of the UI, read by debug builds only. Read on each
+ * call, so a change needs no rebind.
+ */
+internal fun debugOverride(context: Context, name: String): String? {
+    if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return null
+    return runCatching { Settings.Global.getString(context.contentResolver, name) }
+        .getOrNull()?.takeIf { it.isNotEmpty() && it != "null" }
+}
+
 /** Defaults are never duplicated here: a missing key falls back to [GestureConfiguration]. */
 class GestureSettingsRepository(
     private val context: Context,
@@ -92,7 +102,7 @@ class GestureSettingsRepository(
     private fun toConfiguration(preferences: Preferences, withOverrides: Boolean): GestureConfiguration {
         val defaults = GestureConfiguration()
         // Debug overrides apply only to what is read for use, never to what a save starts from.
-        val override: (String) -> String? = { name -> if (withOverrides) debugOverride(name) else null }
+        val override: (String) -> String? = { name -> if (withOverrides) debugOverride(context, name) else null }
         return GestureConfiguration(
             edgeWidthDp = preferences[EDGE_WIDTH_DP] ?: defaults.edgeWidthDp,
             sideMinimumSwipeDistanceDp =
@@ -154,13 +164,6 @@ class GestureSettingsRepository(
 
     /** The app-list override spares the debug emulator run a tap on the toggle. */
     private fun isOn(value: String): Boolean = value == "1" || value.equals("true", ignoreCase = true)
-
-    /** A global setting the e2e suites set in place of the UI, read by debug builds only. */
-    private fun debugOverride(name: String): String? {
-        if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0) return null
-        return runCatching { Settings.Global.getString(context.contentResolver, name) }
-            .getOrNull()?.takeIf { it.isNotEmpty() && it != "null" }
-    }
 
     private companion object {
         const val EDGE_APP_LIST_OVERRIDE = "navgesture_edge_app_list"

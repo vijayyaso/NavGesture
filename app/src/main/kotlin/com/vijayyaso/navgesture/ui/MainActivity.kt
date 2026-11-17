@@ -167,6 +167,9 @@ internal enum class Screen(@param:StringRes val title: Int) {
     CREDITS(R.string.section_credits),
     DISCLOSURE(R.string.disclosure_title),
     DEMO(R.string.demo_title),
+
+    // Live practice on the real edges; the same title names the page for TalkBack.
+    PRACTICE(R.string.demo_title),
 }
 
 private fun FirstStack.screens(): Array<Screen> = when (this) {
@@ -228,6 +231,9 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
         }
     }
 
+    // Read here, once, for "Try again" from the own-Back snackbar.
+    val practiceEntry = rememberPracticeOrDemo(model)
+
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     // Test tags become resource ids, so the e2e suites select rows without matching text.
     Scaffold(
@@ -247,11 +253,19 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
             val open: (Screen) -> Unit = { screen -> update { it.openFrom(entry.id, screen, scroll.value) } }
             val close = { update { it.backFrom(entry.id) } }
             val replace: (List<Screen>) -> Unit = { screens -> update { it.replacedBy(*screens.toTypedArray()) } }
+            val swap: (Screen) -> Unit = { screen -> update { it.swapTopFrom(entry.id, screen) } }
             // From a Turn on, Fix or Open button: the disclosure goes on top of the current screen.
             if (model.disclosureRequested && !leaving) {
                 LaunchedEffect(Unit) {
                     open(Screen.DISCLOSURE)
                     model.disclosureRequested = false
+                }
+            }
+            // From the own-Back snackbar's "Try again": practice opens again from the current screen.
+            if (model.practiceRequested && !leaving) {
+                LaunchedEffect(Unit) {
+                    open(practiceEntry)
+                    model.practiceRequested = false
                 }
             }
             val title = stringResource(entry.screen.title)
@@ -261,33 +275,46 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
                     .padding(padding)
                     .then(if (leaving) LeavingScreen else Modifier.semantics { paneTitle = title }),
             ) {
-                // Home opens on its own large title instead, so it has no bar and no back arrow.
-                if (entry.screen != Screen.HOME) ScreenBar(title, onBack = close)
+                // Home opens on its own large title instead, so it has no bar and no back arrow. The
+                // live practice page is full screen and has its own Close.
+                val fullScreen = entry.screen == Screen.PRACTICE
+                if (entry.screen != Screen.HOME && !fullScreen) ScreenBar(title, onBack = close)
                 val settled = remember(entry.id) {
                     { screens.targetState.id == entry.id && screens.currentState == screens.targetState }
                 }
+                val content = @Composable {
+                    ScreenContent(
+                        screen = entry.screen,
+                        model = model,
+                        leaving = leaving,
+                        open = open,
+                        close = close,
+                        replace = replace,
+                        swap = swap,
+                        onAgree = {
+                            if (saved?.top?.id == entry.id) {
+                                model.acceptDisclosure()
+                                close()
+                                openAccessibility(context)
+                            }
+                        },
+                    )
+                }
                 CompositionLocalProvider(LocalScreenSettled provides settled) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(scroll)
-                            .padding(bottom = 24.dp),
-                    ) {
-                        ScreenContent(
-                            screen = entry.screen,
-                            model = model,
-                            open = open,
-                            close = close,
-                            replace = replace,
-                            onAgree = {
-                                if (saved?.top?.id == entry.id) {
-                                    model.acceptDisclosure()
-                                    close()
-                                    openAccessibility(context)
-                                }
-                            },
-                        )
+                    if (fullScreen) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                        ) { content() }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(scroll)
+                                .padding(bottom = 24.dp),
+                        ) { content() }
                     }
                 }
             }
@@ -334,14 +361,16 @@ private fun ScreenBar(title: String, onBack: () -> Unit) {
 private fun ScreenContent(
     screen: Screen,
     model: AppModel,
+    leaving: Boolean,
     open: (Screen) -> Unit,
     close: () -> Unit,
     replace: (List<Screen>) -> Unit,
+    swap: (Screen) -> Unit,
     onAgree: () -> Unit,
 ) {
     when (screen) {
         Screen.HOME -> HomeScreen(model, onOpen = open)
-        Screen.SETUP -> SetupScreen(model)
+        Screen.SETUP -> SetupScreen(model, onOpen = open)
         Screen.APP_SWITCHING -> AppSwitchingScreen(
             model = model,
             onOpenFavourites = { open(Screen.FAVOURITE_APPS) },
@@ -371,6 +400,14 @@ private fun ScreenContent(
         Screen.DEMO -> DemoScreen(
             model = model,
             onClose = close,
+            onSetUp = { replace(listOf(Screen.HOME, Screen.SETUP)) },
+        )
+        // Full screen, with no bar and no scroll column; every hand-off swaps it for the drawn demo.
+        Screen.PRACTICE -> PracticeScreen(
+            model = model,
+            leaving = leaving,
+            onClose = close,
+            onSwap = swap,
             onSetUp = { replace(listOf(Screen.HOME, Screen.SETUP)) },
         )
     }

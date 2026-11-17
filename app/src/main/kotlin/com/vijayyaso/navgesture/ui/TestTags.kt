@@ -83,6 +83,14 @@ internal object TestTags {
     const val DEMO_SKIP = "demo_skip"
     const val DEMO_SKIP_STEP = "demo_skip_step"
     const val DEMO_DONE = "demo_done"
+    const val PRACTICE_PAGE = "practice_page"
+    const val PRACTICE_STEP = "practice_step"
+    const val PRACTICE_RESULT = "practice_result"
+    const val PRACTICE_WAITING = "practice_waiting"
+    const val PRACTICE_PAUSED = "practice_paused"
+    const val PRACTICE_CLOSE = "practice_close"
+    const val PRACTICE_SKIP_STEP = "practice_skip_step"
+    const val SETUP_PRACTISE = "setup_practise"
 
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"

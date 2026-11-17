@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.vijayyaso.navgesture.demo.DemoStep
 import com.vijayyaso.navgesture.diagnostics.Diagnostics
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
@@ -42,6 +43,7 @@ import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 import com.vijayyaso.navgesture.navigation.NavigationMode
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.settings.GestureSettingsRepository
+import com.vijayyaso.navgesture.settings.debugOverride
 import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.setup.SetupChecklist
 import com.vijayyaso.navgesture.setup.SetupFacts
@@ -91,6 +93,18 @@ internal class AppModel(
 
     /** Set by a Turn on tap without consent; the screen stack shows the disclosure and clears it. */
     var disclosureRequested by mutableStateOf(false)
+
+    /**
+     * Set by the own-Back snackbar's "Try again". The screen stack opens practice from whatever
+     * is on top, as it does for [disclosureRequested], and clears it.
+     */
+    var practiceRequested by mutableStateOf(false)
+
+    /**
+     * One-shot: the step the live practice page hands to the drawn demo when it hands off. The
+     * drawn demo reads it once to start there, then clears it.
+     */
+    var demoStartStep by mutableStateOf<DemoStep?>(null)
 
     /** Where a Home switch tap put the switch while its request is in flight; null otherwise. */
     var pendingSwitch by mutableStateOf<Boolean?>(null)
@@ -203,6 +217,20 @@ internal class AppModel(
 
     fun acceptDisclosure() = setFlag(SetupFlag.DISCLOSURE_ACCEPTED, true)
 
+    /** A snackbar with one action, which [onAction] runs if the user taps it. */
+    fun showMessage(text: String, actionLabel: String, onAction: () -> Unit) {
+        scope.launch {
+            val result = snackbar.showSnackbar(text, actionLabel = actionLabel, withDismissAction = true)
+            if (result == SnackbarResult.ActionPerformed) onAction()
+        }
+    }
+
+    /**
+     * Debug builds only: `navgesture_force_drawn_demo` = 1 makes "Try the gestures" open the drawn
+     * demo even with the service working. Read on each call, so a change needs no rebind.
+     */
+    fun forcesDrawnDemo(): Boolean = debugOverride(context, FORCE_DRAWN_DEMO_OVERRIDE) == "1"
+
     fun setFlag(flag: SetupFlag, value: Boolean) {
         scope.launch { setupState.set(flag, value) }
     }
@@ -238,6 +266,9 @@ private const val STOP_GRACE_MS = 3_000L
 
 /** The service takes itself down about half a second after a switch-off. */
 private const val SWITCH_SETTLE_MS = 800L
+
+/** The debug override that keeps the drawn demo with the service on; the `demo` suite sets it. */
+private const val FORCE_DRAWN_DEMO_OVERRIDE = "navgesture_force_drawn_demo"
 
 @Composable
 internal fun rememberAppModel(): AppModel {

@@ -95,7 +95,7 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
         enter = EnterTransition.None,
         exit = CardFoldExit,
     ) {
-        SetupGroup(model)
+        SetupGroup(model, onOpen)
     }
 
     val bankApps by remember(context) { PackageListStore.bankApps(context).packages }
@@ -165,12 +165,16 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     TileGrid(tiles)
 
     SettingsGroup(title = stringResource(R.string.section_more)) {
+        // Live practice on the real edges once the service works; the drawn demo otherwise.
+        val practice = rememberPracticeOrDemo(model)
         NavigationRow(
             title = stringResource(R.string.demo_title),
-            supporting = stringResource(R.string.demo_row_summary),
+            supporting = stringResource(
+                if (practice == Screen.PRACTICE) R.string.practice_row_summary else R.string.demo_row_summary,
+            ),
             tag = TestTags.ROW_DEMO,
             icon = GroupIcon(Icons.Filled.PlayArrow, IconTint.GREEN),
-        ) { onOpen(Screen.DEMO) }
+        ) { onOpen(practice) }
         NavigationRow(
             title = stringResource(R.string.section_troubleshooting),
             tag = TestTags.ROW_TROUBLESHOOTING,
@@ -239,7 +243,8 @@ private fun TileGrid(tiles: List<HomeTile>) {
  * it folds away it still draws the live list: every step reads Done, and Accessibility is always one.
  */
 @Composable
-private fun SetupGroup(model: AppModel) {
+private fun SetupGroup(model: AppModel, onOpen: (Screen) -> Unit) {
+    val practice = rememberPracticeOrDemo(model)
     val checklist = model.checklist
     SettingsGroup(
         title = pluralStringResource(
@@ -249,6 +254,6 @@ private fun SetupGroup(model: AppModel) {
             checklist.required.size,
         ),
     ) {
-        SetupRows(checklist.required, model)
+        SetupRows(checklist.required, model, onPractise = { onOpen(practice) })
     }
 }

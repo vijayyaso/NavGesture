@@ -159,6 +159,38 @@
     <string name="demo_set_up_now">Set up now</string>
     <string name="demo_done">Done</string>
 
+    <!-- Live practice: the user swipes the real screen edges; the service reports, nothing runs. -->
+    <string name="practice_row_summary">Practise each swipe on your screen\'s edges</string>
+    <string name="practice_now">Practise now</string>
+    <string name="practice_close">Close</string>
+    <string name="practice_waiting">Getting the edges ready…</string>
+    <string name="practice_paused">Practice paused. Your swipes now do real actions.</string>
+    <string name="practice_does">On your phone this does: %1$s</string>
+    <string name="practice_step_back">Swipe in from the side</string>
+    <string name="practice_step_home">Swipe up from the bottom</string>
+    <string name="practice_step_recents">Swipe up and stop</string>
+    <string name="practice_step_app_list">Swipe up, then slide sideways</string>
+    <string name="practice_step_corner">Swipe from a bottom corner</string>
+    <string name="practice_step_wait">Swipe in and hold</string>
+    <string name="practice_step_long">Long swipe in</string>
+    <string name="practice_do_back">Start at the very edge of the screen, on the %1$s. Swipe in a little, then lift.</string>
+    <string name="practice_do_home">Start at the very bottom of the screen. Swipe up and lift while your finger still moves.</string>
+    <string name="practice_do_recents">Start at the very bottom. Swipe up, stop, then lift.</string>
+    <string name="practice_do_app_list">Start at the very bottom. Swipe up a little, then slide left or right. Lift on any app.</string>
+    <string name="practice_do_corner">Start in the bottom %1$s corner. Swipe up and in at a slant.</string>
+    <string name="practice_do_wait">Start at the %1$s edge. Swipe in, then hold still until it buzzes.</string>
+    <string name="practice_do_long">Start at the %1$s edge. Swipe in far, then lift.</string>
+    <string name="practice_side_left">left</string>
+    <string name="practice_side_right">right</string>
+    <string name="practice_side_both">left or right</string>
+    <string name="practice_result_detected">%1$s detected</string>
+    <string name="practice_result_would_open">Would open %1$s</string>
+    <string name="practice_result_would_run">Would run %1$s</string>
+    <string name="practice_result_circle">Circle to Search detected</string>
+    <string name="practice_hint_list_tap">Now tap any app in the list.</string>
+    <string name="practice_own_back">That was your phone\'s own Back. Start nearer the edge.</string>
+    <string name="practice_try_again">Try again</string>
+
     <!-- App switching. -->
     <string name="section_app_switch">App switching</string>
     <string name="label_edge_app_list">Bottom app switcher</string>
