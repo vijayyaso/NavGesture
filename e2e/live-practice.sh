@@ -142,9 +142,13 @@ open_practice() {
   settle
 }
 
-# close_practice - taps Close, and waits for the strips after the dump.
+# close_practice - taps Close, or Done when the swipe passed the last step and the Finish card
+# shows, and waits for the strips after the dump.
 close_practice() {
-  tap_node "$(ui_nodes | grep -m1 'resource-id="practice_close"' || true)"
+  screen="$(ui_nodes)"
+  node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="practice_close"' || true)"
+  [ -n "${node}" ] || node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="demo_done"' || true)"
+  tap_node "${node}"
   sleep 1
   if practice_shown; then fail "Close closes practice"; else pass "Close closes practice"; fi
   settle
