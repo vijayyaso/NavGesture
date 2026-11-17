@@ -24,6 +24,8 @@ import android.util.Log
 import android.util.LruCache
 import android.view.HapticFeedbackConstants
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.demo.DemoMiss
+import com.vijayyaso.navgesture.demo.DemoResult
 import com.vijayyaso.navgesture.gesture.AppListStyle
 import com.vijayyaso.navgesture.gesture.FavouriteList
 import com.vijayyaso.navgesture.gesture.ScreenEdge
@@ -48,6 +50,9 @@ import kotlinx.coroutines.withContext
  * [style] decides what a lift does: Drag opens the selected app, Tap leaves the list open
  * for touching, and Both opens the app only if the finger moved the selection at least one
  * step (step count not zero), else leaves the list open.
+ *
+ * A list opened while live practice held the gate opens no app: a pick is reported to the page
+ * through [practiceReport], and every other way the list closes reports a cancel, once per list.
  */
 internal class EdgeSwitcherController(
     private val panel: SwitcherPanelOverlay,
@@ -57,6 +62,7 @@ internal class EdgeSwitcherController(
     private val style: AppListStyle,
     private val stepDp: Float,
     private val adaptiveSpeed: Boolean,
+    private val practiceReport: (PracticeEvent) -> Unit,
     private val haptic: (Int) -> Unit,
 ) {
     private val context = switcher.context
@@ -82,6 +88,10 @@ internal class EdgeSwitcherController(
     private var selected: Int? = null
     /** The app the row last highlighted, so a tick follows each visible change. */
     private var lastShown: Int? = null
+    /** The practice gate was on when this list opened, so it reports instead of launching. */
+    private var practice = false
+    /** This list already told the practice page how it ended. */
+    private var reported = false
 
     private val idleTimeout = Runnable {
         Log.i(TAG, "SWITCHER_TIMEOUT")
@@ -94,7 +104,7 @@ internal class EdgeSwitcherController(
             Log.i(TAG, "SWITCHER_DISMISSED")
             cancel()
         }
-        panel.onTouchStart = { if (waitingForTouch) armIdleTimeout() }
+        panel.onTouchStart = ::onPanelTouchStart
     }
 
     /** True while the touch-mode panel waits for a touch. */
@@ -110,8 +120,11 @@ internal class EdgeSwitcherController(
         startLoad()
     }
 
-    fun open(action: TrackerAction.OpenSwitcher) {
+    /** [practice] is the overlay's reading of the gate for the touch that opened the list. */
+    fun open(action: TrackerAction.OpenSwitcher, practice: Boolean) {
         if (action.edge != ScreenEdge.BOTTOM || opened) return
+        this.practice = practice
+        reported = false
         origin = action.origin
         latest = action.origin
         travel = SlideTravel(adaptiveSpeed).apply {
@@ -135,6 +148,8 @@ internal class EdgeSwitcherController(
      */
     fun openForTouch(recents: Boolean) {
         cancel()
+        practice = false
+        reported = false
         this.recents = recents
         opened = true
         touchMode = true
@@ -179,6 +194,7 @@ internal class EdgeSwitcherController(
             render()
             armIdleTimeout()
             Log.i(TAG, "SWITCHER_TOUCH_MODE")
+            if (practice) practiceReport(PracticeEvent.ListWaiting)
             return
         }
         launchAndClose(selected)
@@ -192,7 +208,13 @@ internal class EdgeSwitcherController(
         }
     }
 
+    /** Closes the list. A practice list that has not reported yet reports a cancel. */
     fun cancel() {
+        if (practice && !reported) {
+            reported = true
+            practiceReport(PracticeEvent.Missed(DemoMiss.Cancelled))
+        }
+        practice = false
         generation++
         load?.cancel()
         load = null
@@ -216,13 +238,42 @@ internal class EdgeSwitcherController(
     }
 
     private fun launchAndClose(index: Int?) {
-        val packageName = index?.let { apps?.getOrNull(it)?.packageName }
+        // Read before cancel() clears the list.
+        val app = index?.let { apps?.getOrNull(it) }
+        if (practice || PracticeSession.isActive()) {
+            // The pick is this list's report, so the close below must not report a cancel too.
+            reported = true
+            cancel()
+            if (index != null && app != null) {
+                Log.i(TAG, "PRACTICE_CAUGHT AppList ${app.packageName}")
+                practiceReport(PracticeEvent.Caught(DemoResult.AppPicked(index), app.label))
+            } else {
+                practiceReport(PracticeEvent.Missed(DemoMiss.Cancelled))
+            }
+            return
+        }
+        val packageName = app?.packageName
         // Hide before starting another activity, even if metadata arrived only just now.
         cancel()
         if (packageName != null && switcher.launch(packageName)) {
             haptic(HapticFeedbackConstants.CONFIRM)
             Log.i(TAG, "SWITCHER_LAUNCHED $packageName")
         }
+    }
+
+    /**
+     * A touch on the open panel. The idle timer restarts on every touch, so a list opened in
+     * practice could outlive the page; once the gate is off, this touch closes it instead, and
+     * no app opens.
+     */
+    private fun onPanelTouchStart() {
+        if (practice && !PracticeSession.isActive()) {
+            Log.i(TAG, "SWITCHER_CLOSED practice ended")
+            reported = true
+            cancel()
+            return
+        }
+        if (waitingForTouch) armIdleTimeout()
     }
 
     private fun armIdleTimeout() {
