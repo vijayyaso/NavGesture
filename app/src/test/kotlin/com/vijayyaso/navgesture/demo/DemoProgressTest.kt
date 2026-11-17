@@ -140,4 +140,85 @@ class DemoProgressTest {
         assertEquals(finished, finished.after(DemoEvent.Performed(torch)))
         assertEquals(finished, finished.after(miss))
     }
+
+    @Test fun `a plan goes through only its own steps, then finishes`() {
+        val plan = listOf(DemoStep.BACK, DemoStep.HOME, DemoStep.LONG)
+        val start = DemoProgress.start(plan)
+        assertEquals(DemoStep.BACK, start.step)
+        assertEquals(plan, start.plan)
+        val home = start.advance()
+        assertEquals(DemoStep.HOME, home.step)
+        val long = home.advance()
+        assertEquals(DemoStep.LONG, long.step)
+        assertEquals(plan, long.plan)
+        val done = long.advance()
+        assertTrue(done.finished)
+        assertEquals(done, done.advance())
+    }
+
+    @Test fun `a plan that skips the first steps starts at its own first step`() {
+        val start = DemoProgress.start(listOf(DemoStep.RECENTS, DemoStep.WAIT))
+        assertEquals(DemoStep.RECENTS, start.step)
+        assertEquals(DemoStep.WAIT, start.advance().step)
+        assertTrue(DemoProgress.start(emptyList()).finished)
+    }
+
+    @Test fun `skipping a step after two tries moves on in the plan`() {
+        val plan = listOf(DemoStep.HOME, DemoStep.CORNER)
+        val twice = DemoProgress.start(plan).after(miss).after(miss)
+        assertTrue(twice.canSkipStep)
+        val skipped = twice.advance()
+        assertEquals(DemoStep.CORNER, skipped.step)
+        assertEquals(0, skipped.tries)
+        assertEquals(plan, skipped.plan)
+    }
+
+    @Test fun `a new plan keeps the step it still has, or moves to the next one it has`() {
+        val atHome = DemoProgress.start(listOf(DemoStep.BACK, DemoStep.HOME, DemoStep.LONG)).advance().after(miss)
+        val kept = atHome.withPlan(listOf(DemoStep.HOME, DemoStep.WAIT))
+        assertEquals(DemoStep.HOME, kept.step)
+        assertEquals(1, kept.tries)
+        assertEquals(DemoStep.WAIT, kept.advance().step)
+        val moved = atHome.withPlan(listOf(DemoStep.BACK, DemoStep.CORNER, DemoStep.LONG))
+        assertEquals(DemoStep.CORNER, moved.step)
+        assertEquals(0, moved.tries)
+        assertTrue(atHome.withPlan(listOf(DemoStep.BACK)).finished)
+        assertTrue(DemoProgress(step = null).withPlan(listOf(DemoStep.BACK)).finished)
+    }
+
+    @Test fun `a step the plan no longer has advances to the next step the plan has`() {
+        val progress = DemoProgress(step = DemoStep.RECENTS, plan = listOf(DemoStep.BACK, DemoStep.WAIT))
+        assertEquals(DemoStep.WAIT, progress.advance().step)
+    }
+
+    @Test fun `steps match the slot, not the action`() {
+        val leftShortApp = ran(edge(ScreenEdge.LEFT, SwipeKind.SHORT), SwipeAction.OpenApp("com.example"))
+        val rightShortHome = ran(SlotId.Edge(ScreenEdge.RIGHT, SwipeZone.TOP_HALF, SwipeKind.SHORT), SwipeAction.Home)
+        assertTrue(DemoStep.BACK.passes(leftShortApp))
+        assertTrue(DemoStep.BACK.passes(rightShortHome))
+        val longScreenshot = ran(edge(ScreenEdge.RIGHT, SwipeKind.LONG), SwipeAction.Screenshot)
+        assertTrue(DemoStep.LONG.passes(longScreenshot))
+        assertFalse(DemoStep.LONG.passes(back))
+        assertFalse(DemoStep.BACK.passes(longScreenshot))
+        val bottomShortBack = ran(edge(ScreenEdge.BOTTOM, SwipeKind.SHORT), SwipeAction.Back)
+        assertTrue(DemoStep.HOME.passes(bottomShortBack))
+        assertFalse(DemoStep.BACK.passes(bottomShortBack))
+        val bottomPauseTorch = ran(edge(ScreenEdge.BOTTOM, SwipeKind.PAUSE), SwipeAction.Torch)
+        assertTrue(DemoStep.RECENTS.passes(bottomPauseTorch))
+        assertFalse(DemoStep.HOME.passes(bottomPauseTorch))
+        val waitOnTopHalf = ran(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.TOP_HALF, SwipeKind.WAIT), SwipeAction.Back)
+        assertTrue(DemoStep.WAIT.passes(waitOnTopHalf))
+        assertFalse(DemoStep.BACK.passes(waitOnTopHalf))
+    }
+
+    @Test fun `Circle to Search passes no step`() {
+        DemoStep.entries.forEach { assertFalse(it.passes(DemoResult.CircleToSearch)) }
+    }
+
+    @Test fun `the step order is fixed, as saved progress stores it by ordinal`() {
+        assertEquals(
+            listOf("BACK", "HOME", "RECENTS", "APP_LIST", "CORNER", "WAIT", "LONG"),
+            DemoStep.entries.map { it.name },
+        )
+    }
 }

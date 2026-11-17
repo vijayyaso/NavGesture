@@ -20,7 +20,6 @@ package com.vijayyaso.navgesture.demo
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.GestureTracker
-import com.vijayyaso.navgesture.gesture.RejectionReason
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SlideTravel
 import com.vijayyaso.navgesture.gesture.SwipeAction
@@ -28,33 +27,6 @@ import com.vijayyaso.navgesture.gesture.SwitcherCancel
 import com.vijayyaso.navgesture.gesture.SwitcherSelection
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
-
-/** A whole practice gesture. Nothing real runs for it; the drawn phone shows it. */
-sealed interface DemoResult {
-    /** A swipe that the real service would run [run] for. */
-    data class Ran(val run: GestureAction.Run) : DemoResult
-
-    /** The app list, lifted on its app [index], 0 to 3. */
-    data class AppPicked(val index: Int) : DemoResult
-
-    /** A drag to the left during the rise, which opens the favourite apps for real. */
-    data object FavouritesOpened : DemoResult
-}
-
-/** Why a practice touch was no gesture. */
-sealed interface DemoMiss {
-    /** It started away from every drawn edge. */
-    data object NotOnEdge : DemoMiss
-
-    /** A second finger went down, or the app list was closed by a slide back down. */
-    data object Cancelled : DemoMiss
-
-    /** A side swipe released back inside its trigger distance. */
-    data object PulledBack : DemoMiss
-
-    /** The recogniser's own reason. */
-    data class Rejected(val reason: RejectionReason) : DemoMiss
-}
 
 /** What the drawn phone shows while a finger moves, and how the touch ended. */
 sealed interface DemoEvent {

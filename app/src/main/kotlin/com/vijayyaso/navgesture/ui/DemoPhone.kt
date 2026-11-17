@@ -120,6 +120,8 @@ private fun effectOf(result: DemoResult?): Effect = when (result) {
     null -> Effect.NONE
     is DemoResult.AppPicked -> Effect.APP
     DemoResult.FavouritesOpened -> Effect.FAVOURITES
+    // Only the live page gets Circle to Search; the drawn engine never sends it.
+    DemoResult.CircleToSearch -> Effect.NONE
     is DemoResult.Ran -> when {
         result.run.slot is SlotId.Corner -> Effect.SHADE
         result.run.action == SwipeAction.Back -> Effect.BACK

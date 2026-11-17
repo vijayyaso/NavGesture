@@ -540,6 +540,7 @@ private fun resultName(result: DemoResult): String = when (result) {
     is DemoResult.Ran -> shortcutLabel(result.run.action)
     is DemoResult.AppPicked -> stringResource(R.string.demo_name_app_list)
     DemoResult.FavouritesOpened -> stringResource(R.string.demo_name_favourites)
+    DemoResult.CircleToSearch -> stringResource(R.string.section_circle_to_search)
 }
 
 @get:StringRes

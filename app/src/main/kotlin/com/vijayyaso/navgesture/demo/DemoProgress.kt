@@ -17,11 +17,16 @@
 
 package com.vijayyaso.navgesture.demo
 
+import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.SlotId
-import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeZone
 
-/** The seven gestures the practice demo teaches, in the order it teaches them. */
+/**
+ * The seven gestures the practice demo teaches, in the order it teaches them. Both demos save a
+ * step by its ordinal, and the live page hands its step to the drawn demo by ordinal, so the
+ * order of these entries must never change.
+ */
 enum class DemoStep {
     BACK,
     HOME,
@@ -38,18 +43,25 @@ enum class DemoStep {
     /** The step after this one, or null after the last. */
     val next: DemoStep? get() = entries.getOrNull(ordinal + 1)
 
-    /** Whether [result] is the gesture this step teaches. */
-    fun passes(result: DemoResult): Boolean = when (this) {
-        BACK -> result.ran(SwipeAction.Back)
-        HOME -> result.ran(SwipeAction.Home)
-        RECENTS -> result.ran(SwipeAction.Recents)
-        APP_LIST -> result is DemoResult.AppPicked
-        CORNER -> result is DemoResult.Ran && result.run.slot is SlotId.Corner
-        WAIT -> result is DemoResult.Ran && (result.run.slot as? SlotId.Edge)?.kind == SwipeKind.WAIT
-        LONG -> result.ran(SwipeAction.Torch)
+    /**
+     * Whether [result] is the gesture this step teaches. It matches the slot the swipe ended in,
+     * not the action, because any slot can be remapped: a left short swipe that opens an app is
+     * still the Back step's swipe.
+     */
+    fun passes(result: DemoResult): Boolean {
+        if (this == APP_LIST) return result is DemoResult.AppPicked
+        val slot = (result as? DemoResult.Ran)?.run?.slot ?: return false
+        val edge = slot as? SlotId.Edge
+        return when (this) {
+            BACK -> edge != null && edge.edge != ScreenEdge.BOTTOM && edge.kind == SwipeKind.SHORT
+            HOME -> edge == SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)
+            RECENTS -> edge == SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)
+            APP_LIST -> false
+            CORNER -> slot is SlotId.Corner
+            WAIT -> edge?.kind == SwipeKind.WAIT
+            LONG -> edge?.kind == SwipeKind.LONG
+        }
     }
-
-    private fun DemoResult.ran(action: SwipeAction): Boolean = this is DemoResult.Ran && run.action == action
 }
 
 /** What the line under the instruction explains after a try that did not pass. */
@@ -63,13 +75,16 @@ sealed interface DemoHint {
 
 /**
  * Where the user is in the demo. [step] is null once the last step is done. [celebrating] is
- * the passing result while its effect plays; the screen then calls [advance].
+ * the passing result while its effect plays; the screen then calls [advance]. [plan] is the
+ * steps to go through, in [DemoStep] order: every step for the drawn demo, the steps the user's
+ * own settings hold for the live page.
  */
 data class DemoProgress(
     val step: DemoStep? = DemoStep.BACK,
     val tries: Int = 0,
     val hint: DemoHint? = null,
     val celebrating: DemoResult? = null,
+    val plan: List<DemoStep> = DemoStep.entries,
 ) {
     val finished: Boolean get() = step == null
 
@@ -94,10 +109,33 @@ data class DemoProgress(
         }
     }
 
-    /** The next step with no tries and no hint; after the last step, finished. Skip uses it too. */
-    fun advance(): DemoProgress = DemoProgress(step = step?.next)
+    /**
+     * The next step of the plan with no tries and no hint; after the last step, finished. Skip
+     * uses it too.
+     */
+    fun advance(): DemoProgress = DemoProgress(step = step?.let { nextInPlan(plan, it) }, plan = plan)
+
+    /**
+     * This progress under a new [plan], as when a settings change rebuilds it. The current step
+     * stays if the new plan still has it, with its tries and hint; else the next step the plan
+     * has takes its place, from the start. A finished progress stays finished.
+     */
+    fun withPlan(plan: List<DemoStep>): DemoProgress {
+        if (plan == this.plan) return this
+        val current = step ?: return copy(plan = plan)
+        if (current in plan) return copy(plan = plan)
+        return DemoProgress(step = plan.firstOrNull { it.ordinal > current.ordinal }, plan = plan)
+    }
 
     companion object {
         const val SKIP_AFTER_TRIES = 2
+
+        /** The first step of [plan], or finished at once for an empty plan. */
+        fun start(plan: List<DemoStep>): DemoProgress = DemoProgress(step = plan.firstOrNull(), plan = plan)
+
+        // The plan is in DemoStep order, so the next step is the first one after [step], which
+        // also works for a step the plan no longer has.
+        private fun nextInPlan(plan: List<DemoStep>, step: DemoStep): DemoStep? =
+            plan.firstOrNull { it.ordinal > step.ordinal }
     }
 }

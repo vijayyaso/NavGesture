@@ -30,6 +30,7 @@ import com.vijayyaso.navgesture.gesture.SwipeZone
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -365,6 +366,30 @@ class DemoEngineTest {
         assertEquals(SwipeAction.None, long.actionFor(edgeSlot(ScreenEdge.LEFT, SwipeKind.WAIT)))
         assertEquals(120f, long.longSwipeDp)
         assertEquals(90f, DemoConfiguration.forStep(DemoStep.LONG, 200f).longSwipeDp)
+    }
+
+    @Test fun `the slot rule gives the drawn demo's answers in every step`() {
+        drawings.forEach { d ->
+            // A long swipe in step 1 has no long slot, so it fires the short slot: still Back.
+            val far = engine(d, DemoStep.BACK).play(Stroke(10f, d.midY).to(160f, d.midY, 150L)).results()
+            assertTrue("far Back on the $d", DemoStep.BACK.passes((far.single() as DemoEvent.Performed).result))
+            // In step 6 a swipe that does not wait is the short slot: Back, which is not a wait.
+            val noWait = engine(d, DemoStep.WAIT).play(back(d)).results()
+            val shortInWait = (noWait.single() as DemoEvent.Performed).result
+            assertFalse("a short swipe in step 6 on the $d", DemoStep.WAIT.passes(shortInWait))
+            assertTrue(DemoStep.BACK.passes(shortInWait))
+            // In step 7 a short swipe is not long, and a long one passes only step 7.
+            val short = (engine(d, DemoStep.LONG).play(back(d)).results().single() as DemoEvent.Performed).result
+            assertFalse("a short swipe in step 7 on the $d", DemoStep.LONG.passes(short))
+            val long = (engine(d, DemoStep.LONG).play(longSwipe(d)).results().single() as DemoEvent.Performed).result
+            DemoStep.entries.forEach {
+                assertEquals("$it for a long swipe on the $d", it == DemoStep.LONG, it.passes(long))
+            }
+            // A drag to the left in step 4 opens the favourites, which passes no step.
+            val favourites = engine(d, DemoStep.APP_LIST).play(openList(d, toRight = false)).results()
+            val opened = (favourites.single() as DemoEvent.Performed).result
+            DemoStep.entries.forEach { assertFalse(it.passes(opened)) }
+        }
     }
 
     @Test fun `a step change mid-touch waits for the lift`() {
