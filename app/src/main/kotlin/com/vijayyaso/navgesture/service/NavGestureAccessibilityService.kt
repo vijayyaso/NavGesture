@@ -51,7 +51,6 @@ import com.vijayyaso.navgesture.settings.GestureSettingsRepository
 import com.vijayyaso.navgesture.settings.PackageListStore
 import com.vijayyaso.navgesture.setup.GestureTileService
 import com.vijayyaso.navgesture.setup.ServiceKeeper
-import kotlin.math.hypot
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,10 +153,14 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             context = this,
             windowManager = windowManager,
             replayer = this,
-            onGestureAction = ::onGestureAction,
+            // The backstop: while live practice holds the gate, nothing runs, whatever path led here.
+            onGestureAction = { action, edge ->
+                if (!PracticeSession.blocks("gesture", action.id)) onGestureAction(action, edge)
+            },
             switcher = performer.switcher,
             favourites = { favourites },
-            onAction = { performer.perform(it) },
+            // Runs after the settle delay, so this is the second reading of the gate.
+            onAction = { if (!PracticeSession.blocks("action", it.id)) performer.perform(it) },
         )
 
         (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
@@ -376,6 +379,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         installOverlay()
     }
 
+    // The live practice gate is left alone (owner, 2026-11-18): with the service down nothing
+    // reads it, and its 2 s lease ends it once the page stops renewing.
     private fun teardown() {
         runCatching {
             (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
@@ -414,8 +419,9 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
 
         val first = samples.first()
         val last = samples.last()
-        val movedPx = hypot(last.xPx - first.xPx, last.yPx - first.yPx)
-        val isTap = movedPx < TAP_SLOP_PX
+        val isTap = isTap(samples)
+        // Live practice replays only taps; a swipe it did not catch must not reach the app below.
+        if (!isTap && PracticeSession.blocks("replay", "swipe")) return false
         val rawDurationMs = last.timestampMs - first.timestampMs
 
         val path = Path().apply {
@@ -458,7 +464,13 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
         // Safety net: release the strips even if the result callback never arrives.
         handler.postDelayed(finish, durationMs + settleDelayMs + FINISH_GRACE_MS)
-        handler.postDelayed({
+        handler.postDelayed(dispatch@{
+            // Practice may have turned on during the settle delay.
+            if (!isTap && PracticeSession.blocks("replay", "swipe")) {
+                handler.removeCallbacks(finish)
+                finish.run()
+                return@dispatch
+            }
             // After this delay the service may be unbound, and dispatchGesture then throws
             // instead of returning false; uncaught that kills the process and gets the
             // service flagged "malfunctioning".
@@ -490,6 +502,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             }
             if (dispatched) {
                 Log.i(TAG, "REPLAY_DISPATCHED ${samples.size} samples over ${durationMs}ms")
+                Log.i(TAG, if (isTap) "ACTION_PERFORMED replay_tap" else "ACTION_PERFORMED replay_swipe")
             } else {
                 Log.w(TAG, "REPLAY_REFUSED dispatchGesture rejected the replay")
                 handler.removeCallbacks(finish)
@@ -508,8 +521,6 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         private const val MIN_TAP_MS = 50L
 
         private const val TAP_STROKE_CAP_MS = 60L
-
-        private const val TAP_SLOP_PX = 12f
 
         /**
          * Grace for the non-touchable + alpha-0 update to reach the input pipeline, so the

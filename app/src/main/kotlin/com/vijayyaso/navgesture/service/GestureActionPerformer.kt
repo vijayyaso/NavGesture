@@ -22,6 +22,7 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.widget.Toast
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.RecentApps
 import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
@@ -76,7 +77,9 @@ class GestureActionPerformer(private val service: AccessibilityService) {
             SwipeAction.PreviousApp -> return previousApp()
             SwipeAction.Torch -> {
                 Log.i(TAG, "SWIPE_ACTION ${action.id}")
-                return torch.toggle()
+                val toggled = torch.toggle()
+                if (toggled) Log.i(TAG, "ACTION_PERFORMED torch")
+                return toggled
             }
             SwipeAction.None, SwipeAction.RecentsList, SwipeAction.FavouritesList,
             is SwipeAction.AppShortcut,
@@ -104,8 +107,11 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                     Log.w(TAG, lastFailure.orEmpty())
                     return@execute
                 }
-                if (closed) return@execute
-                if (!ShortcutCatalog.launch(service, found)) {
+                // The lookup can take seconds, so the practice gate is read after it.
+                if (closed || PracticeSession.blocks("shortcut", shortcut.id)) return@execute
+                if (ShortcutCatalog.launch(service, found)) {
+                    Log.i(TAG, "ACTION_PERFORMED ${shortcut.id}")
+                } else {
                     lastFailure = "${shortcut.id}: ${ShortcutCatalog.lastFailure}"
                 }
             }
@@ -124,7 +130,8 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 if (closed) return@execute
                 val recent = switcher.recentApps()
                 val previous = RecentApps.previous(recent.packages, recent.currentFirst)
-                if (closed) return@execute
+                // Both exits below run something real, so the practice gate is read once for both.
+                if (closed || PracticeSession.blocks("previous", SwipeAction.PreviousApp.id)) return@execute
                 if (previous == null) {
                     Log.i(TAG, "PREVIOUS_APP none, opening Recents")
                     global("Recents", AccessibilityService.GLOBAL_ACTION_RECENTS)
@@ -153,7 +160,9 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 Log.w(TAG, "performGlobalAction($name) threw", throwable)
                 return false
             }
-        if (!performed) {
+        if (performed) {
+            Log.i(TAG, "ACTION_PERFORMED $name")
+        } else {
             // No retry: a repeated global action can double-navigate.
             lastFailure = "$name: performGlobalAction returned false"
             Log.w(TAG, "performGlobalAction($name) returned false")
@@ -163,7 +172,11 @@ class GestureActionPerformer(private val service: AccessibilityService) {
 
     // A missing default assistant is invisible from a gesture, so it is said on screen too.
     fun circleToSearch(): Boolean {
-        val problem = CircleToSearchLauncher.launch(service, assistantTag) ?: return true
+        val problem = CircleToSearchLauncher.launch(service, assistantTag)
+        if (problem == null) {
+            Log.i(TAG, "ACTION_PERFORMED ${GestureAction.CircleToSearch.id}")
+            return true
+        }
         lastCircleToSearchFailure = problem
         Log.w(TAG, "CIRCLE_TO_SEARCH_FAILED $problem")
         runCatching {
