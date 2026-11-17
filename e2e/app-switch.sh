@@ -37,18 +37,6 @@ require_adb
 geometry
 warm_input
 
-# swipe_up_drag <x> <dx> - a short swipe up from the bottom, then a longer drag sideways, then
-# lift. The rise only arms the gesture; the sideways travel must beat it.
-swipe_up_drag() {
-  x="$1" dx="$2" top=$((BOTTOM_Y - 120))
-  "${ADB_BIN}" shell input motionevent DOWN "${x}" "${BOTTOM_Y}" >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE "${x}" "${top}" >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE $((x + dx)) "${top}" >/dev/null
-  sleep 0.4
-  "${ADB_BIN}" shell input motionevent UP $((x + dx)) "${top}" >/dev/null
-  sleep 2
-}
-
 # hold_edge <x> <y> - press, wait, then lift without moving.
 hold_edge() {
   "${ADB_BIN}" shell input motionevent DOWN "$1" "$2" >/dev/null

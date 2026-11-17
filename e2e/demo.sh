@@ -18,8 +18,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # The practice demo: a Back and a Home drawn on its phone each pass their step, and neither
-# leaves the demo. The service is on throughout, so a practice swipe that ran a real Back or
-# Home would close the screen. The lookup helpers scroll the page with swipes across the middle
+# leaves the demo. With the service working, "Try the gestures" opens live practice instead, so
+# a debug APK keeps the service on and forces the drawn demo with navgesture_force_drawn_demo:
+# a practice swipe that ran a real Back or Home would close the screen, which proves the strip
+# pause. A release APK ignores the override, so there the service is switched off after the
+# setup, and those checks prove less. The lookup helpers scroll the page with swipes across the middle
 # of the screen, which on the demo land on the drawn phone and count as tries, so on the demo
 # this suite reads one dump at a time and taps with tap_node.
 #
@@ -37,6 +40,31 @@ set -e
 require_adb
 geometry
 warm_input
+
+if "${ADB_BIN}" shell dumpsys package "${PKG}" 2>/dev/null | grep -q 'pkgFlags=.*DEBUGGABLE'; then
+  restore() {
+    "${ADB_BIN}" shell settings delete global navgesture_force_drawn_demo >/dev/null 2>&1 || true
+  }
+  trap restore EXIT INT TERM
+  "${ADB_BIN}" shell settings put global navgesture_force_drawn_demo 1 >/dev/null
+  echo "   debug APK: the drawn demo is forced with the service on" >&2
+else
+  restore() {
+    # shellcheck disable=SC2310 # the trap turns the service back on as best it can
+    enable_service >/dev/null 2>&1 || true
+  }
+  trap restore EXIT INT TERM
+  "${ADB_BIN}" shell settings delete secure enabled_accessibility_services >/dev/null 2>&1 || true
+  off_try=1
+  # shellcheck disable=SC2310 # a bound service is the retry signal
+  while service_bound && [ "${off_try}" -le 10 ]; do
+    sleep 1
+    off_try=$((off_try + 1))
+  done
+  # The app shows a stop only after its 3 s grace.
+  sleep 4
+  echo "   release APK: the service is off, so Try the gestures opens the drawn demo" >&2
+fi
 
 phone_shown() {
   ui_nodes | grep -q 'resource-id="demo_phone"'

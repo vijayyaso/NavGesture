@@ -219,6 +219,18 @@ swipe_and_hold() {
 }
 
 # corner_swipe <x0> <dx-sign> - a 45-degree diagonal from a bottom corner, in three events.
+# swipe_up_drag <x> <dx> - the app-list trigger: a short swipe up from the bottom, then a longer
+# drag sideways, then lift. The rise only arms the gesture; the sideways travel must beat it.
+swipe_up_drag() {
+  x="$1" dx="$2" top=$((BOTTOM_Y - 120))
+  "${ADB_BIN}" shell input motionevent DOWN "${x}" "${BOTTOM_Y}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE "${x}" "${top}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE $((x + dx)) "${top}" >/dev/null
+  sleep 0.4
+  "${ADB_BIN}" shell input motionevent UP $((x + dx)) "${top}" >/dev/null
+  sleep 2
+}
+
 corner_swipe() {
   x0="$1" sign="$2"
   "${ADB_BIN}" shell input motionevent DOWN "${x0}" "${BOTTOM_Y}" >/dev/null
@@ -469,11 +481,19 @@ set_toggle_id() {
 # open_test_app lands on whichever screen was open last, where Back only returns home.
 # So a suite that touches the UI or needs Back to leave the app goes through these.
 
-# to_home - taps the app bar's back arrow until home, which has none, is showing.
+# to_home - taps the app bar's back arrow until home, which has none, is showing. The live
+# practice page has no bar, so its Close is tapped instead, or Done on its finish card.
 to_home() {
   back_try=1
   while [ "${back_try}" -le 6 ]; do
-    back_node="$(ui_nodes | grep -m1 'resource-id="nav_back"' || true)"
+    screen="$(ui_nodes)"
+    back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="nav_back"' || true)"
+    if [ -z "${back_node}" ]; then
+      back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="practice_close"' || true)"
+    fi
+    if [ -z "${back_node}" ] && printf '%s\n' "${screen}" | grep -q 'resource-id="practice_page"'; then
+      back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="demo_done"' || true)"
+    fi
     if [ -z "${back_node}" ]; then
       return 0
     fi
