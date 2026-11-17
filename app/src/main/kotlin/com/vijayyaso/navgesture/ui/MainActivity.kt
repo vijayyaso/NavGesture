@@ -232,7 +232,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
     }
 
     // Read here, once, for "Try again" from the own-Back snackbar.
-    val practiceEntry = rememberPracticeOrDemo(model)
+    val practiceEntry = rememberPracticeEntry(model)
 
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     // Test tags become resource ids, so the e2e suites select rows without matching text.
@@ -264,7 +264,7 @@ private fun NavGestureApp(openDisclosure: MutableState<Boolean>) {
             // From the own-Back snackbar's "Try again": practice opens again from the current screen.
             if (model.practiceRequested && !leaving) {
                 LaunchedEffect(Unit) {
-                    open(practiceEntry)
+                    open(practiceEntry())
                     model.practiceRequested = false
                 }
             }

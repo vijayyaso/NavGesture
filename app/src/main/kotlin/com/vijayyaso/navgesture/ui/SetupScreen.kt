@@ -24,8 +24,8 @@ import com.vijayyaso.navgesture.R
 @Composable
 internal fun SetupScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     val checklist = model.checklist
-    val practice = rememberPracticeOrDemo(model)
-    val onPractise = { onOpen(practice) }
+    val practice = rememberPracticeEntry(model)
+    val onPractise = { onOpen(practice()) }
     SettingsGroup(title = stringResource(R.string.setup_group_required)) {
         SetupRows(checklist.required, model, onPractise)
     }

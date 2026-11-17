@@ -119,10 +119,16 @@ internal fun practiceOrDemo(model: AppModel, touchExploration: Boolean, multiWin
     return if (live) Screen.PRACTICE else Screen.DEMO
 }
 
-/** [practiceOrDemo] with the screen reader and the window mode read here, kept current. */
+/**
+ * [practiceOrDemo], to call at the moment of the tap, with the screen reader and the window mode
+ * kept current here.
+ */
 @Composable
-internal fun rememberPracticeOrDemo(model: AppModel): Screen =
-    practiceOrDemo(model, rememberTouchExploration(), rememberMultiWindow())
+internal fun rememberPracticeEntry(model: AppModel): () -> Screen {
+    val touchExploration = rememberTouchExploration()
+    val multiWindow = rememberMultiWindow()
+    return { practiceOrDemo(model, touchExploration, multiWindow) }
+}
 
 /**
  * Whether the activity is in split screen or a floating window. Read on each composition, as a
@@ -139,6 +145,11 @@ internal fun rememberMultiWindow(): Boolean {
         onDispose { activity?.removeOnMultiWindowModeChangedListener(listener) }
     }
     return changed ?: (activity?.isInMultiWindowMode == true)
+}
+
+/** The settings the strips were last built with, kept while a rebind takes them away. */
+private class LastStrips {
+    var configuration: GestureConfiguration? = null
 }
 
 /** The page's hold on the gate: in memory only, never saved, so it can never outlive the page. */
@@ -171,8 +182,11 @@ internal fun PracticeScreen(
     PortraitLock()
     val strips by PracticeSession.strips.collectAsState()
     val unsupported by NavGestureAccessibilityService.unsupported.collectAsState()
-    // The settings the strips were built with; before they are installed, the same settings flow.
-    val configuration = strips?.configuration ?: model.configuration
+    // The settings the strips were built with, also through a rebind (each uiautomator dump does
+    // one), when they are away for a moment; before the first install, the app's settings flow.
+    val lastStrips = remember { LastStrips() }
+    strips?.let { lastStrips.configuration = it.configuration }
+    val configuration = lastStrips.configuration ?: model.configuration
     val plan = remember(configuration, unsupported) { PracticePlan.steps(configuration, unsupported) }
     val currentPlan by rememberUpdatedState(plan)
     var saved by rememberSaveable(stateSaver = PracticeProgressSaver) { mutableStateOf(DemoProgress.start(plan)) }
@@ -182,15 +196,17 @@ internal fun PracticeScreen(
     val gate = remember { GateHold() }
     val landscape = strips?.landscape == true
 
-    val choice = rememberPracticeOrDemo(model)
+    val choice = rememberPracticeEntry(model)()
     val handOff: () -> Unit = {
         gate.end()
-        model.demoStartStep = saved.withPlan(currentPlan).step
+        // An empty plan has no step of its own, so the drawn demo gets the step the page was on.
+        model.demoStartStep = saved.withPlan(currentPlan).step ?: saved.step
         onSwap(Screen.DEMO)
     }
     // A service stop (after model.status's own grace), TalkBack, split screen, an empty plan, or
     // a restored page that should no longer be live: the drawn demo carries on at this step.
-    val handingOff = !leaving && step != null && (choice != Screen.PRACTICE || plan.isEmpty())
+    // [saved] is read, not [step]: an empty plan makes [step] null.
+    val handingOff = !leaving && saved.step != null && (choice != Screen.PRACTICE || plan.isEmpty())
     if (handingOff) LaunchedEffect(Unit) { handOff() }
     // Strips that stay landscape: Android did not honour the portrait lock.
     if (!leaving && step != null && landscape) {
@@ -217,6 +233,8 @@ internal fun PracticeScreen(
     }
 
     if (step == null) {
+        // An empty plan hands off instead; a plan that ran out shows the finish card.
+        if (handingOff) return
         Column(
             modifier = Modifier
                 .fillMaxSize()
