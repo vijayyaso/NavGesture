@@ -26,6 +26,16 @@
   <img src="docs/screenshots/home-dark.png" alt="Home screen in dark mode" width="180">
 </p>
 
+## See it in action
+
+<p align="center">
+  <img src="docs/screenshots/gestures.gif" alt="Animation: the Back drop from the side, the app row from the bottom, then the Home drop going Home" width="260">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/home-drop.png" alt="Swipe up from the bottom: a black drop with the Home icon rises from the edge" width="260">
+</p>
+
+<p align="center"><sub>Left: Back drop, app row, then Home. Right: the Home drop rising from the bottom edge. Recorded on the Android 16 emulator, which keeps its button bar on screen.</sub></p>
+
 ## Why NavGesture
 
 HyperOS ties its gesture navigation to the stock launcher. Switch to Nova, Niagara or Lawnchair and the phone drops you back to three buttons.
