@@ -34,6 +34,12 @@ sealed interface PracticeTarget {
     /** A swipe up from the bottom edge. */
     data object Bottom : PracticeTarget
 
+    /**
+     * The app list's swipe: up from the bottom, then a slide sideways. [recentsRight] says which
+     * way the recent apps open (the "Swap the two lists" setting turns it round).
+     */
+    data class AppList(val recentsRight: Boolean) : PracticeTarget
+
     /** A swipe from the bottom [corner]. */
     data class Corner(val corner: BottomCorner) : PracticeTarget
 }
@@ -66,8 +72,14 @@ object PracticePlan {
         configuration: GestureConfiguration,
         unsupported: Set<SwipeAction>,
     ): List<PracticeTarget> = when (step) {
-        DemoStep.HOME, DemoStep.RECENTS, DemoStep.APP_LIST ->
+        DemoStep.HOME, DemoStep.RECENTS ->
             if (included(step, configuration, unsupported)) listOf(PracticeTarget.Bottom) else emptyList()
+        DemoStep.APP_LIST ->
+            if (included(step, configuration, unsupported)) {
+                listOf(PracticeTarget.AppList(recentsRight = !configuration.swapAppLists))
+            } else {
+                emptyList()
+            }
         DemoStep.CORNER -> BottomCorner.entries
             .filter { usable(configuration.shortcutFor(it), unsupported) }
             .map { PracticeTarget.Corner(it) }
@@ -129,7 +141,7 @@ object PracticePlan {
             BottomCorner.LEFT -> edge == ScreenEdge.LEFT
             BottomCorner.RIGHT -> edge == ScreenEdge.RIGHT
         }
-        PracticeTarget.Bottom -> false
+        PracticeTarget.Bottom, is PracticeTarget.AppList -> false
     }
 
     private val SIDES = listOf(ScreenEdge.LEFT, ScreenEdge.RIGHT)

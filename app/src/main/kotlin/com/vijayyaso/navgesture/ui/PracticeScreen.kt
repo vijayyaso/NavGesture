@@ -431,7 +431,7 @@ private fun stepActionLabel(step: DemoStep, targets: List<PracticeTarget>, confi
     val action = when (val first = targets.firstOrNull()) {
         is PracticeTarget.Side -> configuration.slots[first.slot]
         is PracticeTarget.Corner -> configuration.shortcutFor(first.corner)
-        PracticeTarget.Bottom -> when (step) {
+        PracticeTarget.Bottom, is PracticeTarget.AppList -> when (step) {
             DemoStep.HOME -> configuration.slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)]
             DemoStep.RECENTS -> configuration.slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)]
             else -> null
@@ -469,7 +469,12 @@ private fun PracticeArrows(targets: List<PracticeTarget>, modifier: Modifier) {
 }
 
 private fun DrawScope.drawArrow(target: PracticeTarget, travel: Float, color: Color) {
+    if (target is PracticeTarget.AppList) {
+        drawAppListArrow(target, travel, color)
+        return
+    }
     val (start, direction, length) = when (target) {
+        is PracticeTarget.AppList -> return
         is PracticeTarget.Side -> {
             val y = when (target.slot.zone) {
                 SwipeZone.WHOLE -> size.height / 2f
@@ -501,6 +506,36 @@ private fun DrawScope.drawArrow(target: PracticeTarget, travel: Float, color: Co
     val side = Offset(-direction.y, direction.x) * head
     drawLine(color.copy(alpha = alpha), tip, tip + back + side, strokeWidth = stroke, cap = StrokeCap.Round)
     drawLine(color.copy(alpha = alpha), tip, tip + back - side, strokeWidth = stroke, cap = StrokeCap.Round)
+}
+
+/**
+ * The app list's arrow bends: the first half of its travel goes up from the bottom middle, the
+ * second half slides sideways toward the recent apps, so it shows the real "up, then slide".
+ */
+private fun DrawScope.drawAppListArrow(target: PracticeTarget.AppList, travel: Float, color: Color) {
+    val start = Offset(size.width / 2f, size.height)
+    val corner = start + Offset(0f, -size.height * APP_LIST_RISE)
+    val side = Offset(if (target.recentsRight) 1f else -1f, 0f)
+    val up = Offset(0f, -1f)
+    val (tip, direction) = if (travel < HALF) {
+        Pair(start + (corner - start) * (travel / HALF), up)
+    } else {
+        Pair(corner + side * (size.width * SHORT_SHARE * ((travel - HALF) / HALF)), side)
+    }
+    val alpha = 1f - travel * FADE
+    val stroke = ARROW_STROKE.toPx()
+    val tail = color.copy(alpha = alpha * TAIL_ALPHA)
+    if (travel < HALF) {
+        drawLine(tail, start, tip, strokeWidth = stroke, cap = StrokeCap.Round)
+    } else {
+        drawLine(tail, start, corner, strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(tail, corner, tip, strokeWidth = stroke, cap = StrokeCap.Round)
+    }
+    val head = ARROW_HEAD.toPx()
+    val back = direction * -head
+    val wing = Offset(-direction.y, direction.x) * head
+    drawLine(color.copy(alpha = alpha), tip, tip + back + wing, strokeWidth = stroke, cap = StrokeCap.Round)
+    drawLine(color.copy(alpha = alpha), tip, tip + back - wing, strokeWidth = stroke, cap = StrokeCap.Round)
 }
 
 /**
@@ -547,6 +582,8 @@ private const val TAIL_ALPHA = 0.5f
 private const val UPPER_ZONE = 0.3f
 private const val LOWER_ZONE = 0.7f
 private const val SHORT_SHARE = 0.25f
+private const val APP_LIST_RISE = 0.12f
+private const val HALF = 0.5f
 private const val LONG_SHARE = 0.45f
 private const val HINT_LINES = 3
 private val ARROW_STROKE = 6.dp

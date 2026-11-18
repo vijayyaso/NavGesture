@@ -135,10 +135,20 @@ class PracticePlanTest {
     }
 
     @Test fun `the bottom steps point at the bottom and the corner step at the set corners`() {
-        listOf(DemoStep.HOME, DemoStep.RECENTS, DemoStep.APP_LIST).forEach {
+        listOf(DemoStep.HOME, DemoStep.RECENTS).forEach {
             assertEquals(listOf(PracticeTarget.Bottom), PracticePlan.target(it, defaults, emptySet()))
             assertNull(PracticePlan.sides(it, defaults, emptySet()))
         }
+        // The app list bends toward the recent apps, which the swap setting turns round.
+        assertEquals(
+            listOf(PracticeTarget.AppList(recentsRight = true)),
+            PracticePlan.target(DemoStep.APP_LIST, defaults, emptySet()),
+        )
+        assertEquals(
+            listOf(PracticeTarget.AppList(recentsRight = false)),
+            PracticePlan.target(DemoStep.APP_LIST, defaults.copy(swapAppLists = true), emptySet()),
+        )
+        assertNull(PracticePlan.sides(DemoStep.APP_LIST, defaults, emptySet()))
         val rightCorner = defaults.copy(rightCornerShortcut = SwipeAction.Notifications)
         assertEquals(
             listOf(PracticeTarget.Corner(BottomCorner.RIGHT)),
