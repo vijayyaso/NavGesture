@@ -17,6 +17,14 @@
 ---
 
 <p align="center">
+  <img src="docs/screenshots/gestures.gif" alt="Animation: the Back drop from the side, the app row from the bottom, then the Home drop going Home" width="300">
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/home-drop.png" alt="Swipe up from the bottom: a black drop with the Home icon rises from the edge" width="300">
+</p>
+
+<p align="center"><sub>Left: Back drop, app row, then Home. The blue line is the finger's path. Right: the Home drop rising from the bottom edge. Recorded on the Android 16 emulator, which keeps its button bar on screen.</sub></p>
+
+<p align="center">
   <img src="docs/screenshots/home.png" alt="Home screen: gestures are on, with feature cards" width="180">
   &nbsp;
   <img src="docs/screenshots/app-list.png" alt="Swipe up and drag sideways: a row of recent apps above the bottom edge" width="180">
@@ -25,16 +33,6 @@
   &nbsp;
   <img src="docs/screenshots/home-dark.png" alt="Home screen in dark mode" width="180">
 </p>
-
-## See it in action
-
-<p align="center">
-  <img src="docs/screenshots/gestures.gif" alt="Animation: the Back drop from the side, the app row from the bottom, then the Home drop going Home" width="260">
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/home-drop.png" alt="Swipe up from the bottom: a black drop with the Home icon rises from the edge" width="260">
-</p>
-
-<p align="center"><sub>Left: Back drop, app row, then Home. Right: the Home drop rising from the bottom edge. Recorded on the Android 16 emulator, which keeps its button bar on screen.</sub></p>
 
 ## Why NavGesture
 
