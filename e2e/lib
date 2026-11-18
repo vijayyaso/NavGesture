@@ -218,7 +218,6 @@ swipe_and_hold() {
   "${ADB_BIN}" shell input motionevent UP "$3" "$4" >/dev/null
 }
 
-# corner_swipe <x0> <dx-sign> - a 45-degree diagonal from a bottom corner, in three events.
 # swipe_up_drag <x> <dx> - the app-list trigger: a short swipe up from the bottom, then a longer
 # drag sideways, then lift. The rise only arms the gesture; the sideways travel must beat it.
 swipe_up_drag() {
@@ -231,6 +230,7 @@ swipe_up_drag() {
   sleep 2
 }
 
+# corner_swipe <x0> <dx-sign> - a 45-degree diagonal from a bottom corner, in three events.
 corner_swipe() {
   x0="$1" sign="$2"
   "${ADB_BIN}" shell input motionevent DOWN "${x0}" "${BOTTOM_Y}" >/dev/null
@@ -384,6 +384,10 @@ scroll_app() {
 # find_id <tag> - scrolls the app from the top until that node's centre clears the bottom
 # strip, which takes a tap there for itself, and prints the node.
 find_id() {
+  # Four, not two: a long Home page restored part-way down (as after the disclosure's Not now)
+  # needs more than two to reach the status block at the top.
+  scroll_app up
+  scroll_app up
   scroll_app up
   scroll_app up
   size="$("${ADB_BIN}" shell wm size | tr -d '\r' | awk -F': *' '{print $2}' | tail -1)"

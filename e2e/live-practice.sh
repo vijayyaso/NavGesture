@@ -437,6 +437,7 @@ settle
 reset_log
 back_swipe
 assert_log "the gate is on: the Back swipe is caught" "PRACTICE_CAUGHT LEFT Back"
+assert_no_log "no backstop refusal" "PRACTICE_BLOCKED"
 if [ -z "${close_bounds}" ]; then
   fail "Close has bounds"
 else
@@ -465,7 +466,10 @@ if [ -n "${DEBUG}" ]; then
   open_screen row_demo practice_page
   if step_text | grep -q ' 1 of 1$'; then pass "the plan has one step"; else fail "the plan has one step"; fi
   settle
+  reset_log
   back_swipe
+  assert_log "the one step's Back swipe is caught" "PRACTICE_CAUGHT LEFT Back"
+  assert_no_log "no backstop refusal" "PRACTICE_BLOCKED"
   waited=0
   finished=''
   while [ "${waited}" -lt 5 ]; do

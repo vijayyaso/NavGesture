@@ -1,9 +1,12 @@
 # Live practice on the real edges
 
 *   **Author:** vijayyaso (the owner; one person)
-*   **Status:** Draft 2026-11-18, reviewed and resolved 2026-11-18, not built.
-    Written against commit `874f804`. Line numbers below are from that
-    commit. Nothing here is tested yet. The review is in
+*   **Status:** Built 2026-11-18 (commits 9c88871..110c0ce). Unit tests,
+    lint, both builds and shellcheck pass; the live-practice device suite
+    passed 75 of 75 on the ng36 emulator. Not yet run on a real phone; the
+    Poco F5 check below is the release gate. Written against commit
+    `874f804`. Line numbers below are from that commit. Where the build
+    differs from this text, the text says "As built". The review is in
     `../../../egm-review/live-practice/consolidated_review_report.md`
     (outside the repository).
 *   **Date:** 2026-11-18
@@ -447,6 +450,11 @@ PracticeGate(leaseMs = 2_000)
 `renew(token)` and `end(token)` with no time. There is no `clear()`: the
 service never touches the gate (owner, 2026-11-18).
 
+As built: the gate, clock, strips state, event flow and `blocks` live in an
+`internal open class PracticeState(gate, clock, log)`, so a test can build
+one with its own clock and log. `PracticeSession` is the object the app
+uses, `PracticeState(PracticeGate(), SystemClock::uptimeMillis, Log.i)`.
+
 Rules:
 
 *   **Owner token.** `end` and `renew` with an old token do nothing. So an
@@ -585,6 +593,10 @@ Changes, each at the line it touches:
     `DemoMiss.Cancelled`), and `ACTION_CANCEL` (`:546-558`,
     `DemoMiss.Cancelled`). The overlay reports it only if
     `inPractice(stream)`. Outside practice the lambda does nothing.
+    As built: while an app list is open (`switching`), the overlay reports
+    nothing for a second finger or `ACTION_CANCEL`; the controller's
+    `cancel()` reports the list's own `Missed(Cancelled)`, so the touch
+    still gets exactly one report.
 *   **App list open (`:587-594`).** `controller.open(action)` becomes
     `controller.open(action, practice = inPractice(stream))`, through a new
     `TouchCaptureView` lambda `practiceNow: (Long) -> Boolean`. It takes the
@@ -595,6 +607,9 @@ Changes, each at the line it touches:
     *   New field `practice`, set in `open` (`:113-130`), false in
         `openForTouch` (`:136-145`), cleared in `cancel` (`:195-211`). A
         field `reported` (reset at open) keeps one report per list.
+    *   As built: the controller reports through a
+        `practiceReport: (PracticeEvent) -> Unit` constructor parameter
+        that the overlay passes.
     *   `launchAndClose` (`:218-226`): it already reads the package before
         `cancel()` clears `apps` (`:219-221`). It now reads the whole
         `PanelApp` (package and `label`, `SwitcherPanelOverlay.kt:43`)
@@ -611,9 +626,11 @@ Changes, each at the line it touches:
         restarts on every panel touch (`:97`, `:228-231`), so the reading
         kept from the open could outlive the page. So the panel's touch
         start (`:97`) checks first: if `practice` is set and
-        `PracticeSession.isActive()` is false, it calls `cancel()` and
-        re-arms nothing. That touch closes the list, no app opens, and the
-        next swipe is real (S3).
+        `PracticeSession.isActive()` is false, it logs `SWITCHER_CLOSED
+        practice ended`, calls `cancel()` without a report (the page is
+        gone), and re-arms nothing. That touch closes the list, no app
+        opens, and the next swipe is real (S3). As built: the close marks
+        the list as reported, so it sends no `Missed`.
     *   Touch mode (`:176-182`): while `practice` is set, report
         `ListWaiting`.
     *   The touch-mode panel is `FLAG_NOT_FOCUSABLE`
@@ -660,7 +677,7 @@ proved.)
 | `PRACTICE_CAUGHT` | Overlay `catch`; controller `launchAndClose` | `PRACTICE_CAUGHT <edge> <action.id>`; `PRACTICE_CAUGHT AppList <package>` |
 | `ACTION_PERFORMED` | `global` when `performGlobalAction` returns true (`:150-161`); torch after `toggle()` returns true (`:77-80`); `AppSwitcher.launch` on success (`:58-59`); `appShortcut` after `ShortcutCatalog.launch` returns true (`:108`); `circleToSearch` when no problem (`:166`); `replay` next to `REPLAY_DISPATCHED` (`:492`) | `ACTION_PERFORMED <name>`, `ACTION_PERFORMED torch`, `ACTION_PERFORMED launch <package>`, `ACTION_PERFORMED <shortcut id>`, `ACTION_PERFORMED CircleToSearch`, `ACTION_PERFORMED replay_tap` or `replay_swipe` |
 | `PRACTICE_BLOCKED` | `PracticeSession.blocks` | `PRACTICE_BLOCKED <route> <id>` |
-| `PRACTICE_MISSED` | Overlay `report`, for each `Missed` it emits | `PRACTICE_MISSED <reason>`: the `RejectionReason` name (for example `TOO_SLOW_TO_ARM`), or `PULLED_BACK` or `CANCELLED`. The release run of case 6 proves the name survives R8. |
+| `PRACTICE_MISSED` | Overlay `sendToPractice`, for each `Missed` sent to the page (from the overlay's `report` and from the controller's list closes) | `PRACTICE_MISSED <reason>`: the `RejectionReason` name (for example `TOO_SLOW_TO_ARM`), or `PULLED_BACK` or `CANCELLED`. The release run of case 6 proves the name survives R8. |
 
 **Privacy.** The markers carry action ids, package names and miss reasons
 only. The owner accepted the package names (2026-11-18, answer 4). Package
@@ -717,30 +734,39 @@ screen, wherever the system does not list it, as on HyperOS, `:140-145`). A slot
 | `WAIT` | a reachable side `WAIT` slot is usable |
 | `LONG` | a reachable side `LONG` slot is usable |
 
-The configuration is the one in `PracticeSession.strips`, which is what the
-strips were built with (with the debug overrides that the service reads,
-`GestureSettingsRepository.kt:50`). It is read when `strips` is first not
-null (the page may take the gate before that). A settings change mid-practice rebuilds the strips; the page
+The configuration is the one the strips were last built with
+(`PracticeSession.strips`, with the debug overrides the service reads,
+`GestureSettingsRepository.kt:50`). As built: the page keeps it while a
+rebind removes the strips, so the plan does not jump. Before the first
+install (the page may take the gate before that) it uses
+`model.configuration`. A settings change mid-practice rebuilds the strips; the page
 then rebuilds the plan, keeps the current step if it is still in the plan,
 else moves to the next one that is. The same rule applies when the page is
 restored after the process was killed: the saved step may no longer be in
 the plan. If the rebuilt plan is empty, the page hands off to the drawn
 demo (section 6).
 
-**Where to point the arrow.** `PracticePlan.target(step, configuration)`
-gives, for the Back, Wait and Long steps, the first slot in `SwipeSlots.ALL`
-order that is usable and whose zone is in `zonesOf(edge)` (edge and zone).
-`ALL` lists `WHOLE` before the halves (`gesture/SwipeSlots.kt:107-117`),
-and on a split side the `WHOLE` slot keeps its default, so the zone check
-matters. It gives the bottom for the Home, Recents and App list steps, and
-the set corners for the Corner step. It also gives the sides (`LEFT`,
-`RIGHT` or both) for the instruction text.
+**Where to point the arrow.** As built: `PracticePlan.target(step,
+configuration, unsupported)` returns a `List<PracticeTarget>`. For the Back,
+Wait and Long steps it holds one `Side(slot)` per side: the first slot in
+`SwipeSlots.ALL` order that is usable and whose zone is in `zonesOf(edge)`
+(edge and zone). `ALL` lists `WHOLE` before the halves
+(`gesture/SwipeSlots.kt:107-117`), and on a split side the `WHOLE` slot keeps
+its default, so the zone check matters. It holds `Bottom` for the Home,
+Recents and App list steps, and one `Corner` per set corner for the Corner
+step. It is empty for a step the plan does not hold.
+`PracticePlan.sides(step, configuration, unsupported)` derives
+`PracticeSides` (`LEFT`, `RIGHT`, `BOTH`, or null for the bottom) from
+`target`, for the instruction text.
 
 **`DemoProgress` and the plan.** `DemoProgress` (`DemoProgress.kt:68-103`)
 gets a last parameter `plan: List<DemoStep> = DemoStep.entries` and a
 factory `DemoProgress.start(plan)`. `advance()` moves to the next step in
 `plan`, not `step.next`. The drawn demo passes nothing and behaves as
-today. "Step n of m" on the live page uses the index in the plan.
+today. "Step n of m" on the live page uses the index in the plan. As built:
+`withPlan(plan)` re-applies a rebuilt plan: it keeps the step (with tries
+and hint) if the plan still has it, else moves to the next step the plan
+has.
 
 **`DemoStep` ordinals stay stable.** The drawn demo's saver stores
 `step.ordinal` (`DemoScreen.kt:570-578`). The live page's saver does the
@@ -782,10 +808,12 @@ From top to bottom:
     catch this state; not device-checked.)
 *   "Step n of m" (tag `practice_step`; for example "Step 1 of 4", n and m
     from the plan), the step title, the "On your phone this does: Back"
-    line, and the instruction. Centred.
+    line, and the instruction. Centred. As built: the "does" line names the
+    action of the slot the first arrow points at; for the App list step it
+    reads "App list".
 *   The result (tag `practice_result`), in large text: "Back detected",
-    "Would open YouTube". It stays until the next `Caught` or `Missed`,
-    also across the step change.
+    "Would open YouTube". As built: a `Caught` sets it; a `Missed` or "Skip
+    this step" clears it. It stays across the step change after a pass.
 *   The hint line, as in the drawn demo.
 *   "Skip this step" (tag `practice_skip_step`) after two tries, in the
     centre column, never at the screen bottom.
@@ -838,7 +866,10 @@ multi-window mode is not device-checked; a Poco F5 row checks it.
 `requestedOrientation` to `SCREEN_ORIENTATION_PORTRAIT`. It puts back the
 old value only when the page really leaves (its dispose runs while the
 activity is not `isChangingConfigurations`). The dispose that the lock's
-own recreate causes must not undo the lock. This is not proved yet; a
+own recreate causes must not undo the lock. As built: the value from
+before the lock is kept with `rememberSaveable`, so it survives the lock's
+own recreate. Lint's `SourceLockedOrientationActivity` is suppressed on this
+function, with the owner's non-goal (no landscape practice) as the reason. This is not proved yet; a
 by-hand row opens practice with the phone sideways. The manifest declares no `configChanges`
 (`AndroidManifest.xml:71-83`), so if the phone was sideways the activity is
 recreated. The step and tries survive by `rememberSaveable`; the gate is
@@ -883,7 +914,8 @@ today `private`; it moves to `ui/DemoText.kt` as `internal`) and calls
 `advance()`. `ListWaiting` shows "Now tap any app in the list" in the hint
 line. After the last step the existing `FinishCard` shows
 (`DemoScreen.kt:446`, made `internal`). The gate has ended by then (S2), so
-on the Finish card every swipe is real.
+on the Finish card every swipe is real. As built: no hand-off runs once
+the Finish card shows.
 
 **Hand-off to the drawn demo** (owner, 2026-11-18). The page is replaced by
 the drawn demo at the same step when any of these happens:
@@ -931,16 +963,19 @@ restored page hands off at once, before it takes the gate.
     `model.status == ServiceStatus.WORKING`, touch exploration is off, the
     activity is not in multi-window mode, and the plan is not empty; else
     `Screen.DEMO`. `WORKING`, not "not `OFF`": a `STOPPED` service has no
-    strips. At entry the plan is built from `model.configuration` (the
-    same settings flow, with the same debug overrides,
-    `GestureSettingsRepository.kt:50`) and
-    `NavGestureAccessibilityService.unsupported.value`. On a debug APK
-    only, the debug override `navgesture_force_drawn_demo` = `1` makes it
-    return `Screen.DEMO` always; the `demo` suite uses it. It is read on
-    each call through `debugOverride`, which moves out of
-    `GestureSettingsRepository` (`:159-163`) as an `internal` function, so
-    no rebind is needed. The page checks again with
-    `PracticeSession.strips` once it opens (section 6). The summary reads
+    strips. At entry the plan is built from `model.configuration`. As built:
+    that flow applies debug overrides only when the app's settings are read,
+    so an override set after the app started may be missing there; the page
+    re-checks with the strips' configuration once it opens (section 6). The
+    plan also uses `NavGestureAccessibilityService.unsupported.value`. On a
+    debug APK only, `AppModel.forcesDrawnDemo()` reads
+    `navgesture_force_drawn_demo` through the now top-level `internal fun
+    debugOverride(context, name)` (it moved out of
+    `GestureSettingsRepository`, `:159-163`) on each call, so no rebind is
+    needed; `1` makes `practiceOrDemo` return `Screen.DEMO`; the `demo`
+    suite uses it. `rememberPracticeEntry(model)` keeps touch exploration
+    and `rememberMultiWindow()` current and returns a lambda that calls
+    `practiceOrDemo` at the moment of the tap. The summary reads
     `practice_row_summary` when the answer is live, else
     `demo_row_summary`.
 *   **Every way in goes through `practiceOrDemo`:** the Home row,
@@ -1037,7 +1072,9 @@ Result wording: Back, Home and Recents use `practice_result_detected` with
 `shortcutLabel` (`SwipeActionPicker.kt:127-151`). An app uses
 `practice_result_would_open` with the app's own label: for a list pick,
 `Caught.label`; for Open app, the label from `rememberLaunchableApps`, or
-the package name while the list loads or when the app is gone.
+the package name while the list loads or when the app is gone. As built: if
+the app list gives no label, the result uses the existing `demo_name_app_list`
+name.
 `shortcutLabel` is not used for apps: for `OpenApp` it returns "Open
 YouTube" (`corner_open_named_app`, `SwipeActionPicker.kt:141-147`,
 `strings.xml:198`), which would read "Would open Open YouTube". Every
@@ -1172,12 +1209,12 @@ start with another folder. Test paths are under
 | `demo/DemoResult.kt` | (added) | `DemoResult` and `DemoMiss` moved from `DemoEngine.kt`; new `CircleToSearch`. `AppPicked(index)` unchanged. |
 | `demo/DemoEngine.kt` | (modified) | The two types removed (moved). `DemoEvent` stays. |
 | `demo/DemoProgress.kt` | (modified) | Slot rule in `DemoStep.passes`; `plan` parameter, `start(plan)`, `advance()` by plan; a comment that the enum order is saved by ordinal. |
-| `demo/PracticePlan.kt` | (added) | `steps`, `target`, `sides` (section 5); `useLive(working, touchExploration, multiWindow, planEmpty)`. |
-| `ui/PracticeScreen.kt` | (added) | The live page (section 6), its saver (step ordinal and tries), the gate effect under the gate rule (takes `leaving`), portrait lock and the 2 s landscape hand-off, multi-window check, `BackHandler` with the own-Back rule, the hand-offs on `model.status`, TalkBack and an empty plan. |
+| `demo/PracticePlan.kt` | (added) | `PracticeTarget`, `PracticeSides`, `steps`, `target`, `sides` (section 5); `useLive(working, touchExploration, multiWindow, planEmpty)`. |
+| `ui/PracticeScreen.kt` | (added) | The live page (section 6), its saver (step ordinal and tries), the gate effect under the gate rule (takes `leaving`), portrait lock and the 2 s landscape hand-off, multi-window check, `BackHandler` with the own-Back rule, the hand-offs on `model.status`, TalkBack and an empty plan; `practiceOrDemo`, `rememberPracticeEntry`, `rememberMultiWindow`. |
 | `ui/DemoText.kt` | (added) | `hintText`, `title`, `instruction`, `resultName` (with a `CircleToSearch` branch) and `EFFECT_SHOWN_MS` moved from `DemoScreen.kt` and made `internal`; live `practiceTitle`, `practiceInstruction`, `practiceResult`; `rememberTouchExploration` moved here. Without the new branch the exhaustive `when` in `resultName` does not compile. |
 | `ui/DemoScreen.kt` | (modified) | The moved helpers removed; `FinishCard` made `internal`; reads `AppModel.demoStartStep` once to start at a step. |
 | `ui/DemoPhone.kt` | (modified) | Its `when` over `DemoResult` (`effectOf`, `:119-122`) handles `CircleToSearch` (no effect; never sent by the engine). |
-| `ui/MainActivity.kt` | (modified) | `Screen.PRACTICE(R.string.demo_title)` (every `Screen` needs a title, `:129`); no `ScreenBar` and no scroll column for it; `ScreenContent` branch that passes `leaving` and a `swap` callback (`swapTopFrom(entry.id, …)`) that the page uses for every hand-off, including a restored entry; `SetupScreen(model, onOpen = open)` (`:344`); `practiceRequested` handled like `disclosureRequested` (`:250-255`); `practiceOrDemo`. |
+| `ui/MainActivity.kt` | (modified) | `Screen.PRACTICE(R.string.demo_title)` (every `Screen` needs a title, `:129`); no `ScreenBar` and no scroll column for it; `ScreenContent` branch that passes `leaving` and a `swap` callback (`swapTopFrom(entry.id, …)`) that the page uses for every hand-off, including a restored entry; `SetupScreen(model, onOpen = open)` (`:344`); `practiceRequested` handled like `disclosureRequested` (`:250-255`). |
 | `ui/BackStack.kt` | (modified) | `swapTopFrom(id, screen)`, with the top-id guard. |
 | `ui/HomeScreen.kt` | (modified) | Row opens `practiceOrDemo`; live summary; `SetupGroup` passes `onPractise`. |
 | `ui/SetupScreen.kt` | (modified) | Takes `onOpen`; passes `onPractise` to both `SetupRows` calls. |
@@ -1189,11 +1226,11 @@ start with another folder. Test paths are under
 | `service/PracticeSessionTest.kt` (test) | (added) | See the list below. |
 | `demo/PracticePlanTest.kt` (test) | (added) | See the list below. |
 | `demo/DemoProgressTest.kt` (test) | (modified) | Slot rule cases; plan order and skipping; `start(plan)`; finish after the last plan step. |
-| `demo/DemoEngineTest.kt` (test) | (modified) | `AppPicked` equality with the new field. The parity tests stay. |
+| `demo/DemoEngineTest.kt` (test) | (modified) | Slot-rule parity cases: the drawn engine's results pass the same steps under the slot rule. `AppPicked(index)` is unchanged. The parity tests stay. |
 | `ui/BackStackTest.kt` (test) | (modified) | `swapTopFrom`: replaces the top with a new id when the id is the top; no change for another id; a saved `PRACTICE` name restores. |
 | `e2e/live-practice.sh` | (added) | See below. |
 | `e2e/demo.sh` | (modified) | See below. |
-| `e2e/lib` | (modified) | `to_home` also taps `practice_close` when it shows (it stops when `nav_back` is absent, `lib:473-484`, and the live page has no bar). `swipe_up_drag` moves here from `corner.sh:63` and `app-switch.sh:42`, which then use it. |
+| `e2e/lib` | (modified) | `to_home` also taps `practice_close` when it shows, or `demo_done` when the live page shows its Finish card (which has no Close) (it stops when `nav_back` is absent, `lib:473-484`, and the live page has no bar). `swipe_up_drag` moves here from `corner.sh:63` and `app-switch.sh:42`, which then use it. |
 | `e2e/run.sh` | (modified) | Add `live-practice` to `all_suites` (`run.sh:65`), before `demo`. |
 | `.github/workflows/e2e.yaml` | (modified) | Add `live-practice` to the shard that runs `demo` (`:90`), before it. |
 | `docs/development.md` | (modified) | One paragraph on live practice and the four markers under Screens (`:89`); "thirteen" to "fourteen" and the suite list (`:115`); `demo` uses `navgesture_force_drawn_demo` on a debug APK and switches the service off on a release APK; `to_home` also closes the live page. |
@@ -1294,6 +1331,8 @@ Helpers in the suite:
     `practice_step_reaches` the next number, then `wait_strip 0; sleep 1`.
     Its taps log `ACTION_PERFORMED replay_tap`, so every case runs
     `reset_log` after `advance_to` and before its own swipe.
+*   `close_practice`: taps Close, or Done on the Finish card, checks the
+    page is gone, then `wait_strip 0; sleep 1`.
 *   Overrides and the rebind come before practice opens: set them, rebind,
     wait for `service_bound` and `wait_strip 0`, then open practice.
 
@@ -1326,8 +1365,9 @@ Verification Plan.
 5.  **Recents:** `swipe_and_hold` up past the line. `PRACTICE_CAUGHT
     BOTTOM Recents`; no `ACTION_PERFORMED`; no `PRACTICE_BLOCKED`.
     Control: case 1.
-6.  **Route 7:** a slow left-strip swipe, 80 dp inward over 2 s, so it
-    arms too late (`TOO_SLOW_TO_ARM`) and is replayed as a swipe today.
+6.  **Route 7:** a slow left-strip swipe, 20 dp inward over 2 s: it never
+    reaches the 24 dp trigger inside the 1 s arm window (80 dp would arm at
+    0.6 s), so it ends `TOO_SLOW_TO_ARM` and is replayed as a swipe today.
     `assert_log PRACTICE_MISSED TOO_SLOW_TO_ARM`; `assert_no_log
     ACTION_PERFORMED replay_swipe`; no `REPLAY_DISPATCHED`; no
     `PRACTICE_BLOCKED`. Control: close practice, same swipe, `assert_log
@@ -1356,8 +1396,8 @@ Verification Plan.
     suite. The emulator has no usage events (`corner.sh:23-25`), so the
     recents list is empty and only the favourites drag can pick an app.
 9.  **Route 5 (debug):** the same favourites, style `TAP`. At the App list
-    step, the drag and lift log `SWITCHER_TOUCH_MODE` and the hint reads
-    "Now tap any app in the list". Tap the first cell, at the place
+    step, the drag and lift log `SWITCHER_TOUCH_MODE` (no dump here: one
+    unbinds the service, which closes the list). Tap the first cell, at the place
     `corner.sh:158-167` computes. `PRACTICE_CAUGHT AppList <first>`; no
     `SWITCHER_LAUNCHED`; no `PRACTICE_BLOCKED`. Control: `corner.sh:171`
     already proves the same tap launches outside practice.
@@ -1375,10 +1415,11 @@ Verification Plan.
     that part is a by-hand row now.
 12. **Arriving Back:** reopen practice at step 1; `wait_strip 0; sleep 1`;
     `input keyevent KEYCODE_BACK`. `practice_page` is gone; the snackbar
-    shows: `find_text "$(string_res practice_own_back)"` (`find_text` takes
-    the literal text). Then `tap_node` on the node line that
-    `find_text "$(string_res practice_try_again)"` returns (`tap_node`
-    takes a node line, not a tag): `practice_page` shows again.
+    shows: the dump contains the text of `practice_own_back` from "own
+    Back" on (the apostrophe is escaped in the string file and may be in
+    the dump). Then `tap_node` on the node line with the text of
+    `practice_try_again`, from the same dump (`tap_node` takes a node line,
+    not a tag): `practice_page` shows again.
 13. **Close, then a real Back at once:** reopen practice at step 1. Read
     the bounds of `practice_close` from one dump (`bounds_of_id`,
     `lib:348-351`); `wait_strip 0; sleep 1`. A Back swipe must log `PRACTICE_CAUGHT LEFT Back` (the
@@ -1390,8 +1431,8 @@ Verification Plan.
     takes 200 ms).
 14. **Finish card (debug):** a one-step plan: `none` in
     `navgesture_slot_right_whole_short`,
-    `navgesture_slot_bottom_whole_short` and
-    `navgesture_slot_bottom_whole_pause`, and `navgesture_edge_app_list`
+    `navgesture_slot_bottom_short` and
+    `navgesture_slot_bottom_pause`, and `navgesture_edge_app_list`
     off; rebind. Open practice ("Step 1 of 1") and pass Back. The Finish card shows. `wait_strip 0;
     sleep 1`; `reset_log`; Back swipe: `assert_log ACTION_PERFORMED Back`.
 15. **Cleanup:** the exit trap deletes every override set here and
@@ -1401,7 +1442,7 @@ By-hand rows, not in the suite (Verification Plan): route 6 (Circle to
 Search needs an assistant; the unit tests cover the `CircleToSearch`
 result); a real swipe while the shade is open; the hand-off on a service
 stop; the TalkBack path; split screen; a second finger (`input
-motionevent` has one pointer). The 2 s lease on its own is a unit test.
+motionevent` has one pointer); the case 9 hint text (by-hand row 14). The 2 s lease on its own is a unit test.
 
 ### Verification Plan
 
@@ -1415,7 +1456,7 @@ Commands run in the build container, as `docs/development.md` describes.
 | Scripts | `shellcheck -o all` on the changed scripts | Script checks. |
 | Device suites | `./e2e/run.sh live-practice demo disclosure`, then `./e2e/run.sh` (all fourteen) because the touch path, the performer and the replay changed | CUJ 1, 2, 4, 5 (return only), 6, 7, 11, 12; routes 1, 2, 3, 4, 5, 7; the gate through a rebind; the drawn demo's strip pause with the service on (`demo`, debug APK). |
 | Release markers | `./e2e/run.sh -p navgesture.apk live-practice demo` | The markers survive R8; the default-slot cases pass on release; `demo` with the service switched off. |
-| By hand on the emulator | See the list below. | CUJ 3, 5, 8, 9, 10; the portrait lock; the S3 rows. |
+| By hand on the emulator | See the list below. | CUJ 3, 4 (the tap hint), 5, 8, 9, 10; the portrait lock; the S3 rows. |
 | Phone | Poco F5, release build, real fingers. See the checklist below. | Real fingers and the phone's own edge gesture. **Blocks a release** (owner, 2026-11-18). The owner does it; the build job does not. |
 
 By hand on the emulator (debug build). Each row names what must be seen.
@@ -1447,6 +1488,9 @@ By hand on the emulator (debug build). Each row names what must be seen.
     nothing runs.
 13. Drawn demo with the service on and TalkBack on: a drawn Home swipe runs
     no real Home (strip pause).
+14. App list step, Tap style: after the lift, the hint reads "Now tap any
+    app in the list." (The case 9 suite row cannot check this: a dump
+    unbinds the service and closes the list.)
 
 Poco F5 checklist (release build, real fingers, the owner's own settings).
 The owner writes the date, the build and pass or fail per row into this
