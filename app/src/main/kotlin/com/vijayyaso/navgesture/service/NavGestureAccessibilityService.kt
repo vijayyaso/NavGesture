@@ -40,6 +40,7 @@ import com.vijayyaso.navgesture.bankpause.BankPause
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.FailureLog
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.PlatformDefaults
@@ -50,7 +51,6 @@ import com.vijayyaso.navgesture.settings.GestureSettingsRepository
 import com.vijayyaso.navgesture.settings.PackageListStore
 import com.vijayyaso.navgesture.setup.GestureTileService
 import com.vijayyaso.navgesture.setup.ServiceKeeper
-import kotlin.math.hypot
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -121,6 +121,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         super.onServiceConnected()
         instance = this
         runningState.value = true
+        unsupportedState.value = unsupportedActions()
         ServiceLog.add(this, "service started")
         ServiceKeeper.markWanted(this, wanted = true)
         pausing = false
@@ -134,19 +135,32 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         GestureTileService.requestRefresh(this)
     }
 
+    /** The system lists the actions it can run; split screen is missing from that list on HyperOS. */
+    private fun unsupportedActions(): Set<SwipeAction> {
+        val ids = runCatching { systemActions.map { it.id } }.getOrElse { return emptySet() }
+        val split = AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN in ids
+        Log.i(TAG, "SYSTEM_ACTIONS split_screen=$split")
+        return if (split) emptySet() else setOf(SwipeAction.SplitScreen)
+    }
+
     private fun setUp() {
         if (!scope.isActive) scope = newScope()
         settings = GestureSettingsRepository(applicationContext)
         performer = GestureActionPerformer(this)
+        performer.torch.start()
         windowManager = getSystemService(WindowManager::class.java)
         overlay = EdgeTouchOverlay(
             context = this,
             windowManager = windowManager,
             replayer = this,
-            onGestureAction = ::onGestureAction,
+            // The backstop: while live practice holds the gate, nothing runs, whatever path led here.
+            onGestureAction = { action, edge ->
+                if (!PracticeSession.blocks("gesture", action.id)) onGestureAction(action, edge)
+            },
             switcher = performer.switcher,
             favourites = { favourites },
-            onShortcut = { performer.performShortcut(it) },
+            // Runs after the settle delay, so this is the second reading of the gate.
+            onAction = { if (!PracticeSession.blocks("action", it.id)) performer.perform(it) },
         )
 
         (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
@@ -365,6 +379,8 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         installOverlay()
     }
 
+    // The live practice gate is left alone (owner, 2026-11-18): with the service down nothing
+    // reads it, and its 2 s lease ends it once the page stops renewing.
     private fun teardown() {
         runCatching {
             (getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
@@ -372,7 +388,10 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
         overlay?.remove()
         // A failed setUp can get here before the performer exists.
-        if (::performer.isInitialized) performer.close()
+        if (::performer.isInitialized) {
+            performer.torch.stop()
+            performer.close()
+        }
         gestureBar?.release()
         gestureBar = null
         overlay = null
@@ -383,8 +402,11 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
     }
 
     private fun onGestureAction(action: GestureAction, edge: ScreenEdge) {
-        Log.v(TAG, "Gesture from $edge -> $action")
-        performer.perform(action)
+        Log.v(TAG, "Gesture from $edge -> ${action.id}")
+        when (action) {
+            GestureAction.CircleToSearch -> performer.circleToSearch()
+            is GestureAction.Run -> performer.perform(action.action)
+        }
     }
 
     /**
@@ -397,8 +419,9 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
 
         val first = samples.first()
         val last = samples.last()
-        val movedPx = hypot(last.xPx - first.xPx, last.yPx - first.yPx)
-        val isTap = movedPx < TAP_SLOP_PX
+        val isTap = isTap(samples)
+        // Live practice replays only taps; a swipe it did not catch must not reach the app below.
+        if (!isTap && PracticeSession.blocks("replay", "swipe")) return false
         val rawDurationMs = last.timestampMs - first.timestampMs
 
         val path = Path().apply {
@@ -441,7 +464,13 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
         // Safety net: release the strips even if the result callback never arrives.
         handler.postDelayed(finish, durationMs + settleDelayMs + FINISH_GRACE_MS)
-        handler.postDelayed({
+        handler.postDelayed(dispatch@{
+            // Practice may have turned on during the settle delay.
+            if (!isTap && PracticeSession.blocks("replay", "swipe")) {
+                handler.removeCallbacks(finish)
+                finish.run()
+                return@dispatch
+            }
             // After this delay the service may be unbound, and dispatchGesture then throws
             // instead of returning false; uncaught that kills the process and gets the
             // service flagged "malfunctioning".
@@ -473,6 +502,7 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
             }
             if (dispatched) {
                 Log.i(TAG, "REPLAY_DISPATCHED ${samples.size} samples over ${durationMs}ms")
+                Log.i(TAG, if (isTap) "ACTION_PERFORMED replay_tap" else "ACTION_PERFORMED replay_swipe")
             } else {
                 Log.w(TAG, "REPLAY_REFUSED dispatchGesture rejected the replay")
                 handler.removeCallbacks(finish)
@@ -491,8 +521,6 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         private const val MIN_TAP_MS = 50L
 
         private const val TAP_STROKE_CAP_MS = 60L
-
-        private const val TAP_SLOP_PX = 12f
 
         /**
          * Grace for the non-touchable + alpha-0 update to reach the input pipeline, so the
@@ -524,6 +552,10 @@ class NavGestureAccessibilityService : AccessibilityService(), TouchReplayer {
         }
 
         private val runningState = MutableStateFlow(false)
+        private val unsupportedState = MutableStateFlow<Set<SwipeAction>>(emptySet())
+
+        /** Actions this phone's system refuses (HyperOS drops split screen); empty until the service starts. */
+        val unsupported: StateFlow<Set<SwipeAction>> = unsupportedState.asStateFlow()
 
         /** Lets an open screen see the service start or stop without waiting for a resume. */
         val running: StateFlow<Boolean> = runningState.asStateFlow()

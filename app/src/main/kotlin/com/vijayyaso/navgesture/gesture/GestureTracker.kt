@@ -47,6 +47,12 @@ import kotlin.math.pow
  *
  * Arming has deliberately no minimum-velocity threshold, which would penalise the slow,
  * deliberate swipes a careful user makes.
+ *
+ * Past the long line (travel from DOWN, re-read on every MOVE) a side swipe runs its zone's
+ * long action, when one is set; pulled back under it, the short action again.
+ *
+ * A side zone's wait action runs when the armed finger stays within the slop for the wait
+ * time, judged by a frame poll; moving on past the slop returns to the band.
  */
 class GestureTracker(
     private val edge: ScreenEdge,
@@ -62,7 +68,7 @@ class GestureTracker(
 
     // What an armed gesture became, as one field.
     private sealed interface Arm {
-        /** Armed for [shortAction]; on the bottom edge Recents is not yet primed. */
+        /** Armed; on the bottom edge Recents is not yet primed, on a side [band] names the action. */
         data object Rising : Arm
 
         /** Paused past the Recents line: the release is Recents unless it is a flick. */
@@ -111,18 +117,40 @@ class GestureTracker(
     private var tailY = 0f
     private var tailAtMs = 0L
 
-    private val backEnabled: Boolean
-        get() = when (edge) {
-            ScreenEdge.LEFT -> configuration.leftEdgeBackEnabled
-            ScreenEdge.RIGHT -> configuration.rightEdgeBackEnabled
-            ScreenEdge.BOTTOM -> true
-        }
+    // The zone this touch started in, read at DOWN.
+    private var zone = SwipeZone.WHOLE
 
-    private val shortAction: GestureAction =
-        if (edge == ScreenEdge.BOTTOM) GestureAction.Home else GestureAction.Back
+    // The band an armed side swipe was last reported in, so only a change is reported again.
+    private var band = SwipeKind.SHORT
 
-    private val holdAction: GestureAction? =
-        if (edge == ScreenEdge.BOTTOM) GestureAction.Recents else null
+    // Where a side swipe's still clock runs from, while its zone has a wait action: the sample
+    // that armed it, or the last MOVE that went more than the touch slop from the one before.
+    private var stillAnchor: TouchSample? = null
+
+    // The wait action is pending: the finger stood still for the wait time.
+    private var waiting = false
+
+    // The bottom always arms, since its pause and app-list drag need the rise. A side arms
+    // only when its zone holds an action, the same rule that installs its strip.
+    private val armsHere: Boolean
+        get() = edge == ScreenEdge.BOTTOM || configuration.slots.zoneInUse(edge, zone)
+
+    private val shortAction: GestureAction.Run
+        get() = slotRun(SlotId.Edge(edge, zone, SwipeKind.SHORT))
+
+    private val pauseRun: GestureAction.Run
+        get() = slotRun(SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE))
+
+    // With no pause action a bottom pause is a plain short swipe, so nothing polls for it.
+    private val pausePolls: Boolean
+        get() = edge == ScreenEdge.BOTTOM && pauseRun.action != SwipeAction.None
+
+    // A side zone polls only when it has a wait action, so Back's timing is untouched otherwise.
+    private val waitPolls: Boolean
+        get() = edge != ScreenEdge.BOTTOM && runFor(SwipeKind.WAIT).action != SwipeAction.None
+
+    private val armPollMs: Long?
+        get() = if (pausePolls || waitPolls) FRAME_MS else null
 
     private val longPressAction: GestureAction? =
         if (edge == ScreenEdge.BOTTOM && configuration.circleToSearchEnabled) {
@@ -139,6 +167,9 @@ class GestureTracker(
 
     private val recentsLinePx: Float
         get() = screenHeightPx * configuration.recentsLinePercent / 100f
+
+    private val longLinePx: Float
+        get() = density * configuration.longLineDp
 
     // POCO's pixel constants were written for a 2400px-tall screen, so they scale with it.
     private val tailGapPx: Float get() = screenHeightPx * TAIL_GAP_OF_HEIGHT
@@ -171,6 +202,10 @@ class GestureTracker(
         tailY = pivotY(sample)
         tailAtMs = sample.timestampMs
         corner = cornerAt(sample)
+        // Side strips are centred on the screen, so its middle splits a side into halves.
+        zone = configuration.slots.zoneAt(edge, sample.yPx, screenHeightPx / 2f)
+        band = SwipeKind.SHORT
+        stopWaiting()
         armTimedOut = false
         longPressPending = edge == ScreenEdge.BOTTOM &&
             longPressAction != null && overHandle(sample)
@@ -215,10 +250,13 @@ class GestureTracker(
             tracked = null
             return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
         }
-        if (!backEnabled || !hasArmed(origin, sample)) return TrackerAction.None
+        if (!armsHere || !hasArmed(origin, sample)) return TrackerAction.None
 
         arm = Arm.Rising
-        return TrackerAction.Armed(scheduleHoldMs = if (holdAction != null) FRAME_MS else null)
+        // One MOVE can land past the long line, so the arm reports the band it lands in.
+        band = bandAt(origin, sample)
+        stillAnchor = sample.takeIf { waitPolls }
+        return TrackerAction.Armed(scheduleHoldMs = armPollMs, pending = runFor(band).action)
     }
 
     private fun whileArmed(origin: TouchSample, state: Arm, sample: TouchSample): TrackerAction {
@@ -233,15 +271,15 @@ class GestureTracker(
             val rise = abs(origin.yPx - sample.yPx)
             if (sideways >= switcherDragPx && sideways > rise) {
                 arm = Arm.Switcher
-                // Right opens recent apps, left opens favourites: the direction is the choice.
+                // Right opens recent apps and left opens favourites, unless the user swapped them.
                 return TrackerAction.OpenSwitcher(
                     ScreenEdge.BOTTOM,
                     sample,
-                    recents = sample.xPx >= origin.xPx,
+                    recents = (sample.xPx >= origin.xPx) != configuration.swapAppLists,
                 )
             }
         }
-        if (holdAction == null) return followSide(origin, state, sample)
+        if (edge != ScreenEdge.BOTTOM) return followSide(origin, state, sample)
         // A primed or fired gesture owns the release.
         if (state != Arm.Rising) return TrackerAction.None
         return TrackerAction.None
@@ -254,21 +292,46 @@ class GestureTracker(
         val past = isPastTrigger(origin, sample)
         if (retracted && past) {
             arm = Arm.Rising
-            return TrackerAction.Armed(scheduleHoldMs = null)
+            band = bandAt(origin, sample)
+            // A re-arm starts the still clock again, from here.
+            stillAnchor = sample.takeIf { waitPolls }
+            return TrackerAction.Armed(scheduleHoldMs = armPollMs, pending = runFor(band).action)
         }
         if (!retracted && !past) {
             arm = Arm.Retracted
+            stopWaiting()
             return TrackerAction.Disarmed
+        }
+        if (retracted) return TrackerAction.None
+        // A move past the slop restarts the still clock, and a wait already reached gives way
+        // to the band the finger is in now, with the poll started again.
+        val anchor = stillAnchor
+        if (anchor != null && strayedBeyondSlop(anchor, sample)) {
+            stillAnchor = sample
+            if (waiting) {
+                waiting = false
+                band = bandAt(origin, sample)
+                return TrackerAction.Pending(runFor(band).action, band, scheduleHoldMs = FRAME_MS)
+            }
+        }
+        // While the wait is pending only a move past the slop changes the action.
+        if (waiting) return TrackerAction.None
+        // Armed and still past the trigger: crossing the long line either way changes the action.
+        val now = bandAt(origin, sample)
+        if (now != band) {
+            band = now
+            return TrackerAction.Pending(runFor(now).action, now)
         }
         return TrackerAction.None
     }
 
     /**
-     * Polled every frame while a bottom swipe is rising, because a finger held still sends
-     * no MOVE at all and the tail still has to catch up with it.
+     * Polled every frame while a bottom swipe is rising, or a side swipe with a wait action is
+     * armed, because a finger held still sends no MOVE at all.
      */
     fun onHoldElapsed(nowMs: Long): TrackerAction {
-        if (holdAction == null || arm != Arm.Rising) return TrackerAction.None
+        if (edge != ScreenEdge.BOTTOM) return waitElapsed(nowMs)
+        if (!pausePolls || arm != Arm.Rising) return TrackerAction.None
         val origin = tracked ?: return TrackerAction.None
         val sample = latest ?: return TrackerAction.None
         advanceTail(nowMs)
@@ -276,9 +339,18 @@ class GestureTracker(
         val slow = speedDpPerMs(nowMs) < HOLD_MAX_DP_PER_MS
         if (pastLine && slow && tailDistance(sample) < tailGapPx) {
             arm = Arm.Primed
-            return TrackerAction.RecentsPrimed
+            return TrackerAction.Pending(pauseRun.action, SwipeKind.PAUSE)
         }
         return TrackerAction.RearmHold(FRAME_MS)
+    }
+
+    // Judged from timestamps only. The poll stops once the wait is reached, or after a retract.
+    private fun waitElapsed(nowMs: Long): TrackerAction {
+        if (!waitPolls || arm != Arm.Rising || waiting) return TrackerAction.None
+        val anchor = stillAnchor ?: return TrackerAction.None
+        if (nowMs - anchor.timestampMs < configuration.waitMs) return TrackerAction.RearmHold(FRAME_MS)
+        waiting = true
+        return TrackerAction.Pending(runFor(SwipeKind.WAIT).action, SwipeKind.WAIT)
     }
 
     /** Fires only for a touch still down, unarmed and within the slop since DOWN. */
@@ -297,25 +369,28 @@ class GestureTracker(
         tracked = null
         longPressPending = false
 
-        if (state is Arm.Corner) return TrackerAction.Fire(GestureAction.Corner(state.side), edge)
+        if (state is Arm.Corner) return TrackerAction.Fire(cornerRun(state.side), edge)
         if (state == Arm.Switcher || state is Arm.Fired) return TrackerAction.None
         if (origin == null) return TrackerAction.Unused(rejectionFor(start, sample))
         remember(sample)
         // A DOWN then UP with no MOVE between can still be a whole corner diagonal.
         val side = corner
         if (side != null && (state == null || state == Arm.Rising) && isCornerSwipe(side, origin, sample)) {
-            return TrackerAction.Fire(GestureAction.Corner(side), edge)
+            return TrackerAction.Fire(cornerRun(side), edge)
         }
         if (state != null) {
             // The release point decides, so a swipe brought back to the edge in one batched
             // event reverts as surely as one that disarmed on the way.
-            if (holdAction == null && !isPastTrigger(origin, sample)) return TrackerAction.Reverted
-            if (holdAction != null && isPulledBack(origin, sample)) return TrackerAction.Reverted
+            if (edge != ScreenEdge.BOTTOM && !isPastTrigger(origin, sample)) return TrackerAction.Reverted
+            if (edge == ScreenEdge.BOTTOM && isPulledBack(origin, sample)) return TrackerAction.Reverted
             if (state == Arm.Primed) {
                 val flick = upwardDpPerMs(sample.timestampMs) > configuration.homeFlickDpPerMs
-                return TrackerAction.Fire(if (flick) shortAction else GestureAction.Recents, edge)
+                return fire(if (flick) shortAction else pauseRun)
             }
-            return TrackerAction.Fire(shortAction, edge)
+            // A reached wait runs, unless the lift itself moved on past the slop, as a MOVE would.
+            val anchor = stillAnchor
+            if (waiting && anchor != null && !strayedBeyondSlop(anchor, sample)) return fire(runFor(SwipeKind.WAIT))
+            return fire(runFor(bandAt(origin, sample)))
         }
 
         if (armTimedOut) return TrackerAction.Unused(RejectionReason.TOO_SLOW_TO_ARM)
@@ -323,7 +398,7 @@ class GestureTracker(
         // load does this, and a slow emulator does it reliably. The release is still a
         // swipe if it clears the threshold on its own, so judge it by the same rule.
         if (sample.timestampMs - origin.timestampMs <= configuration.maximumArmDurationMs) {
-            if (backEnabled && hasArmed(origin, sample)) return TrackerAction.Fire(shortAction, edge)
+            if (armsHere && hasArmed(origin, sample)) return fire(runFor(bandAt(origin, sample)))
         }
         return TrackerAction.Unused(rejectionFor(origin, sample))
     }
@@ -334,10 +409,42 @@ class GestureTracker(
         arm = null
         corner = null
         armTimedOut = false
+        zone = SwipeZone.WHOLE
+        band = SwipeKind.SHORT
+        stopWaiting()
         longPressPending = false
         latest = null
         recent.clear()
     }
+
+    private fun stopWaiting() {
+        stillAnchor = null
+        waiting = false
+    }
+
+    private fun slotRun(slot: SlotId.Edge): GestureAction.Run =
+        GestureAction.Run(slot, configuration.slots[slot])
+
+    private fun runFor(kind: SwipeKind): GestureAction.Run = slotRun(SlotId.Edge(edge, zone, kind))
+
+    /** LONG past the long line when this zone has a long action; SHORT otherwise, and always on the bottom. */
+    private fun bandAt(origin: TouchSample, sample: TouchSample): SwipeKind = when {
+        edge == ScreenEdge.BOTTOM -> SwipeKind.SHORT
+        travelFrom(origin, sample) < longLinePx -> SwipeKind.SHORT
+        runFor(SwipeKind.LONG).action == SwipeAction.None -> SwipeKind.SHORT
+        else -> SwipeKind.LONG
+    }
+
+    // An empty slot runs nothing, so the touch goes back to the app underneath.
+    private fun fire(run: GestureAction.Run): TrackerAction =
+        if (run.action == SwipeAction.None) {
+            TrackerAction.Unused(RejectionReason.SLOT_EMPTY)
+        } else {
+            TrackerAction.Fire(run, edge)
+        }
+
+    private fun cornerRun(side: BottomCorner): GestureAction.Run =
+        GestureAction.Run(SlotId.Corner(side), configuration.shortcutFor(side))
 
     /** The bottom corner [sample] starts in, if that corner has a shortcut. */
     private fun cornerAt(sample: TouchSample): BottomCorner? {
@@ -350,7 +457,7 @@ class GestureTracker(
             sample.xPx >= width - zone -> BottomCorner.RIGHT
             else -> return null
         }
-        return side.takeIf { configuration.shortcutFor(it) != CornerShortcut.None }
+        return side.takeIf { configuration.shortcutFor(it) != SwipeAction.None }
     }
 
     /** Up and inward, long enough, and between [CORNER_MIN_DEGREES] and [CORNER_MAX_DEGREES]. */
@@ -430,7 +537,8 @@ class GestureTracker(
     private fun anchorFor(nowMs: Long): TouchSample? =
         recent.lastOrNull { nowMs - it.timestampMs >= VELOCITY_WINDOW_MS } ?: recent.firstOrNull()
 
-    // Launcher3 aborts a handle long press past the platform touch slop, as a distance.
+    // Launcher3 aborts a handle long press past the platform touch slop, as a distance. The
+    // side still clock uses the same slop.
     private fun strayedBeyondSlop(reference: TouchSample, sample: TouchSample): Boolean {
         val dx = sample.xPx - reference.xPx
         val dy = sample.yPx - reference.yPx
@@ -476,6 +584,8 @@ class GestureTracker(
             offAxisPx > travelPx * configuration.offAxisToleranceRatio -> RejectionReason.OFF_AXIS
             sample.timestampMs - origin.timestampMs > configuration.maximumArmDurationMs ->
                 RejectionReason.TOO_SLOW_TO_ARM
+            // A whole swipe on a zone with nothing set.
+            !armsHere -> RejectionReason.SLOT_EMPTY
             else -> RejectionReason.INSUFFICIENT_MOVEMENT
         }
     }

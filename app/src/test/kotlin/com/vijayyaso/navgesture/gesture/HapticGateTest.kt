@@ -29,7 +29,7 @@ class HapticGateTest {
         configuration: GestureConfiguration = GestureConfiguration(),
     ) {
         private val tracker = GestureTracker(edge, configuration, density = 3f)
-        private val gate = HapticGate()
+        private val gate = HapticGate(edge)
         val ticks = mutableListOf<TrackerAction>()
         private var time = 0L
 
@@ -48,8 +48,8 @@ class HapticGateTest {
             return feed(tracker.onMove(TouchSample(x, y, time)))
         }
 
-        fun hold(): TrackerAction {
-            time += 300L
+        fun hold(afterMs: Long = 300L): TrackerAction {
+            time += afterMs
             return feed(tracker.onHoldElapsed(time))
         }
 
@@ -118,13 +118,13 @@ class HapticGateTest {
         run.down(540f, 2395f)
         // 300px up is past the 250px Recents line.
         run.move(540f, 2095f)
-        assertEquals(TrackerAction.RecentsPrimed, run.hold())
+        assertEquals(RECENTS_PENDING, run.hold())
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             run.up(540f, 2095f),
         )
         assertEquals(1, run.ticks.size)
-        assertEquals(TrackerAction.RecentsPrimed, run.ticks.single())
+        assertEquals(RECENTS_PENDING, run.ticks.single())
     }
 
     @Test
@@ -144,5 +144,150 @@ class HapticGateTest {
             run.up(180f, 1200f)
         }
         assertEquals(2, run.ticks.size)
+    }
+
+    @Test
+    fun `a bottom arm with no pause action buzzes like a side arm, and its release stays quiet`() {
+        val noPause = SwipeSlots().with(SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE), SwipeAction.None)
+        val run = Run(ScreenEdge.BOTTOM, GestureConfiguration(slots = noPause))
+        run.down(540f, 2300f)
+        assertTrue(run.move(540f, 2200f) is TrackerAction.Armed)
+        assertTrue(run.up(540f, 2100f) is TrackerAction.Fire)
+        assertEquals(1, run.ticks.size)
+        assertTrue(run.ticks.single() is TrackerAction.Armed)
+    }
+
+    // Density 3: the trigger is 72 px and the long line 360 px from DOWN.
+    private val leftLongHome = GestureConfiguration(
+        slots = SwipeSlots().with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Home),
+    )
+
+    @Test
+    fun `a far swipe ticks on arming and again on entering the long swipe, and its release stays quiet`() {
+        val run = Run(ScreenEdge.LEFT, leftLongHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        assertEquals(TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG), run.move(500f, 1200f))
+        assertTrue(run.up(500f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, run.ticks.size)
+        assertTrue(run.ticks[0] is TrackerAction.Armed)
+        assertEquals(TrackerAction.Pending(SwipeAction.Home, SwipeKind.LONG), run.ticks[1])
+    }
+
+    @Test
+    fun `falling back from the long swipe to the short one is silent`() {
+        val run = Run(ScreenEdge.LEFT, leftLongHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        run.move(500f, 1200f)
+        assertEquals(TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT), run.move(200f, 1200f))
+        assertTrue(run.up(200f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, run.ticks.size)
+        assertTrue(run.ticks.none { it == TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT) })
+    }
+
+    @Test
+    fun `with only a long slot the arm is quiet and entering the long swipe ticks once`() {
+        val longOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Screenshot)
+        val run = Run(ScreenEdge.LEFT, GestureConfiguration(slots = longOnly))
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        run.move(500f, 1200f)
+        assertTrue(run.up(500f, 1200f) is TrackerAction.Fire)
+        assertEquals(listOf<TrackerAction>(TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG)), run.ticks)
+    }
+
+    @Test
+    fun `an arm with nothing pending stays quiet`() {
+        val longOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Screenshot)
+        val run = Run(ScreenEdge.LEFT, GestureConfiguration(slots = longOnly))
+        run.down(0f, 1200f)
+        assertEquals(TrackerAction.Armed(null, SwipeAction.None), run.move(180f, 1200f))
+        assertEquals(TrackerAction.Unused(RejectionReason.SLOT_EMPTY), run.up(180f, 1200f))
+        assertTrue(run.ticks.isEmpty())
+    }
+
+    // Density 3: the touch slop is 24 px; the wait time is 350 ms.
+    private val leftWaitHome = GestureConfiguration(
+        slots = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT), SwipeAction.Home)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.LONG), SwipeAction.Screenshot),
+    )
+
+    private val waitPending = TrackerAction.Pending(SwipeAction.Home, SwipeKind.WAIT)
+
+    @Test
+    fun `a side arm ticks even while a wait action has its still clock polling`() {
+        val run = Run(ScreenEdge.LEFT, leftWaitHome)
+        run.down(0f, 1200f)
+        assertEquals(TrackerAction.Armed(GestureTracker.FRAME_MS, SwipeAction.Back), run.move(180f, 1200f))
+        assertTrue(run.up(180f, 1200f) is TrackerAction.Fire)
+        assertEquals(listOf<TrackerAction>(TrackerAction.Armed(GestureTracker.FRAME_MS, SwipeAction.Back)), run.ticks)
+    }
+
+    @Test
+    fun `entering the wait buzzes, and the release after it stays quiet`() {
+        val run = Run(ScreenEdge.LEFT, leftWaitHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        assertEquals(waitPending, run.hold(400L))
+        assertEquals(
+            TrackerAction.Fire(GestureAction.Run(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT), SwipeAction.Home), ScreenEdge.LEFT),
+            run.up(180f, 1200f),
+        )
+        assertEquals(2, run.ticks.size)
+        assertTrue(run.ticks[0] is TrackerAction.Armed)
+        assertEquals(waitPending, run.ticks[1])
+    }
+
+    @Test
+    fun `leaving the wait is silent, back to the short swipe or on into the far swipe`() {
+        val short = Run(ScreenEdge.LEFT, leftWaitHome)
+        short.down(0f, 1200f)
+        short.move(180f, 1200f)
+        short.hold(400L)
+        assertEquals(TrackerAction.Pending(SwipeAction.Back, SwipeKind.SHORT, GestureTracker.FRAME_MS), short.move(260f, 1200f))
+        assertTrue(short.up(260f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, short.ticks.size)
+        assertEquals(waitPending, short.ticks.last())
+
+        val far = Run(ScreenEdge.LEFT, leftWaitHome)
+        far.down(0f, 1200f)
+        far.move(180f, 1200f)
+        far.hold(400L)
+        assertEquals(TrackerAction.Pending(SwipeAction.Screenshot, SwipeKind.LONG, GestureTracker.FRAME_MS), far.move(500f, 1200f))
+        assertTrue(far.up(500f, 1200f) is TrackerAction.Fire)
+        assertEquals(2, far.ticks.size)
+        assertEquals(waitPending, far.ticks.last())
+    }
+
+    @Test
+    fun `a wait reached again after moving on buzzes again`() {
+        val run = Run(ScreenEdge.LEFT, leftWaitHome)
+        run.down(0f, 1200f)
+        run.move(180f, 1200f)
+        run.hold(400L)
+        run.move(260f, 1200f)
+        assertEquals(waitPending, run.hold(400L))
+        assertTrue(run.up(260f, 1200f) is TrackerAction.Fire)
+        assertEquals(3, run.ticks.size)
+        assertEquals(listOf(waitPending, waitPending), run.ticks.drop(1))
+    }
+
+    @Test
+    fun `with only a wait slot the arm is quiet and the wait buzzes once`() {
+        val waitOnly = SwipeSlots()
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.SHORT), SwipeAction.None)
+            .with(SlotId.Edge(ScreenEdge.LEFT, SwipeZone.WHOLE, SwipeKind.WAIT), SwipeAction.Home)
+        val run = Run(ScreenEdge.LEFT, GestureConfiguration(slots = waitOnly))
+        run.down(0f, 1200f)
+        assertEquals(TrackerAction.Armed(GestureTracker.FRAME_MS, SwipeAction.None), run.move(180f, 1200f))
+        run.hold(400L)
+        assertTrue(run.up(180f, 1200f) is TrackerAction.Fire)
+        assertEquals(listOf<TrackerAction>(waitPending), run.ticks)
     }
 }

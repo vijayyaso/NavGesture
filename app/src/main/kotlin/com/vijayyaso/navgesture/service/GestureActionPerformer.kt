@@ -22,8 +22,9 @@ import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.widget.Toast
 import com.vijayyaso.navgesture.R
-import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureAction
+import com.vijayyaso.navgesture.gesture.RecentApps
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 
 /**
@@ -34,6 +35,13 @@ import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 class GestureActionPerformer(private val service: AccessibilityService) {
 
     val switcher = AppSwitcher(service)
+
+    // Listens to the camera service from start() to stop(); a failure goes to lastFailure.
+    internal val torch = Torch(
+        cameras = AndroidTorchCameras(service),
+        record = { lastFailure = it },
+        log = { Log.i(TAG, it) },
+    )
 
     /** One at a time, so two quick corner swipes start their shortcuts in order. */
     private val shortcutThread = java.util.concurrent.Executors.newSingleThreadExecutor { task ->
@@ -48,42 +56,37 @@ class GestureActionPerformer(private val service: AccessibilityService) {
         NavigationIntegrationFactory.create(service).assistantAttributionTag
     }
 
-    fun perform(action: GestureAction): Boolean {
+    /** Runs an action. The two app-list actions are the overlay's, not this. */
+    fun perform(action: SwipeAction): Boolean {
+        if (action is SwipeAction.AppShortcut) return appShortcut(action)
         val globalAction = when (action) {
-            GestureAction.Back -> AccessibilityService.GLOBAL_ACTION_BACK
-            GestureAction.Home -> AccessibilityService.GLOBAL_ACTION_HOME
-            GestureAction.Recents -> AccessibilityService.GLOBAL_ACTION_RECENTS
-            GestureAction.CircleToSearch -> return circleToSearch()
-            // The overlay resolves a corner to its shortcut and calls [performShortcut].
-            is GestureAction.Corner -> {
-                lastFailure = "${action.id}: corner reached perform() without its shortcut"
-                return false
-            }
-        }
-        return global(action.id, globalAction)
-    }
-
-    /** Runs a corner shortcut. The two app-list shortcuts are the overlay's, not this. */
-    fun performShortcut(shortcut: CornerShortcut): Boolean {
-        if (shortcut is CornerShortcut.AppShortcut) return appShortcut(shortcut)
-        val globalAction = when (shortcut) {
-            CornerShortcut.Notifications -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
-            CornerShortcut.QuickSettings -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
-            CornerShortcut.Screenshot -> AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT
-            CornerShortcut.LockScreen -> AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN
-            CornerShortcut.PowerMenu -> AccessibilityService.GLOBAL_ACTION_POWER_DIALOG
-            CornerShortcut.SplitScreen -> AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN
-            is CornerShortcut.OpenApp -> {
-                val launched = switcher.launch(shortcut.packageName)
-                if (!launched) lastFailure = "corner ${shortcut.id}: ${AppSwitcher.lastFailure}"
+            SwipeAction.Back -> return global("Back", AccessibilityService.GLOBAL_ACTION_BACK)
+            SwipeAction.Home -> return global("Home", AccessibilityService.GLOBAL_ACTION_HOME)
+            SwipeAction.Recents -> return global("Recents", AccessibilityService.GLOBAL_ACTION_RECENTS)
+            SwipeAction.Notifications -> AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS
+            SwipeAction.QuickSettings -> AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS
+            SwipeAction.Screenshot -> AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT
+            SwipeAction.LockScreen -> AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN
+            SwipeAction.PowerMenu -> AccessibilityService.GLOBAL_ACTION_POWER_DIALOG
+            SwipeAction.SplitScreen -> AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN
+            is SwipeAction.OpenApp -> {
+                val launched = switcher.launch(action.packageName)
+                if (!launched) lastFailure = "${action.id}: ${AppSwitcher.lastFailure}"
                 return launched
             }
-            CornerShortcut.None, CornerShortcut.RecentsList, CornerShortcut.FavouritesList,
-            is CornerShortcut.AppShortcut,
+            SwipeAction.PreviousApp -> return previousApp()
+            SwipeAction.Torch -> {
+                Log.i(TAG, "SWIPE_ACTION ${action.id}")
+                val toggled = torch.toggle()
+                if (toggled) Log.i(TAG, "ACTION_PERFORMED torch")
+                return toggled
+            }
+            SwipeAction.None, SwipeAction.RecentsList, SwipeAction.FavouritesList,
+            is SwipeAction.AppShortcut,
             -> return false
         }
-        Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
-        return global(shortcut.id, globalAction)
+        Log.i(TAG, "SWIPE_ACTION ${action.id}")
+        return global(action.id, globalAction)
     }
 
     /**
@@ -92,24 +95,52 @@ class GestureActionPerformer(private val service: AccessibilityService) {
      * on [shortcutThread], never on the main thread that handles touches. The caller ignores
      * the result, so this returns true once the work is queued.
      */
-    private fun appShortcut(shortcut: CornerShortcut.AppShortcut): Boolean {
-        Log.i(TAG, "CORNER_SHORTCUT ${shortcut.id}")
+    private fun appShortcut(shortcut: SwipeAction.AppShortcut): Boolean {
+        Log.i(TAG, "SWIPE_ACTION ${shortcut.id}")
         // A swipe racing the service's end finds the thread shut; that must not throw here.
         runCatching {
             shortcutThread.execute {
                 if (closed) return@execute
                 val found = ShortcutCatalog.find(service, shortcut.packageName, shortcut.shortcutId)
                 if (found == null) {
-                    lastFailure = "corner ${shortcut.id}: shortcut not found"
+                    lastFailure = "${shortcut.id}: shortcut not found"
                     Log.w(TAG, lastFailure.orEmpty())
                     return@execute
                 }
-                if (closed) return@execute
-                if (!ShortcutCatalog.launch(service, found)) {
-                    lastFailure = "corner ${shortcut.id}: ${ShortcutCatalog.lastFailure}"
+                // The lookup can take seconds, so the practice gate is read after it.
+                if (closed || PracticeSession.blocks("shortcut", shortcut.id)) return@execute
+                if (ShortcutCatalog.launch(service, found)) {
+                    Log.i(TAG, "ACTION_PERFORMED ${shortcut.id}")
+                } else {
+                    lastFailure = "${shortcut.id}: ${ShortcutCatalog.lastFailure}"
                 }
             }
-        }.onFailure { Log.w(TAG, "corner ${shortcut.id}: dropped, the service is stopping") }
+        }.onFailure { Log.w(TAG, "${shortcut.id}: dropped, the service is stopping") }
+        return true
+    }
+
+    /**
+     * Reads the recent apps on [shortcutThread], since the usage query is slow. With no usage
+     * access, or no other app, it opens Recents instead. Returns true once the work is queued.
+     */
+    private fun previousApp(): Boolean {
+        Log.i(TAG, "SWIPE_ACTION ${SwipeAction.PreviousApp.id}")
+        runCatching {
+            shortcutThread.execute {
+                if (closed) return@execute
+                val recent = switcher.recentApps()
+                val previous = RecentApps.previous(recent.packages, recent.currentFirst)
+                // Both exits below run something real, so the practice gate is read once for both.
+                if (closed || PracticeSession.blocks("previous", SwipeAction.PreviousApp.id)) return@execute
+                if (previous == null) {
+                    Log.i(TAG, "PREVIOUS_APP none, opening Recents")
+                    global("Recents", AccessibilityService.GLOBAL_ACTION_RECENTS)
+                    return@execute
+                }
+                Log.i(TAG, "PREVIOUS_APP $previous")
+                if (!switcher.launch(previous)) lastFailure = "previous app: ${AppSwitcher.lastFailure}"
+            }
+        }.onFailure { Log.w(TAG, "previous app: dropped, the service is stopping") }
         return true
     }
 
@@ -129,7 +160,9 @@ class GestureActionPerformer(private val service: AccessibilityService) {
                 Log.w(TAG, "performGlobalAction($name) threw", throwable)
                 return false
             }
-        if (!performed) {
+        if (performed) {
+            Log.i(TAG, "ACTION_PERFORMED $name")
+        } else {
             // No retry: a repeated global action can double-navigate.
             lastFailure = "$name: performGlobalAction returned false"
             Log.w(TAG, "performGlobalAction($name) returned false")
@@ -138,8 +171,12 @@ class GestureActionPerformer(private val service: AccessibilityService) {
     }
 
     // A missing default assistant is invisible from a gesture, so it is said on screen too.
-    private fun circleToSearch(): Boolean {
-        val problem = CircleToSearchLauncher.launch(service, assistantTag) ?: return true
+    fun circleToSearch(): Boolean {
+        val problem = CircleToSearchLauncher.launch(service, assistantTag)
+        if (problem == null) {
+            Log.i(TAG, "ACTION_PERFORMED ${GestureAction.CircleToSearch.id}")
+            return true
+        }
         lastCircleToSearchFailure = problem
         Log.w(TAG, "CIRCLE_TO_SEARCH_FAILED $problem")
         runCatching {

@@ -85,9 +85,43 @@ Many bank and payment apps refuse to open while an Accessibility app is on. Pick
 
 </td>
 </tr>
+<tr>
+<td valign="top">
+
+### 🎛️ Pick what every swipe does
+Each side edge has three swipes: a short swipe, a long swipe past a second line, and a swipe and wait (hold still until a tick). Give each one an action: Back, Home, Recents, Previous app, Torch, a screenshot, any app, and more. Split an edge into top and bottom halves for twice the slots. The bottom swipes can be changed too. With nothing changed, the app works exactly as before.
+
+</td>
+<td valign="top">
+
+### 🎓 Try the swipes before you set anything up
+The first time you open the app, a phone drawn on the screen lets you practise all seven gestures, with no permission needed. Nothing real runs. Open it again any time from *Try the gestures* on Home.
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+
+### 🎯 Practise on the real edges
+Once the gestures are on, *Try the gestures* (or *Practise now* in setup) lets you practise each swipe on your screen's own edges, with your own settings. Each swipe shows what it would do, and nothing runs until you close the page.
+
+</td>
+</tr>
 </table>
 
-## Gestures
+## Learn the gestures
+
+The built-in practice demo walks through every gesture on a drawn phone, before you grant any permission.
+
+<p align="center">
+  <img src="docs/screenshots/demo-back.png" alt="Practice step 1: Back" width="180">
+  &nbsp;
+  <img src="docs/screenshots/demo-recents.png" alt="Practice step 3: Recent apps" width="180">
+  &nbsp;
+  <img src="docs/screenshots/demo-app-list.png" alt="Practice step 4: App list" width="180">
+  &nbsp;
+  <img src="docs/screenshots/demo-corner.png" alt="Practice step 5: Corner shortcut" width="180">
+</p>
 
 | Gesture | Does |
 | --- | --- |
@@ -98,13 +132,15 @@ Many bank and payment apps refuse to open while an Accessibility app is on. Pick
 | Swipe up from the bottom, then drag left | App list: your favourites, one per drag step, loops at both ends |
 | Swipe down while the app list is open | Closes the list; nothing opens |
 | Swipe up and inward from a bottom corner | That corner's shortcut, once you pick one |
+| Swipe in from a side edge, past the long line | Long swipe: the action you pick, nothing by default |
+| Swipe in from a side edge, then hold still until the tick | Swipe and wait: the action you pick, nothing by default |
 | Touch and hold the middle of the bottom edge | Circle to Search, once it is on |
 
 In landscape the first bottom swipe only shows a pill, and a second one within 2 seconds goes Home, as HyperOS does in games. Recents, corner shortcuts and the app list wait for a second swipe there too. The *Confirm in landscape* switch turns this off.
 
 ## Make it yours
 
-Every distance and delay is adjustable. Turn each edge on or off, pick a shortcut for each corner, and choose which bank apps get the pause.
+Every distance and delay is adjustable. Pick the action for every swipe and each corner, and choose which bank apps get the pause.
 
 <p align="center">
   <img src="docs/screenshots/gesture-settings.png" alt="Gesture settings: touch area, edges and corner shortcuts" width="220">

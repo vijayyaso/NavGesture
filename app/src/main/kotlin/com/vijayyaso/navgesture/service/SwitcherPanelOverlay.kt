@@ -187,6 +187,7 @@ internal class SwitcherPanelOverlay(
 
         private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6141416.toInt() }
         private val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x29FFFFFF }
+        private val highlightBox = RectF()
         private val text = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 14f * context.resources.displayMetrics.scaledDensity
@@ -225,6 +226,8 @@ internal class SwitcherPanelOverlay(
         }
 
         fun select(steps: Int, index: Int?) {
+            // Called on every move of the finger; a row that did not change is not drawn again.
+            if (steps == targetSteps && index == selected) return
             selected = index
             if (steps != targetSteps) {
                 targetSteps = steps
@@ -408,8 +411,8 @@ internal class SwitcherPanelOverlay(
 
         private fun drawHighlight(canvas: Canvas, iconLeft: Float) {
             val top = 18f * density
-            val rect = RectF(iconLeft - 6f * density, top - 6f * density, iconLeft + 54f * density, top + 54f * density)
-            canvas.drawRoundRect(rect, 14f * density, 14f * density, highlight)
+            highlightBox.set(iconLeft - 6f * density, top - 6f * density, iconLeft + 54f * density, top + 54f * density)
+            canvas.drawRoundRect(highlightBox, 14f * density, 14f * density, highlight)
         }
 
         private fun drawIcon(canvas: Canvas, app: PanelApp, left: Float, top: Float, alpha: Int) {

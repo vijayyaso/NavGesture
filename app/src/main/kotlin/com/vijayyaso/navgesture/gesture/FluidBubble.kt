@@ -119,6 +119,8 @@ object FluidBubble {
 class BubbleSpring(
     private val tension: Float = TENSION,
     private val friction: Float = FRICTION,
+    // How close counts as arrived, in the spring's own unit: pixels unless told otherwise.
+    private val settleWithin: Float = SETTLED_PX,
 ) {
     var value = 0f
         private set
@@ -134,9 +136,12 @@ class BubbleSpring(
         velocity = 0f
     }
 
-    /** Advances [dtMs]; sub-stepped, since a dropped frame must not make the spring blow up. */
-    fun step(dtMs: Long) {
-        var remaining = dtMs.coerceIn(0L, MAX_STEP_MS) / 1000f
+    /** Advances [dtMs] whole milliseconds; see [stepNanos]. */
+    fun step(dtMs: Long) = stepNanos(dtMs * NANOS_PER_MS)
+
+    /** Advances [dtNanos]; sub-stepped, since a dropped frame must not make the spring blow up. */
+    fun stepNanos(dtNanos: Long) {
+        var remaining = dtNanos.coerceIn(0L, MAX_STEP_MS * NANOS_PER_MS) / NANOS_PER_SECOND
         while (remaining > 0f) {
             val dt = min(remaining, SUB_STEP_S)
             val acceleration = tension * (target - value) - friction * velocity
@@ -146,8 +151,8 @@ class BubbleSpring(
         }
     }
 
-    /** Within half a pixel of the target and barely moving. */
-    val settled: Boolean get() = abs(target - value) < SETTLED_PX && abs(velocity) < SETTLED_PX * 10f
+    /** Within [settleWithin] of the target (half a pixel by default) and barely moving. */
+    val settled: Boolean get() = abs(target - value) < settleWithin && abs(velocity) < settleWithin * 10f
 
     companion object {
         const val TENSION = 300f
@@ -165,8 +170,75 @@ class BubbleSpring(
         private const val SUB_STEP_S = 0.004f
         private const val MAX_STEP_MS = 64L
         private const val SETTLED_PX = 0.5f
+        private const val NANOS_PER_MS = 1_000_000L
+        private const val NANOS_PER_SECOND = 1_000_000_000f
+
+        /** The icon fade runs from 0 to 1, so "arrived" is a hundredth, not half a pixel. */
+        const val SETTLED_ALPHA = 0.01f
 
         /** The damping ratio, for the record: friction over twice the root of tension. */
         fun dampingRatio(tension: Float, friction: Float): Float = friction / (2f * sqrt(tension))
+    }
+}
+
+/**
+ * The four springs of one bubble. With the phone's "Remove animations" setting on, nothing
+ * moves by itself: the drop sits exactly under the finger and is gone the moment it is let go.
+ */
+class BubbleMotion {
+    // The tip follows the finger; the base drags behind it, so a sliding drop leans.
+    val along = BubbleSpring()
+    val baseAlong = BubbleSpring(BubbleSpring.BASE_TENSION, BubbleSpring.BASE_FRICTION)
+    val rise = BubbleSpring(BubbleSpring.TENSION, BubbleSpring.RISE_FRICTION)
+    val iconAlpha = BubbleSpring(BubbleSpring.ICON_TENSION, BubbleSpring.ICON_FRICTION, BubbleSpring.SETTLED_ALPHA)
+
+    private var animated = true
+
+    val settled: Boolean get() = along.settled && baseAlong.settled && rise.settled && iconAlpha.settled
+
+    /** A fresh drop flush with the edge at [at]. [animate] is the phone's setting, read per touch. */
+    fun start(at: Float, animate: Boolean) {
+        animated = animate
+        along.snap(at)
+        baseAlong.snap(at)
+        rise.snap(0f)
+        iconAlpha.snap(if (animate) 0f else 1f)
+        iconAlpha.target = 1f
+    }
+
+    fun moveTo(at: Float, risePx: Float) {
+        if (animated) {
+            along.target = at
+            baseAlong.target = at
+            rise.target = risePx
+        } else {
+            along.snap(at)
+            baseAlong.snap(at)
+            rise.snap(risePx)
+        }
+    }
+
+    /** Sends the drop back into its edge. False when it went at once, with nothing to wait for. */
+    fun release(): Boolean {
+        if (!animated) {
+            reset()
+            return false
+        }
+        rise.target = 0f
+        iconAlpha.target = 0f
+        return true
+    }
+
+    /** Gone at once, with no motion. */
+    fun reset() {
+        rise.snap(0f)
+        iconAlpha.snap(0f)
+    }
+
+    fun stepNanos(dtNanos: Long) {
+        along.stepNanos(dtNanos)
+        baseAlong.stepNanos(dtNanos)
+        rise.stepNanos(dtNanos)
+        iconAlpha.stepNanos(dtNanos)
     }
 }

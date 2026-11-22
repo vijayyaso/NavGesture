@@ -45,7 +45,7 @@ class GestureTrackerTest {
         assertTrue("expected arming, got $armed", armed is TrackerAction.Armed)
         assertEquals(null, (armed as TrackerAction.Armed).scheduleHoldMs)
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(105f, 1200f, 80L)),
         )
     }
@@ -56,7 +56,7 @@ class GestureTrackerTest {
         t.onDown(sample(1075f, 1200f, 0L))
         assertTrue(t.onMove(sample(975f, 1200f, 60L)) is TrackerAction.Armed)
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.RIGHT),
+            TrackerAction.Fire(backRun(ScreenEdge.RIGHT), ScreenEdge.RIGHT),
             t.onUp(sample(975f, 1200f, 80L)),
         )
     }
@@ -68,7 +68,7 @@ class GestureTrackerTest {
         t.onMove(sample(105f, 1200f, 60L))
         assertEquals(TrackerAction.None, t.onHoldElapsed(500L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(105f, 1200f, 80L)),
         )
     }
@@ -82,7 +82,7 @@ class GestureTrackerTest {
         // The bottom edge polls for a pause once per frame.
         assertEquals(GestureTracker.FRAME_MS, (armed as TrackerAction.Armed).scheduleHoldMs)
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2295f, 70L)),
         )
     }
@@ -103,7 +103,7 @@ class GestureTrackerTest {
         t.onDown(sample(540f, 2395f, 0L))
         t.onMove(sample(540f, 2330f, 20L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2295f, 40L)),
         )
     }
@@ -115,9 +115,9 @@ class GestureTrackerTest {
         t.onMove(sample(540f, 2295f, 50L))
         // 300px up is past the line; the finger then stays put.
         t.onMove(sample(540f, 2095f, 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2095f, 500L)),
         )
     }
@@ -137,11 +137,11 @@ class GestureTrackerTest {
         val t = tracker(ScreenEdge.BOTTOM)
         t.onDown(sample(540f, 2395f, 0L))
         t.onMove(sample(540f, 2095f, 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         t.onMove(sample(540f, 1600f, 450L))
         // 895px in 360ms is 0.9dp/ms, past the 0.5dp/ms flick.
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 1200f, 460L)),
         )
     }
@@ -154,7 +154,7 @@ class GestureTrackerTest {
         assertEquals(TrackerAction.RearmHold(GestureTracker.FRAME_MS), t.onHoldElapsed(40L))
         t.onMove(sample(540f, 1600f, 60L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 1300f, 80L)),
         )
     }
@@ -164,7 +164,7 @@ class GestureTrackerTest {
         val t = tracker(ScreenEdge.BOTTOM)
         t.onDown(sample(540f, 2395f, 0L))
         t.onMove(sample(540f, 2095f, 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(TrackerAction.None, t.onHoldElapsed(416L))
     }
 
@@ -175,7 +175,7 @@ class GestureTrackerTest {
         t.onMove(sample(540f, 2295f, 50L))
         // 5s is far past the 1000ms maximumArmDurationMs.
         assertEquals(TrackerAction.None, t.onMove(sample(540f, 2000f, 5_000L)))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(5_400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(5_400L))
     }
 
     @Test
@@ -323,7 +323,7 @@ class GestureTrackerTest {
         val t = tracker(ScreenEdge.LEFT)
         assertEquals(TrackerAction.None, t.onDown(sample(2f, 1200f, 0L)))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(300f, 1200f, 120L)),
         )
     }
@@ -385,10 +385,10 @@ class GestureTrackerTest {
         val t = tracker(ScreenEdge.BOTTOM)
         t.onDown(sample(540f, 2395f, 0L))
         t.onMove(sample(540f, 2095f, 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(TrackerAction.None, t.onMove(sample(560f, 2000f, 600L)))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(560f, 2000f, 900L)),
         )
     }
@@ -427,7 +427,7 @@ class GestureTrackerTest {
         t.onDown(sample(5f, 1200f, 0L))
         assertTrue(t.onMove(sample(105f, 1200f, 60L)) is TrackerAction.Armed)
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(105f, 1200f, 80L)),
         )
         assertEquals(
@@ -478,9 +478,9 @@ class GestureTrackerTest {
         t.onDown(sample(5f, 1200f, 0L))
         t.onMove(sample(205f, 1200f, 60L))
         assertEquals(TrackerAction.Disarmed, t.onMove(sample(20f, 1200f, 160L)))
-        assertEquals(TrackerAction.Armed(scheduleHoldMs = null), t.onMove(sample(205f, 1200f, 260L)))
+        assertEquals(TrackerAction.Armed(scheduleHoldMs = null, pending = SwipeAction.Back), t.onMove(sample(205f, 1200f, 260L)))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(205f, 1200f, 280L)),
         )
     }
@@ -493,7 +493,7 @@ class GestureTrackerTest {
         // 30px back still leaves 170px, well past the 66px trigger.
         assertEquals(TrackerAction.None, t.onMove(sample(175f, 1200f, 90L)))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT),
+            TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT),
             t.onUp(sample(175f, 1200f, 100L)),
         )
     }
@@ -520,6 +520,36 @@ class GestureTrackerTest {
     }
 
     @Test
+    fun `a left drag opens favourites`() {
+        val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
+        t.onDown(sample(540f, 2395f, 0L))
+        t.onMove(sample(540f, 2295f, 50L))
+        val drag = sample(340f, 2295f, 100L)
+        assertEquals(TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, drag, recents = false), t.onMove(drag))
+    }
+
+    @Test
+    fun `with the lists swapped a right drag opens favourites and a left drag recent apps`() {
+        val swapped = GestureConfiguration(swapAppLists = true)
+        val right = tracker(ScreenEdge.BOTTOM, configuration = swapped)
+        right.onDown(sample(540f, 2395f, 0L))
+        right.onMove(sample(540f, 2295f, 50L))
+        val dragRight = sample(740f, 2295f, 100L)
+        assertEquals(
+            TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, dragRight, recents = false),
+            right.onMove(dragRight),
+        )
+        val left = tracker(ScreenEdge.BOTTOM, configuration = swapped)
+        left.onDown(sample(540f, 2395f, 0L))
+        left.onMove(sample(540f, 2295f, 50L))
+        val dragLeft = sample(340f, 2295f, 100L)
+        assertEquals(
+            TrackerAction.OpenSwitcher(ScreenEdge.BOTTOM, dragLeft, recents = true),
+            left.onMove(dragLeft),
+        )
+    }
+
+    @Test
     fun `a sideways drag with the app list on opens the switcher`() {
         val t = tracker(ScreenEdge.BOTTOM, configuration = GestureConfiguration())
         t.onDown(sample(540f, 2395f, 0L))
@@ -538,9 +568,9 @@ class GestureTrackerTest {
         t.onDown(sample(540f, 2395f, 0L))
         t.onMove(sample(540f, 2295f, 50L))
         t.onMove(sample(540f, 2095f, 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(540f, 2095f, 500L)),
         )
     }

@@ -167,13 +167,18 @@ its rows.
     group title (`SectionHeader`, 32 dp from the screen edge), then a rounded
     card (16 dp corners, 16 dp side margin, `surface` colour) holding the
     rows, then the optional footer (small grey text, 32 dp from the screen
-    edge). Between two measured children it draws a 0.5 dp hairline in
+    edge). Between two children that both have height it draws a 0.5 dp hairline in
     `outlineVariant`, inset 16 dp from the start and flush with the card's
     end. The inset is the same for every row, so groups that mix rows with
     and without icons line up.
     The dividers are drawn by a small custom `Layout` that stacks children
-    like a `Column` and records each child's bottom edge for the draw step.
-    Rows that a screen leaves out with `if` are not children. A plain
+    like a `Column` and records where each line goes for the draw step
+    (`dividerEdges`, unit tested): above each child with height that has a
+    child with height somewhere above it. Rows that a screen leaves out with
+    `if` are not children. An `AnimatedVisibility` is one child, and while
+    it folds to nothing it draws no line, not even on the card's edge. A
+    group that can vanish whole is wrapped from outside, so no title or
+    empty card stays behind. A plain
     `Column` cannot draw a line *between* arbitrary children: a row does not
     know whether it is the first one in its card.
     **A divider separates children, so one logical block must be one
@@ -219,8 +224,77 @@ its rows.
 *   Other screens use a `CenterAlignedTopAppBar` with the back arrow
     (`nav_back` tag kept) and the screen title, always on the page colour.
     The content is padded below the bar, so nothing scrolls under it and no
-    scroll behaviour is needed.
+    scroll behaviour is needed. Each screen draws its own bar above its
+    scrolling column (not the scaffold's `topBar` slot), so the bar comes
+    and goes with its screen during a screen change.
 *   The scaffold background is the page colour.
+
+### Motion (`ui/Motion.kt`, added 2026-11-13)
+
+Motion is short and quiet. `Motion.kt` holds the only numbers the screens
+use: the `EaseOutStrong` curve (`CubicBezierEasing(0.23, 1, 0.32, 1)`), fade
+in 150 ms, expand 200 ms, fade out 100 ms, shrink 150 ms, screen change
+200 ms, and `BlockEnter`/`BlockExit` for a block that opens under a switch
+(fade in + expand; fade out + shrink). Compose scales every one by the
+phone's animator duration scale, so "Remove animations" turns them off. No
+screen times anything with `delay()`.
+
+*   **Small state changes.** Four more places use the same curve, with
+    their numbers in `Motion.kt`. The Home status badge and icon change
+    colour over 200 ms (`TONE_MS`). The update download bar opens and
+    closes as a block, and its fill moves linearly over 200 ms between two
+    progress reports. The touch-area band lights up over 100 ms when a
+    drag starts and lets go over 200 ms. The Setup tile, when the setup
+    card folds away on the same visit, fades in and grows from 96% over
+    200 ms, starting 150 ms after the fold begins; on any later visit it is
+    simply there.
+*   **Back keeps its place.** A screen opened forward starts at its top.
+    Back shows the screen underneath at the scroll it was left at. The back
+    stack (`BackStack.kt`) is a list of entries; each holds its screen, an
+    id that is new for every opening, and the scroll it had when it was
+    covered. `BackStackSaver` keeps all three, so a rotation keeps them; the
+    screen on top keeps its live scroll through `rememberSaveable`. Back
+    never pops the last screen, so two Backs before one redraw cannot empty
+    the stack. Unit tested in `BackStackTest`.
+*   **The Home switch answers at once.** A tap moves the thumb in the same
+    frame and holds it there, dimmed and disabled, while the request is in
+    flight (`AppModel.pendingSwitch`). The status text, icon and card colour
+    keep the real state and change only when it does. The hold ends when a
+    refresh finds the real state at the tap, and always once the refresh
+    after the 800 ms settle finishes, so a refused switch-off falls back to
+    "on". A switch-on that needs the Accessibility screen or the disclosure
+    holds nothing. The rules live in `HomeSwitch.kt`, unit tested in
+    `HomeSwitchTest`. The status card grows and shrinks over 200 ms
+    (`animateContentSize`), so the Turn on button and hints do not jump
+    the tiles below.
+*   **The setup card folds away.** Confirming the last Required step fades
+    the card out over 150 ms while its space closes over 250 ms
+    (`CardFoldExit`); it draws its live rows while it goes, all reading
+    Done. It appears without motion, and only once the saved setup record
+    is read (`AppModel.recordLoaded`): before that, steps confirmed by hand
+    look undone, and the card would show and then fold on every cold start.
+*   **Blocks under a switch slide open and closed** with `BlockEnter` and
+    `BlockExit`: the Timing and Needs groups under the Circle to Search
+    switch, the hold slider under its system-timing switch, the status
+    group under the Updates switch (github), the shortcut rows under an app
+    in the corner picker, and the Needs group on App switching. A block folding away keeps its last content
+    (`rememberLastShown`). The corner picker's arrow is one glyph that turns
+    90° to point down over 200 ms, the other way in right-to-left. Only a
+    tap on an app animates it: starting a search, the search filter,
+    ticking an app and "Loading…" turning into the list stay instant.
+*   **Screens change with a short slide.** `MainActivity` shows the stack's
+    top entry through `AnimatedContent`, one slot per entry. The new screen
+    slides in from a tenth of the width away and fades in over 200 ms; the
+    old one fades out over 100 ms. Forward (a newer entry) arrives from the
+    end side, Back from the start side, mirrored in right-to-left
+    (`screenSlideOffset`, unit tested). The bar is part of each slot, so
+    Home's missing bar never pops on its own. The screen fading out takes no
+    touch and is hidden from TalkBack and uiautomator, so test tags are
+    never doubled in a dump and only the new screen can open or close
+    anything (`BackStack.openFrom`/`backFrom`). A Back pressed while a
+    screen is still arriving is swallowed. The app pickers start loading at
+    once but hand their list over only once the screen has arrived
+    (`LocalScreenSettled`), so a long list never builds mid-slide.
 
 ### Home (`ui/HomeScreen.kt`, `ui/StatusBlock.kt`)
 
@@ -272,7 +346,8 @@ Legend: `[x]` = icon square, `(●)` = switch on, `(○)` = switch off.
 *   **Setup**: unchanged logic. "Essentials" means every Required checklist
     step is done (`checklist.essentialsDone`). Until then the Required steps
     show in a `SettingsGroup` titled with the existing `setup_progress`
-    plural ("Setup, 1 of 2 done"). After that, Setup becomes a tile
+    plural ("Setup, 1 of 2 done"); the card waits for the saved setup record
+    and folds away when the last step is done (see Motion). After that, Setup becomes a tile
     (`row_setup`) whose state line is the existing `chip_done` text or the
     `setup_recommended_left` plural (`checklist.recommendedLeft`).
 *   **Feature tiles**: built from a list of `HomeTile` specs, laid out two per
@@ -366,15 +441,24 @@ group with no title is written as **(no title)**.
 
 *   **Setup** — **Required**: required steps. **Recommended**: recommended
     steps; *footer: setup footer (HyperOS or generic text)*.
-*   **App switching** — **(no title)**: app-list switch, Favourite apps row.
-    **List style**: the three style radio rows, drag step slider, adaptive
-    speed switch. **Needs**: usage access row; *footer: usage access explainer*.
-    **Gestures it adds**: switch-apps info row, last problem row.
+*   **App switching** — **(no title)**: app-list switch, Favourite apps row,
+    "Swap the two lists" switch (`switch_swap_app_lists`). **List style**:
+    the three style radio rows, drag step slider, adaptive speed switch.
+    **Needs** (only while usage access is missing): usage access row with
+    its Grant button; *footer: usage access explainer*. **(no title)**
+    (only after a failure): last problem row.
+*   **No information-only rows** (2026-11-14). A settings screen shows a
+    row only when the user can act on it. A "Needs" row shows while its
+    permission is missing and goes once it is granted; a "Last problem"
+    card shows only when there is a problem (`LastProblem`). The
+    cheat-sheet group on Gesture settings and the "Gestures it adds" group
+    are removed. Troubleshooting and About stay information screens.
 *   **Favourite apps** — **Favourites**: picked apps with move/remove buttons,
     or the empty text inside the card. Then the app search box (`app_search`,
     between the cards), then **All apps**: the checklist.
 *   **Bank apps** — the two intro texts as plain footnotes above everything.
-    **Needs**: adb grant, usage access, notifications rows. **Picked**: the
+    **Needs**: adb grant, usage access, notifications rows, each only while
+    it is missing; no card once all three are met. **Picked**: the
     picked apps or the empty text. Then the app search box, then **All
     apps**: the checklist.
 *   **App search** (both pickers, `AppChecklist` in `AppPicker.kt`, added
@@ -386,18 +470,66 @@ group with no title is written as **(no title)**.
     card says "No apps match". The text survives a rotation
     (`rememberSaveable`).
 *   **Circle to Search** — **(no title)**: the switch; *footer: feature body*.
-    If on: **Timing**: system-timing switch, hold slider. **Needs**:
-    assistant row, last problem row.
-*   **Gesture settings** — **Gestures**: cheat-sheet rows. **Edges**: one
+    If on: **Timing**: system-timing switch, hold slider. **Needs** (only
+    until Google is the assistant): assistant row with its button. **(no
+    title)** (only after a failure): last problem row.
+*   **Gesture settings** — **Edges**: one
     block (edge width value, its body text, the Adjust button, the hint
-    text), left back switch, right back switch, landscape-confirm switch.
+    text), landscape-confirm switch. **Swipes** (added 2026-11-14, replacing
+    the left and right back switches): Left edge, Right edge and Bottom edge
+    rows (`row_left_edge`, `row_right_edge`, `row_bottom_edge`), each with a
+    one-line summary of its actions, each opening its edge page. **(no
+    title)** (only while no swipe or corner goes Home, or none goes Back):
+    one warning row per missing action, "No swipe goes Home" / "No swipe
+    goes Back", naming the NavGesture tile as the way out (`warning_no_home`,
+    `warning_no_back`); it folds in and out like a Needs block. Home's
+    Gestures tile shows the first warning in place of its distances line.
     **Corner shortcuts**: left corner row, right corner row; *footer: corner
     shortcuts body*. (Moved here from App switching on 2026-11-13: a corner
     runs any action and works with the app list off.) **Distance and
-    timing**: the four sliders. **Gesture bar**: hide switch, shown under
+    timing**: the four sliders, and under Back swipe distance a fifth, "Far
+    swipe distance" (added 2026-11-14, `longSwipeDp`, 80-240 dp, default
+    120, `slider_long_swipe` on the slider itself). It shows only while a
+    far swipe that a touch can reach has an action (a half's far swipe
+    counts only while its edge is split), and folds in and out with
+    `BlockEnter`/`BlockExit`. Under it a sixth, "Wait time" (added
+    2026-11-14, `waitMs`, 200-800 ms, default 350, `slider_wait`), shows
+    and folds by the same rule for a wait swipe ("Swipe in and wait").
+    **Gesture bar**: hide switch, shown under
     the same condition as today (`isHyperOsDevice() && (canHide ||
     !IS_PLAY)`).
     **Feedback**: haptics switch. Then the Reset button below the cards.
+*   **Edge pages** (added 2026-11-14, `SwipeEdgeScreen.kt`, screens
+    `LEFT_EDGE`, `RIGHT_EDGE`, `BOTTOM_EDGE`) — one row per swipe, showing
+    its action and opening the action picker. Left and right (far swipe,
+    split and wait added 2026-11-14): **(no title)**: the switch "Top and
+    bottom do different things" (`switch_split_left`, `switch_split_right`).
+    Off: **(no title)**: "Swipe in", "Swipe far in" and "Swipe in and wait"
+    (`row_slot_left_whole_short`, `row_slot_left_whole_long`,
+    `row_slot_left_whole_wait`, and the same for the right). On: **Top
+    half** and **Bottom half**, each with its own three rows
+    (`row_slot_left_top_short`, `row_slot_left_top_long`,
+    `row_slot_left_top_wait`, `row_slot_left_bottom_short`,
+    `row_slot_left_bottom_long`, `row_slot_left_bottom_wait`, and the same
+    for the right). The two
+    layouts swap with `BlockEnter`/`BlockExit`; each half keeps its own
+    actions, so turning the switch off and on loses nothing. Bottom: **(no
+    title)**: "Swipe up" and "Swipe up and pause" (`row_slot_bottom_short`,
+    `row_slot_bottom_pause`). The edge's row on Gesture settings sums up the
+    actions a touch can reach, each named once; the status card and the
+    touch-area adjuster name a side by its short swipe, or both halves'.
+*   **Action picker** (`SwipeActionPicker.kt`, one screen per slot:
+    `LEFT_CORNER`, `RIGHT_CORNER`, `LEFT_SWIPE_IN`, `RIGHT_SWIPE_IN`,
+    `BOTTOM_SWIPE_UP`, `BOTTOM_SWIPE_UP_PAUSE`, and since 2026-11-14
+    `LEFT_SWIPE_FAR_IN`, `RIGHT_SWIPE_FAR_IN` and, per side,
+    `<SIDE>_TOP_SWIPE_IN`, `<SIDE>_TOP_SWIPE_FAR_IN`,
+    `<SIDE>_BOTTOM_SWIPE_IN`, `<SIDE>_BOTTOM_SWIPE_FAR_IN`, titled "Top
+    half, swipe in" and so on; for the wait, `LEFT_SWIPE_IN_WAIT`,
+    `RIGHT_SWIPE_IN_WAIT`, `<SIDE>_TOP_SWIPE_IN_WAIT` and
+    `<SIDE>_BOTTOM_SWIPE_IN_WAIT`) — the corner picker, reused
+    for every slot. Phone actions now start with Back, Home, Recents and
+    Previous app. **Previous app** (only while usage access is missing): the
+    usage access row with its Grant button.
 *   **Troubleshooting** — **Known fixes**: the fix rows with their buttons.
     **This device**: the device value rows. **Last problems**: the three
     value rows, then the recorded-failure block and the service-history
@@ -427,7 +559,13 @@ group with no title is written as **(no title)**.
     drawn by
     `Store.SupportRow()`; the play `Store` draws nothing there, because
     Google Play's payments policy forbids sending users to pay outside Play.
-    **Credits**: the two credit rows.
+    **(no title)**: a Credits row (`row_credits`) that opens the Credits
+    page.
+    The same Buy me a coffee button is also the last thing on Home, under
+    the More card (github build only).
+*   **Credits** — **(no title)**: HyperGesture (`row_credit_hypergesture`,
+    opens its source page), then the two other credit rows. This page is
+    information by purpose, like About.
 *   **Updates** (github only) — **(no title)**: the update switch; *footer:
     switch body*. If on: **(no title)**: the status row with its buttons.
 *   **Disclosure** — the intro text; one card holding the three parts in
@@ -436,9 +574,12 @@ group with no title is written as **(no title)**.
     (Agree filled, Not now outlined), now full width and stacked; the
     footnote. No text changes (Play policy text, mirrored in
     `docs/play-store/disclosure.md`).
+Like Last problem, the "No swipe goes Home" and "No swipe goes Back" rows
+show only while the problem exists.
 
-The `usage_access` node keeps showing only its status string (the explainer
-stays a separate footer), so `status-refresh.sh` still matches it exactly.
+The `usage_access` node shows only the "missing" status string (the explainer
+stays a separate footer), so `status-refresh.sh` still matches it exactly;
+once access is granted the node is gone, and the suite checks that too.
 
 ## Alternatives considered
 
@@ -515,7 +656,7 @@ removed or renamed. No new test tag is needed.
     `AboutScreen.kt`, `DisclosureScreen.kt` — wrap rows in `SettingsGroup`
     per the screen list above; icons per the glyph table; buttons per the
     button table. No logic change. `AppPicker.kt` and
-    `CornerShortcutPicker.kt` are not changed: their callers wrap them in a
+    `CornerShortcutPicker.kt` (now `SwipeActionPicker.kt`) are not changed: their callers wrap them in a
     group.
 9.  `github/kotlin/com/vijayyaso/navgesture/ui/Store.kt` — `HomeRow` →
     `homeTile(onOpen): HomeTile?`.

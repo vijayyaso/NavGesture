@@ -43,6 +43,7 @@ class SetupStateRepositoryTest {
             SetupFlag.BATTERY_CONFIRMED to SetupRecord::batteryConfirmed,
             SetupFlag.AUTOSTART_CONFIRMED to SetupRecord::autostartConfirmed,
             SetupFlag.DISCLOSURE_ACCEPTED to SetupRecord::disclosureAccepted,
+            SetupFlag.DEMO_SEEN to SetupRecord::demoSeen,
         )
         assertEquals(SetupFlag.entries.toSet(), expected.keys)
         for ((flag, field) in expected) {

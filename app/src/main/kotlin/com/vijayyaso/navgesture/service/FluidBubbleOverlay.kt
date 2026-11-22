@@ -26,12 +26,14 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
-import android.os.SystemClock
+import android.animation.ValueAnimator
 import android.util.Log
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import com.vijayyaso.navgesture.gesture.BubbleSpring
+import com.vijayyaso.navgesture.gesture.ActionIcon
+import com.vijayyaso.navgesture.gesture.BubbleMotion
 import com.vijayyaso.navgesture.gesture.FluidBubble
 import com.vijayyaso.navgesture.gesture.ScreenEdge
 import com.vijayyaso.navgesture.gesture.TrackerAction
@@ -39,8 +41,9 @@ import kotlin.math.ceil
 
 /**
  * The bubble that rises from an edge under the finger, in the manner of Fluid Navigation
- * Gestures: from the bottom it carries the Home icon and swaps to Recents when the pause
- * primes it; from a side it carries the Back arrow. It follows the finger along the edge,
+ * Gestures: it carries the icon of the action a release would run, so by default the bottom
+ * shows Home and swaps to Recents when the pause primes it, and a side shows the Back arrow.
+ * With no action pending it shows no icon. It follows the finger along the edge,
  * grows as the finger travels in, and springs back into the edge on release while the
  * action fires alongside.
  *
@@ -99,8 +102,11 @@ internal class FluidBubbleOverlay(
     /** Applies one tracker verdict, with the finger at raw [x],[y]. */
     fun follow(action: TrackerAction, x: Float, y: Float) {
         when (action) {
-            is TrackerAction.Armed -> show(x, y)
-            is TrackerAction.RecentsPrimed -> view.primeRecents()
+            is TrackerAction.Armed -> {
+                show(x, y)
+                view.setIcon(action.pending.icon)
+            }
+            is TrackerAction.Pending -> view.setIcon(action.action.icon)
             is TrackerAction.Fire, is TrackerAction.Reverted -> release()
             is TrackerAction.Unused -> hide()
             else -> if (shown) view.moveTo(along(x, y), risePx(x, y))
@@ -159,16 +165,17 @@ internal class FluidBubbleOverlay(
 
         private val overhangPx = density
 
-        // The tip follows the finger; the base drags behind it, so a sliding drop leans.
-        private val along = BubbleSpring()
-        private val baseAlong = BubbleSpring(BubbleSpring.BASE_TENSION, BubbleSpring.BASE_FRICTION)
-        private val rise = BubbleSpring(BubbleSpring.TENSION, BubbleSpring.RISE_FRICTION)
-        private val iconAlpha = BubbleSpring(BubbleSpring.ICON_TENSION, BubbleSpring.ICON_FRICTION)
+        private val motion = BubbleMotion()
 
-        private var recents = false
+        private var glyph = ActionIcon.NONE
         private var running = false
-        private var lastFrameMs = 0L
+        private var lastFrameNanos = 0L
         private var onSettled: (() -> Unit)? = null
+
+        // One stored callback: a stopped bubble can take its pending frame back, and no frame
+        // makes a new object. Its time is the display's own frame time, even at 120 Hz.
+        private val choreographer = Choreographer.getInstance()
+        private val frameCallback = Choreographer.FrameCallback(::frame)
 
         private val shape = Path()
         private val head = Path()
@@ -185,61 +192,60 @@ internal class FluidBubbleOverlay(
 
         fun start(at: Float) {
             onSettled = null
-            recents = false
-            along.snap(at)
-            baseAlong.snap(at)
-            rise.snap(0f)
-            iconAlpha.snap(0f)
-            iconAlpha.target = 1f
+            // Read per touch, so a change to "Remove animations" applies to the next swipe.
+            motion.start(at, animate = ValueAnimator.areAnimatorsEnabled())
             runSprings()
         }
 
         fun moveTo(at: Float, risePx: Float) {
             if (onSettled != null) return
-            along.target = at
-            baseAlong.target = at
-            rise.target = risePx
+            motion.moveTo(at, risePx)
             runSprings()
         }
 
-        fun primeRecents() {
-            recents = true
+        fun setIcon(icon: ActionIcon) {
+            glyph = icon
             invalidate()
         }
 
         fun release(whenSettled: () -> Unit) {
-            rise.target = 0f
-            iconAlpha.target = 0f
+            if (!motion.release()) {
+                stop()
+                whenSettled()
+                return
+            }
             onSettled = whenSettled
             runSprings()
         }
 
         fun reset() {
             onSettled = null
+            motion.reset()
+            stop()
+        }
+
+        // Ends the frame loop, taking back a frame already asked for.
+        private fun stop() {
             running = false
-            rise.snap(0f)
-            iconAlpha.snap(0f)
+            choreographer.removeFrameCallback(frameCallback)
             invalidate()
         }
 
         private fun runSprings() {
             if (running) return
             running = true
-            lastFrameMs = SystemClock.uptimeMillis()
-            postOnAnimation(::frame)
+            lastFrameNanos = System.nanoTime()
+            choreographer.postFrameCallback(frameCallback)
         }
 
-        private fun frame() {
+        private fun frame(frameTimeNanos: Long) {
             if (!running) return
-            val now = SystemClock.uptimeMillis()
-            val dt = now - lastFrameMs
-            lastFrameMs = now
-            along.step(dt)
-            baseAlong.step(dt)
-            rise.step(dt)
-            iconAlpha.step(dt)
+            // A frame's time can sit just before the touch that started the loop; the step
+            // treats that as no time passed.
+            motion.stepNanos(frameTimeNanos - lastFrameNanos)
+            lastFrameNanos = maxOf(lastFrameNanos, frameTimeNanos)
             invalidate()
-            val done = along.settled && baseAlong.settled && rise.settled && iconAlpha.settled
+            val done = motion.settled
             when {
                 done && onSettled != null -> {
                     running = false
@@ -248,15 +254,15 @@ internal class FluidBubbleOverlay(
                 }
                 // A held bubble keeps ticking only while it still moves.
                 done -> running = false
-                else -> postOnAnimation(::frame)
+                else -> choreographer.postFrameCallback(frameCallback)
             }
         }
 
         override fun onDraw(canvas: Canvas) {
-            val r = rise.value.coerceAtLeast(0f)
+            val r = motion.rise.value.coerceAtLeast(0f)
             if (r < MIN_DRAWN_PX) return
-            val base = baseAlong.value
-            val drop = FluidBubble.shape(r, FluidBubble.lean(along.value, base, density), density, overhangPx)
+            val base = motion.baseAlong.value
+            val drop = FluidBubble.shape(r, FluidBubble.lean(motion.along.value, base, density), density, overhangPx)
 
             // Local (x along, y into the edge) to view coordinates.
             fun vx(lx: Float, ly: Float) = x(base + lx, -ly)
@@ -296,19 +302,20 @@ internal class FluidBubbleOverlay(
 
         private fun drawIcon(canvas: Canvas, cx: Float, cy: Float, headRadius: Float) {
             val radius = headRadius * ICON_FILL
-            val alpha = iconAlpha.value.coerceIn(0f, 1f)
+            val alpha = motion.iconAlpha.value.coerceIn(0f, 1f)
             if (radius < density * 2 || alpha <= 0f) return
             icon.alpha = (alpha * 255).toInt()
             iconPath.rewind()
-            when {
-                edge != ScreenEdge.BOTTOM -> {
+            when (glyph) {
+                ActionIcon.NONE -> return
+                ActionIcon.BACK -> {
                     // A chevron pointing in from the edge.
                     val dir = if (edge == ScreenEdge.LEFT) 1f else -1f
                     iconPath.moveTo(cx + dir * radius * 0.35f, cy - radius * 0.7f)
                     iconPath.lineTo(cx - dir * radius * 0.35f, cy)
                     iconPath.lineTo(cx + dir * radius * 0.35f, cy + radius * 0.7f)
                 }
-                recents -> {
+                ActionIcon.RECENTS -> {
                     // Two stacked cards.
                     val w = radius * 1.1f
                     val h = radius * 1.3f
@@ -318,7 +325,12 @@ internal class FluidBubbleOverlay(
                     iconPath.lineTo(cx + w * 0.75f, cy - h * 0.8f)
                     iconPath.lineTo(cx + w * 0.75f, cy + h * 0.4f)
                 }
-                else -> {
+                ActionIcon.GENERIC -> {
+                    // A dot in a ring.
+                    iconPath.addCircle(cx, cy, radius * 0.85f, Path.Direction.CW)
+                    iconPath.addCircle(cx, cy, radius * 0.15f, Path.Direction.CW)
+                }
+                ActionIcon.HOME -> {
                     // A house: roof and walls.
                     iconPath.moveTo(cx - radius, cy - radius * 0.05f)
                     iconPath.lineTo(cx, cy - radius)

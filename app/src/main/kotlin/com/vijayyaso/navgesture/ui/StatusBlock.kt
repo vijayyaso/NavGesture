@@ -18,6 +18,9 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +57,11 @@ import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeSlots
+import com.vijayyaso.navgesture.gesture.SwipeZone
 
 /** The answer to why the app was opened, with the one action the current state needs. */
 @Composable
@@ -62,6 +70,7 @@ internal fun StatusBlock(
     configuration: GestureConfiguration,
     restrictedSettingsApply: Boolean,
     barStuck: Boolean,
+    switchPending: Boolean?,
     onOpenNavigation: () -> String?,
     onSwitch: (Boolean) -> Unit,
     onTurnOn: () -> Unit,
@@ -75,11 +84,13 @@ internal fun StatusBlock(
         ServiceStatus.WORKING -> R.string.status_working
     }
     val body = when (status) {
-        ServiceStatus.OFF -> R.string.status_off_body
-        ServiceStatus.STOPPED -> R.string.status_stopped_body
-        ServiceStatus.WORKING -> workingBody(configuration)
+        ServiceStatus.OFF -> stringResource(R.string.status_off_body)
+        ServiceStatus.STOPPED -> stringResource(R.string.status_stopped_body)
+        ServiceStatus.WORKING -> workingBody(configuration.slots)
     }
-    val (badge, glyph) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
+    val (badgeNow, glyphNow) = toneColors(if (working) Tone.GOOD else Tone.ATTENTION)
+    val badge by animateColorAsState(badgeNow, tween(TONE_MS, easing = EaseOutStrong), label = "status badge")
+    val glyph by animateColorAsState(glyphNow, tween(TONE_MS, easing = EaseOutStrong), label = "status glyph")
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
@@ -87,6 +98,9 @@ internal fun StatusBlock(
             .fillMaxWidth()
             .clip(TileShape)
             .background(MaterialTheme.colorScheme.surface)
+            // After the clip and background, so the rounded card itself grows and shrinks, and
+            // the tiles below slide with it.
+            .animateContentSize(tween(EXPAND_MS, easing = EaseOutStrong))
             .padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -112,18 +126,20 @@ internal fun StatusBlock(
                     .padding(start = 14.dp)
                     .testTag(TestTags.SERVICE_STATUS),
             )
-            // The quick way out when another app refuses to work while the gestures run.
+            // The quick way out when another app refuses to work while the gestures run. While a
+            // tap is in flight the thumb holds it, dimmed, and the text above keeps the real state.
             val switchLabel = stringResource(R.string.status_switch)
             Switch(
-                checked = working,
+                checked = switchChecked(switchPending, working),
                 onCheckedChange = onSwitch,
+                enabled = switchPending == null,
                 modifier = Modifier
                     .semantics { contentDescription = switchLabel }
                     .testTag(TestTags.STATUS_SWITCH),
             )
         }
         Text(
-            text = stringResource(body),
+            text = body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -169,10 +185,26 @@ internal fun StatusBlock(
     }
 }
 
-private fun workingBody(configuration: GestureConfiguration): Int = when {
-    configuration.leftEdgeBackEnabled && configuration.rightEdgeBackEnabled ->
-        R.string.status_working_body
-    configuration.leftEdgeBackEnabled -> R.string.status_working_body_left
-    configuration.rightEdgeBackEnabled -> R.string.status_working_body_right
-    else -> R.string.status_working_body_bottom
+/** "Back from the sides, Home and Recents from the bottom.", from what each swipe does; sides by [sideName]. */
+@Composable
+private fun workingBody(slots: SwipeSlots): String {
+    val left = sideName(slots, ScreenEdge.LEFT)
+    val right = sideName(slots, ScreenEdge.RIGHT)
+    val bottom = actionsName(
+        listOf(
+            slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.SHORT)],
+            slots[SlotId.Edge(ScreenEdge.BOTTOM, SwipeZone.WHOLE, SwipeKind.PAUSE)],
+        ),
+    )
+    val parts = buildList {
+        if (left != null && left == right) {
+            add(stringResource(R.string.status_part_sides, left))
+        } else {
+            left?.let { add(stringResource(R.string.status_part_left, it)) }
+            right?.let { add(stringResource(R.string.status_part_right, it)) }
+        }
+        bottom?.let { add(stringResource(R.string.status_part_bottom, it)) }
+    }
+    if (parts.isEmpty()) return stringResource(R.string.status_working_body_none)
+    return parts.joinToString(", ", postfix = ".")
 }

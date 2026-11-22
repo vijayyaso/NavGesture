@@ -28,8 +28,8 @@ import org.junit.Test
  */
 class CornerGestureTest {
     private val both = GestureConfiguration(
-        leftCornerShortcut = CornerShortcut.Notifications,
-        rightCornerShortcut = CornerShortcut.RecentsList,
+        leftCornerShortcut = SwipeAction.Notifications,
+        rightCornerShortcut = SwipeAction.RecentsList,
     )
 
     private fun sample(x: Float, y: Float, t: Long = 0L) = TouchSample(x, y, t)
@@ -46,7 +46,10 @@ class CornerGestureTest {
         screenWidthPx = width,
     )
 
-    private val leftFire = TrackerAction.Fire(GestureAction.Corner(BottomCorner.LEFT), ScreenEdge.BOTTOM)
+    private val leftFire = TrackerAction.Fire(
+        cornerRun(BottomCorner.LEFT, SwipeAction.Notifications),
+        ScreenEdge.BOTTOM,
+    )
 
     @Test fun `a 45 degree diagonal from the left corner fires on release`() {
         val t = tracker()
@@ -63,7 +66,7 @@ class CornerGestureTest {
         t.onDown(sample(1030f, 2395f))
         assertEquals(TrackerAction.CornerReady(BottomCorner.RIGHT), t.onMove(sample(950f, 2315f, 40L)))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Corner(BottomCorner.RIGHT), ScreenEdge.BOTTOM),
+            TrackerAction.Fire(cornerRun(BottomCorner.RIGHT, SwipeAction.RecentsList), ScreenEdge.BOTTOM),
             t.onUp(sample(950f, 2315f, 80L)),
         )
     }
@@ -103,7 +106,7 @@ class CornerGestureTest {
             )
         }
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(88f, 2000f, 100L)),
         )
     }
@@ -150,7 +153,7 @@ class CornerGestureTest {
     }
 
     @Test fun `a corner set to nothing is a normal bottom touch`() {
-        val t = tracker(GestureConfiguration(rightCornerShortcut = CornerShortcut.Screenshot))
+        val t = tracker(GestureConfiguration(rightCornerShortcut = SwipeAction.Screenshot))
         t.onDown(sample(60f, 2395f))
         assertNotEquals(TrackerAction.CornerReady(BottomCorner.LEFT), t.onMove(sample(150f, 2305f, 40L)))
     }
@@ -179,7 +182,7 @@ class CornerGestureTest {
     }
 
     @Test fun `the corner ticks once, where it lands`() {
-        val gate = HapticGate()
+        val gate = HapticGate(ScreenEdge.BOTTOM)
         assertTrue(gate.shouldTick(TrackerAction.CornerReady(BottomCorner.LEFT)))
         assertEquals(false, gate.shouldTick(leftFire))
     }

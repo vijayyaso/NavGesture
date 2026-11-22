@@ -27,6 +27,15 @@ internal object TestTags {
     const val APP_SEARCH = "app_search"
     const val ROW_LEFT_CORNER = "row_left_corner"
     const val ROW_RIGHT_CORNER = "row_right_corner"
+    const val ROW_LEFT_EDGE = "row_left_edge"
+    const val ROW_RIGHT_EDGE = "row_right_edge"
+    const val ROW_BOTTOM_EDGE = "row_bottom_edge"
+    const val SWITCH_SPLIT_LEFT = "switch_split_left"
+    const val SWITCH_SPLIT_RIGHT = "switch_split_right"
+    const val SLIDER_LONG_SWIPE = "slider_long_swipe"
+    const val SLIDER_WAIT = "slider_wait"
+    const val WARNING_NO_HOME = "warning_no_home"
+    const val WARNING_NO_BACK = "warning_no_back"
     const val ROW_BANK_APPS = "row_bank_apps"
     const val BANK_APPS_COPY = "bank_apps_copy"
     const val ROW_CIRCLE_TO_SEARCH = "row_circle_to_search"
@@ -34,12 +43,15 @@ internal object TestTags {
     const val ROW_GESTURE_SETTINGS = "row_gesture_settings"
     const val ROW_TROUBLESHOOTING = "row_troubleshooting"
     const val ROW_ABOUT = "row_about"
+    const val ROW_CREDITS = "row_credits"
+    const val ROW_CREDIT_HYPERGESTURE = "row_credit_hypergesture"
     const val ROW_REPORT_BUG = "row_report_bug"
     const val ROW_REQUEST_FEATURE = "row_request_feature"
     const val ROW_EMAIL_DEVELOPER = "row_email_developer"
     const val ROW_SUPPORT = "row_support"
     const val SWITCH_EDGE_APP_LIST = "switch_edge_app_list"
     const val SWITCH_ADAPTIVE_SPEED = "switch_adaptive_speed"
+    const val SWITCH_SWAP_APP_LISTS = "switch_swap_app_lists"
     const val EDGE_AREA_OVERLAY = "edge_area_overlay"
     const val EDGE_AREA_ADJUST = "edge_area_adjust"
     const val EDGE_AREA_VALUE = "edge_area_value"
@@ -65,9 +77,30 @@ internal object TestTags {
     const val UPDATE_ALLOW_INSTALLS = "update_allow_installs"
     const val RUNTIME_SHORTCUTS_HINT = "runtime_shortcuts_hint"
     const val RUNTIME_SHORTCUTS_COPY = "runtime_shortcuts_copy"
+    const val ROW_DEMO = "row_demo"
+    const val DEMO_PHONE = "demo_phone"
+    const val DEMO_STEP = "demo_step"
+    const val DEMO_SKIP = "demo_skip"
+    const val DEMO_SKIP_STEP = "demo_skip_step"
+    const val DEMO_DONE = "demo_done"
+    const val PRACTICE_PAGE = "practice_page"
+    const val PRACTICE_STEP = "practice_step"
+    const val PRACTICE_RESULT = "practice_result"
+    const val PRACTICE_WAITING = "practice_waiting"
+    const val PRACTICE_PAUSED = "practice_paused"
+    const val PRACTICE_CLOSE = "practice_close"
+    const val PRACTICE_SKIP_STEP = "practice_skip_step"
+    const val SETUP_PRACTISE = "setup_practise"
 
     fun listStyle(style: com.vijayyaso.navgesture.gesture.AppListStyle): String =
         "list_style_${style.name.lowercase()}"
+
+    /**
+     * A swipe's row on its edge page, named by its storage key: `row_slot_left_whole_short`,
+     * `row_slot_left_top_long`, `row_slot_left_whole_wait`.
+     */
+    fun slotRow(slot: com.vijayyaso.navgesture.gesture.SlotId.Edge): String =
+        "row_" + com.vijayyaso.navgesture.gesture.SwipeSlots.keyOf(slot)
 
     /** An app's header in the corner picker's App shortcuts card. */
     fun cornerApp(packageName: String): String = "corner_app_$packageName"

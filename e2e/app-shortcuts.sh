@@ -92,7 +92,12 @@ open_left_picker() {
     if tap_id row_left_corner; then
       sleep 3
       title="$(string_res corner_section_app_shortcuts)"
-      if ui_nodes | grep -q "text=\"${title}\""; then
+      # The card sits below the fixed choices, so scroll down to it.
+      # shellcheck disable=SC2310 # a missing card is the retry signal, not an error
+      if find_text "${title}" >/dev/null; then
+        # Back to the top, where the callers look for the fixed choices.
+        scroll_app up
+        scroll_app up
         return 0
       fi
     fi
@@ -161,7 +166,7 @@ fi
 open_test_app
 reset_log
 corner_swipe 30 1
-assert_log "the corner runs the stored shortcut" "CORNER_SHORTCUT shortcut:${FIX}/qr_scanner"
+assert_log "the corner runs the stored shortcut" "SWIPE_ACTION shortcut:${FIX}/qr_scanner"
 assert_log "it is reported as not found" "shortcut:${FIX}/qr_scanner: shortcut not found"
 assert_no_fixture "the test app was not started" "FIXTURE_LAUNCH"
 
@@ -216,7 +221,7 @@ fi
 open_test_app
 reset_log
 corner_swipe 30 1
-assert_log "the corner runs the picked shortcut" "CORNER_SHORTCUT shortcut:${FIX}/qr_scanner"
+assert_log "the corner runs the picked shortcut" "SWIPE_ACTION shortcut:${FIX}/qr_scanner"
 assert_no_log "nothing failed" "shortcut not found"
 assert_fixture "the test app opened with action RUN" "FIXTURE_LAUNCH action=RUN"
 assert_fixture "the GPay-style string extra arrived" "FIXTURE_EXTRA some unique action key|String|QR_SCANNER"

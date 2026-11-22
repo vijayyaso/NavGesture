@@ -18,6 +18,10 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -33,15 +37,21 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -68,12 +78,25 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
         configuration = model.configuration,
         restrictedSettingsApply = model.restrictedSettingsApply,
         barStuck = model.gestureBar == GestureBarHider.BarState.STUCK_HIDDEN,
+        switchPending = model.pendingSwitch,
         onOpenNavigation = model::openNavigationSettings,
         onSwitch = { on -> model.switchService(context, on) },
     ) {
         model.requestAccessibility(context)
     }
-    SetupGroup(model)
+    // Shown at once (no enter motion), and only once the saved record is read, so a cold start
+    // never shows a card that then folds. Confirming the last step folds it away.
+    val setupPending = model.recordLoaded && !model.checklist.essentialsDone
+    // Whether the setup card was seen on this visit: only then does its tile grow in as it folds.
+    val setupSeen = remember { mutableStateOf(false) }
+    if (setupPending) SideEffect { setupSeen.value = true }
+    AnimatedVisibility(
+        visible = setupPending,
+        enter = EnterTransition.None,
+        exit = CardFoldExit,
+    ) {
+        SetupGroup(model, onOpen)
+    }
 
     val bankApps by remember(context) { PackageListStore.bankApps(context).packages }
         .collectAsState(initial = emptyList())
@@ -133,6 +156,7 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
                     },
                     icon = GroupIcon(Icons.Filled.CheckCircle, IconTint.ORANGE),
                     tag = TestTags.ROW_SETUP,
+                    arriving = setupSeen.value,
                 ) { onOpen(Screen.SETUP) },
             )
         }
@@ -141,6 +165,16 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     TileGrid(tiles)
 
     SettingsGroup(title = stringResource(R.string.section_more)) {
+        // Live practice on the real edges once the service works; the drawn demo otherwise.
+        val practice = rememberPracticeEntry(model)
+        NavigationRow(
+            title = stringResource(R.string.demo_title),
+            supporting = stringResource(
+                if (practice() == Screen.PRACTICE) R.string.practice_row_summary else R.string.demo_row_summary,
+            ),
+            tag = TestTags.ROW_DEMO,
+            icon = GroupIcon(Icons.Filled.PlayArrow, IconTint.GREEN),
+        ) { onOpen(practice()) }
         NavigationRow(
             title = stringResource(R.string.section_troubleshooting),
             tag = TestTags.ROW_TROUBLESHOOTING,
@@ -154,6 +188,22 @@ internal fun HomeScreen(model: AppModel, onOpen: (Screen) -> Unit) {
             tag = TestTags.ROW_ABOUT,
             icon = GroupIcon(Icons.Filled.Info, IconTint.GREY),
         ) { onOpen(Screen.ABOUT) }
+    }
+    // github build only: Play forbids links to outside payment.
+    Store.SupportRow()
+}
+
+/** Fades and grows a tile in, a moment after the card it replaces starts to fold. */
+private fun Modifier.tileArrival(): Modifier = composed {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(EXPAND_MS, delayMillis = TILE_ARRIVE_DELAY_MS, easing = EaseOutStrong))
+    }
+    graphicsLayer {
+        alpha = progress.value
+        val scale = TILE_ARRIVE_SCALE + (1f - TILE_ARRIVE_SCALE) * progress.value
+        scaleX = scale
+        scaleY = scale
     }
 }
 
@@ -177,7 +227,8 @@ private fun TileGrid(tiles: List<HomeTile>) {
                         tile,
                         Modifier
                             .weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight()
+                            .then(if (tile.arriving) Modifier.tileArrival() else Modifier),
                     )
                 }
                 // An odd last tile keeps half the width instead of stretching across.
@@ -187,11 +238,14 @@ private fun TileGrid(tiles: List<HomeTile>) {
     }
 }
 
-/** The required steps stay on home, in their own card, until gestures can run unattended. */
+/**
+ * The required steps stay on home, in their own card, until gestures can run unattended. While
+ * it folds away it still draws the live list: every step reads Done, and Accessibility is always one.
+ */
 @Composable
-private fun SetupGroup(model: AppModel) {
+private fun SetupGroup(model: AppModel, onOpen: (Screen) -> Unit) {
+    val practice = rememberPracticeEntry(model)
     val checklist = model.checklist
-    if (checklist.essentialsDone) return
     SettingsGroup(
         title = pluralStringResource(
             R.plurals.setup_progress,
@@ -200,6 +254,6 @@ private fun SetupGroup(model: AppModel) {
             checklist.required.size,
         ),
     ) {
-        SetupRows(checklist.required, model)
+        SetupRows(checklist.required, model, onPractise = { onOpen(practice()) })
     }
 }

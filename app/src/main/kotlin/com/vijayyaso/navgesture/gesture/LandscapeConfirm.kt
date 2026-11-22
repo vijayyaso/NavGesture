@@ -119,14 +119,8 @@ class LandscapeConfirm(private val windowMs: Long = ConfirmPill.WINDOW_MS) {
     }
 
     private companion object {
-        /** Corner shortcuts too: a stray corner swipe in a game is as unwanted as Home. */
-        fun isGuarded(action: GestureAction): Boolean =
-            action in GUARDED || action is GestureAction.Corner
-
         // Circle to Search is a still hold rather than a swipe, so it never leaves by accident.
-        val GUARDED = setOf(
-            GestureAction.Home,
-            GestureAction.Recents,
-        )
+        fun isGuarded(action: GestureAction): Boolean =
+            action is GestureAction.Run && action.action.guardedInLandscape
     }
 }

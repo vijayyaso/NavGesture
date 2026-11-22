@@ -17,31 +17,54 @@
 
 package com.vijayyaso.navgesture.gesture
 
-/** Buzzes once per activation. A fire after an arm that ticked is quiet, and a re-arm ticks. */
-class HapticGate {
+/**
+ * Buzzes once per activation on [edge]. A fire after an arm that ticked is quiet, and a re-arm
+ * ticks. Entering a wait gives the overlay's stronger buzz.
+ */
+class HapticGate(private val edge: ScreenEdge) {
 
     private var armTicked = false
 
+    // The wait action was pending, so the move that leaves it stays quiet whatever band it finds.
+    private var waitShown = false
+
     fun reset() {
         armTicked = false
+        waitShown = false
     }
 
     fun shouldTick(action: TrackerAction): Boolean = when (action) {
-        // An arm that schedules a hold stays quiet, so a plain upward swipe buzzes on fire.
-        is TrackerAction.Armed -> (action.scheduleHoldMs == null).also { if (it) armTicked = true }
+        // A bottom arm with the pause poll stays quiet (Home buzzes on fire); a side arm ticks even
+        // while its still clock polls. An arm with nothing to run stays quiet.
+        is TrackerAction.Armed -> {
+            val pausePoll = edge == ScreenEdge.BOTTOM && action.scheduleHoldMs != null
+            (!pausePoll && action.pending != SwipeAction.None).also { if (it) armTicked = true }
+        }
         is TrackerAction.Fire -> {
             val ticked = armTicked
             armTicked = false
             !ticked
         }
-        // POCO's performEnterRecent tick; the Recents release behind it then stays quiet.
-        is TrackerAction.RecentsPrimed -> true.also { armTicked = true }
+        is TrackerAction.Pending -> pendingTicks(action).also { if (it) armTicked = true }
         // The corner ticks where its diagonal lands; the shortcut's release then stays quiet.
         is TrackerAction.CornerReady -> true.also { armTicked = true }
         is TrackerAction.Disarmed -> {
             armTicked = false
+            waitShown = false
             false
         }
         else -> false
+    }
+
+    // POCO's performEnterRecent tick, a tick on entering a long swipe, and the wait's buzz.
+    // Falling back to the short swipe, or leaving a wait, is silent.
+    private fun pendingTicks(action: TrackerAction.Pending): Boolean {
+        val leavingWait = waitShown
+        waitShown = action.kind == SwipeKind.WAIT
+        return when (action.kind) {
+            SwipeKind.PAUSE, SwipeKind.WAIT -> true
+            SwipeKind.LONG -> !leavingWait
+            SwipeKind.SHORT -> false
+        }
     }
 }

@@ -26,7 +26,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.vijayyaso.navgesture.R
 import com.vijayyaso.navgesture.diagnostics.ServiceStatus
@@ -38,7 +40,7 @@ import com.vijayyaso.navgesture.setup.StepState
 import com.vijayyaso.navgesture.setup.TileAddOutcome
 
 @Composable
-internal fun SetupRows(items: List<SetupItem>, model: AppModel) {
+internal fun SetupRows(items: List<SetupItem>, model: AppModel, onPractise: (() -> Unit)? = null) {
     // Outcomes are held rather than their messages, so a locale change re-resolves them.
     var tileOutcome by rememberSaveable(stateSaver = TileOutcomeSaver) {
         mutableStateOf<TileAddOutcome?>(
@@ -70,6 +72,9 @@ internal fun SetupRows(items: List<SetupItem>, model: AppModel) {
                 done = R.string.step_accessibility_done,
                 open = (if (model.status == ServiceStatus.STOPPED) R.string.action_fix else R.string.action_turn_on) to
                     { model.requestAccessibility(context) },
+                // Right after setup: practise on the real edges while the service works.
+                doneAction = onPractise?.let { R.string.practice_now to it }
+                    ?.takeIf { model.status == ServiceStatus.WORKING },
             )
             SetupStep.BATTERY -> StepRow(
                 item = item,
@@ -122,6 +127,7 @@ private fun StepRow(
     onConfirm: ((Boolean) -> Unit)? = null,
     outcome: String? = null,
     open: Pair<Int, () -> Unit>? = null,
+    doneAction: Pair<Int, () -> Unit>? = null,
 ) {
     val supporting = when (item.state) {
         StepState.DONE -> when {
@@ -144,6 +150,7 @@ private fun StepRow(
     }
     val actionable = item.state == StepState.TO_DO || item.state == StepState.UNVERIFIED
     val undoable = item.state == StepState.DONE && confirmed && onConfirm != null
+    val doneButton = doneAction.takeIf { item.state == StepState.DONE }
     InfoRow(
         title = stringResource(title),
         supporting = listOfNotNull(supporting, outcome).joinToString("\n").ifEmpty { null },
@@ -165,6 +172,16 @@ private fun StepRow(
                 {
                     TextButton(onClick = { onConfirm(false) }) {
                         Text(stringResource(R.string.action_undo))
+                    }
+                }
+            }
+            doneButton != null -> {
+                {
+                    FilledTonalButton(
+                        onClick = doneButton.second,
+                        modifier = Modifier.testTag(TestTags.SETUP_PRACTISE),
+                    ) {
+                        Text(stringResource(doneButton.first))
                     }
                 }
             }

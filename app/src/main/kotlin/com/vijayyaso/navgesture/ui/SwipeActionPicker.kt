@@ -19,20 +19,26 @@
 package com.vijayyaso.navgesture.ui
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -40,7 +46,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -48,6 +56,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
@@ -55,17 +64,20 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.vijayyaso.navgesture.R
+import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.gesture.AppListStyle
-import com.vijayyaso.navgesture.gesture.BottomCorner
-import com.vijayyaso.navgesture.gesture.CornerShortcut
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeAction
 import com.vijayyaso.navgesture.service.RuntimeAccess
 import com.vijayyaso.navgesture.service.ShortcutCatalog
 import com.vijayyaso.navgesture.service.ShortcutEntry
@@ -94,17 +106,17 @@ internal fun AppListStyleChoice(selected: AppListStyle, onChange: (AppListStyle)
     }
 }
 
-/** A corner's row on Gesture settings: shows its shortcut and opens the picker page. */
+/** A slot's row: shows its action and opens the picker page. */
 @Composable
-internal fun CornerShortcutRow(
+internal fun SwipeActionRow(
     title: String,
-    shortcut: CornerShortcut,
+    action: SwipeAction,
     tag: String,
     onOpen: () -> Unit,
 ) {
     NavigationRow(
         title = title,
-        supporting = shortcutLabel(shortcut),
+        supporting = shortcutLabel(action),
         tag = tag,
         onClick = onOpen,
     )
@@ -112,28 +124,35 @@ internal fun CornerShortcutRow(
 
 /** The name a shortcut is shown by; an app or app shortcut shows its own name once loaded. */
 @Composable
-internal fun shortcutLabel(shortcut: CornerShortcut): String = when (shortcut) {
-    CornerShortcut.None -> stringResource(R.string.corner_none)
-    CornerShortcut.RecentsList -> stringResource(R.string.corner_recents_list)
-    CornerShortcut.FavouritesList -> stringResource(R.string.corner_favourites_list)
-    CornerShortcut.Notifications -> stringResource(R.string.corner_notifications)
-    CornerShortcut.QuickSettings -> stringResource(R.string.corner_quick_settings)
-    CornerShortcut.Screenshot -> stringResource(R.string.corner_screenshot)
-    CornerShortcut.LockScreen -> stringResource(R.string.corner_lock_screen)
-    CornerShortcut.PowerMenu -> stringResource(R.string.corner_power_menu)
-    CornerShortcut.SplitScreen -> stringResource(R.string.corner_split_screen)
-    is CornerShortcut.OpenApp -> {
-        val apps by rememberLaunchableApps()
-        val label = apps?.firstOrNull { it.packageName == shortcut.packageName }?.label
-            ?: shortcut.packageName
+internal fun shortcutLabel(shortcut: SwipeAction): String = when (shortcut) {
+    SwipeAction.None -> stringResource(R.string.corner_none)
+    SwipeAction.RecentsList -> stringResource(R.string.corner_recents_list)
+    SwipeAction.FavouritesList -> stringResource(R.string.corner_favourites_list)
+    SwipeAction.Notifications -> stringResource(R.string.corner_notifications)
+    SwipeAction.QuickSettings -> stringResource(R.string.corner_quick_settings)
+    SwipeAction.Screenshot -> stringResource(R.string.corner_screenshot)
+    SwipeAction.LockScreen -> stringResource(R.string.corner_lock_screen)
+    SwipeAction.PowerMenu -> stringResource(R.string.corner_power_menu)
+    SwipeAction.SplitScreen -> stringResource(R.string.corner_split_screen)
+    SwipeAction.Back -> stringResource(R.string.gesture_back_name)
+    SwipeAction.Home -> stringResource(R.string.corner_home)
+    SwipeAction.Recents -> stringResource(R.string.corner_recents)
+    SwipeAction.PreviousApp -> stringResource(R.string.corner_previous_app)
+    is SwipeAction.OpenApp -> {
+        val apps by rememberLaunchableApps(waitForScreen = false)
+        // Null while the list loads; a loaded list without the app means it was removed.
+        val loaded = apps ?: return stringResource(R.string.corner_open_named_app, shortcut.packageName)
+        val label = loaded.firstOrNull { it.packageName == shortcut.packageName }?.label
+            ?: return stringResource(R.string.corner_app_missing)
         stringResource(R.string.corner_open_named_app, label)
     }
-    is CornerShortcut.AppShortcut -> appShortcutLabel(shortcut)
+    is SwipeAction.AppShortcut -> appShortcutLabel(shortcut)
+    SwipeAction.Torch -> stringResource(R.string.corner_torch)
 }
 
 /** "App: Shortcut", read off the main thread; says so when the app no longer offers it. */
 @Composable
-private fun appShortcutLabel(shortcut: CornerShortcut.AppShortcut): String {
+private fun appShortcutLabel(shortcut: SwipeAction.AppShortcut): String {
     val context = LocalContext.current
     // Null while loading; an empty list when the app no longer offers the shortcut.
     val names by produceState<List<String>?>(initialValue = null, shortcut.id) {
@@ -153,27 +172,39 @@ private fun appLabel(context: Context, packageName: String): String = runCatchin
 }.getOrDefault(packageName)
 
 /**
- * The picker page for one corner: the fixed choices, then a search box over the apps' own
- * shortcuts and the apps themselves. Picking saves at once and goes back.
+ * The picker page for one slot, a corner or a swipe: the fixed choices, then a search box over
+ * the apps' own shortcuts and the apps themselves. Picking saves at once and goes back.
  */
 @Composable
-internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: () -> Unit) {
-    val current = model.configuration.shortcutFor(corner)
-    val pick: (CornerShortcut) -> Unit = { picked ->
-        model.update {
-            when (corner) {
-                BottomCorner.LEFT -> it.copy(leftCornerShortcut = picked)
-                BottomCorner.RIGHT -> it.copy(rightCornerShortcut = picked)
-            }
-        }
+internal fun SwipeActionPickerScreen(slot: SlotId, model: AppModel, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val current = model.configuration.actionFor(slot)
+    val pick: (SwipeAction) -> Unit = { picked ->
+        model.update { it.withAction(slot, picked) }
         onDone()
     }
 
-    // The fixed choices keep the order of CornerShortcut.fixed, split into three cards.
-    val fixed = CornerShortcut.fixed.groupBy(::fixedSection)
+    // The fixed choices keep the order of SwipeAction.fixed, split into three cards.
+    val unsupported by NavGestureAccessibilityService.unsupported.collectAsState()
+    val fixed = SwipeAction.offered(unsupported, current).groupBy(::fixedSection)
     FixedGroup(null, fixed[FixedSection.NOTHING].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_app_lists), fixed[FixedSection.LISTS].orEmpty(), current, pick)
     FixedGroup(stringResource(R.string.corner_section_phone_actions), fixed[FixedSection.ACTIONS].orEmpty(), current, pick)
+    // Previous app reads the recent apps, so it says what it needs while access is missing.
+    AnimatedVisibility(visible = !model.usageAccess, enter = BlockEnter, exit = BlockExit) {
+        SettingsGroup(title = stringResource(R.string.corner_previous_app)) {
+            InfoRow(
+                title = stringResource(R.string.label_usage_access),
+                supporting = stringResource(R.string.feature_needs_usage_access),
+                supportingTag = TestTags.USAGE_ACCESS,
+                trailing = {
+                    FilledTonalButton(onClick = { openUsageAccess(context) }) {
+                        Text(stringResource(R.string.action_grant_usage_access))
+                    }
+                },
+            )
+        }
+    }
 
     var query by rememberSaveable { mutableStateOf("") }
     SearchField(query, stringResource(R.string.corner_search_apps)) { query = it }
@@ -185,18 +216,18 @@ internal fun CornerPickerScreen(corner: BottomCorner, model: AppModel, onDone: (
 
 private enum class FixedSection { NOTHING, LISTS, ACTIONS }
 
-private fun fixedSection(shortcut: CornerShortcut): FixedSection = when (shortcut) {
-    CornerShortcut.None -> FixedSection.NOTHING
-    CornerShortcut.RecentsList, CornerShortcut.FavouritesList -> FixedSection.LISTS
+private fun fixedSection(shortcut: SwipeAction): FixedSection = when (shortcut) {
+    SwipeAction.None -> FixedSection.NOTHING
+    SwipeAction.RecentsList, SwipeAction.FavouritesList -> FixedSection.LISTS
     else -> FixedSection.ACTIONS
 }
 
 @Composable
 private fun FixedGroup(
     title: String?,
-    choices: List<CornerShortcut>,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    choices: List<SwipeAction>,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     if (choices.isEmpty()) return
     SettingsGroup(title = title) {
@@ -210,17 +241,22 @@ private fun FixedGroup(
     }
 }
 
-private fun fixedIcon(shortcut: CornerShortcut): GroupIcon? = when (shortcut) {
-    CornerShortcut.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
-    CornerShortcut.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
-    CornerShortcut.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)
-    CornerShortcut.Notifications -> GroupIcon(Icons.Filled.Notifications, IconTint.RED)
-    CornerShortcut.QuickSettings -> GroupIcon(Icons.Filled.Settings, IconTint.GREY)
-    CornerShortcut.Screenshot -> GroupIcon(ScreenshotGlyph, IconTint.TEAL)
-    CornerShortcut.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
-    CornerShortcut.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
-    CornerShortcut.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
-    is CornerShortcut.OpenApp, is CornerShortcut.AppShortcut -> null
+internal fun fixedIcon(shortcut: SwipeAction): GroupIcon? = when (shortcut) {
+    SwipeAction.None -> GroupIcon(Icons.Filled.Clear, IconTint.GREY)
+    SwipeAction.RecentsList -> GroupIcon(Icons.AutoMirrored.Filled.List, IconTint.BLUE)
+    SwipeAction.FavouritesList -> GroupIcon(Icons.Filled.Star, IconTint.ORANGE)
+    SwipeAction.Notifications -> GroupIcon(Icons.Filled.Notifications, IconTint.RED)
+    SwipeAction.QuickSettings -> GroupIcon(Icons.Filled.Settings, IconTint.GREY)
+    SwipeAction.Screenshot -> GroupIcon(ScreenshotGlyph, IconTint.TEAL)
+    SwipeAction.LockScreen -> GroupIcon(Icons.Filled.Lock, IconTint.GREY)
+    SwipeAction.PowerMenu -> GroupIcon(PowerGlyph, IconTint.RED)
+    SwipeAction.SplitScreen -> GroupIcon(SplitScreenGlyph, IconTint.PURPLE)
+    SwipeAction.Back -> GroupIcon(Icons.AutoMirrored.Filled.ArrowBack, IconTint.BLUE)
+    SwipeAction.Home -> GroupIcon(Icons.Filled.Home, IconTint.BLUE)
+    SwipeAction.Recents -> GroupIcon(RecentsGlyph, IconTint.BLUE)
+    SwipeAction.PreviousApp -> GroupIcon(Icons.Filled.Refresh, IconTint.BLUE)
+    SwipeAction.Torch -> GroupIcon(TorchGlyph, IconTint.ORANGE)
+    is SwipeAction.OpenApp, is SwipeAction.AppShortcut -> null
 }
 
 /** A row that picks: a check mark marks the current choice, and it reads as a radio button. */
@@ -255,8 +291,8 @@ private class ShortcutPage(val access: RuntimeAccess, val apps: List<AppShortcut
 private fun AppShortcutsGroup(
     apps: List<LaunchableApp>?,
     query: String,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     val context = LocalContext.current
     val iconPx = (40 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
@@ -286,7 +322,7 @@ private fun AppShortcutsGroup(
             ShortcutPage(access, entries)
         }
     }
-    val chosenPackage = (current as? CornerShortcut.AppShortcut)?.packageName
+    val chosenPackage = (current as? SwipeAction.AppShortcut)?.packageName
     // The app holding the current choice starts open (keyed, as the settings load late); a
     // search opens every match, and those can still be closed one by one.
     var open by remember(chosenPackage) { mutableStateOf(setOfNotNull(chosenPackage)) }
@@ -313,25 +349,31 @@ private fun AppShortcutsGroup(
             val name = entry.app.packageName
             val searching = query.isNotEmpty()
             val expanded = if (searching) name !in closedInSearch else name in open
-            // One child per app, so the card draws its lines between apps, not inside one.
-            Column {
-                AppHeaderRow(entry.app, expanded, TestTags.cornerApp(name)) {
-                    if (searching) {
-                        closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
-                    } else {
-                        open = if (name in open) open - name else open + name
+            // Keyed by app and by search, so only a tap on the app animates: starting or ending a
+            // search, or the filter, rebuilds the block in place without motion.
+            key(name, searching) {
+                // One child per app, so the card draws its lines between apps, not inside one.
+                Column {
+                    AppHeaderRow(entry.app, expanded, TestTags.cornerApp(name)) {
+                        if (searching) {
+                            closedInSearch = if (name in closedInSearch) closedInSearch - name else closedInSearch + name
+                        } else {
+                            open = if (name in open) open - name else open + name
+                        }
                     }
-                }
-                if (expanded) {
-                    shown.forEach { (shortcut, icon) ->
-                        PickRow(
-                            title = shortcut.label,
-                            selected = current == CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id),
-                            modifier = Modifier
-                                .padding(start = 40.dp)
-                                .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
-                            leading = { AppIconImage(icon ?: entry.app.icon) },
-                        ) { pick(CornerShortcut.AppShortcut(shortcut.packageName, shortcut.id)) }
+                    AnimatedVisibility(visible = expanded, enter = BlockEnter, exit = BlockExit) {
+                        Column {
+                            shown.forEach { (shortcut, icon) ->
+                                PickRow(
+                                    title = shortcut.label,
+                                    selected = current == SwipeAction.AppShortcut(shortcut.packageName, shortcut.id),
+                                    modifier = Modifier
+                                        .padding(start = 40.dp)
+                                        .testTag(TestTags.cornerShortcut(shortcut.packageName, shortcut.id)),
+                                    leading = { AppIconImage(icon ?: entry.app.icon) },
+                                ) { pick(SwipeAction.AppShortcut(shortcut.packageName, shortcut.id)) }
+                            }
+                        }
                     }
                 }
             }
@@ -343,14 +385,19 @@ private fun AppShortcutsGroup(
 @Composable
 private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, tag: String, onToggle: () -> Unit) {
     val state = stringResource(if (expanded) R.string.corner_expanded else R.string.corner_collapsed)
+    // One arrow that turns to point down. It points to the end side, so right-to-left turns it
+    // the other way round.
+    val down = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
+    val turn by animateFloatAsState(if (expanded) down else 0f, tween(EXPAND_MS, easing = EaseOutStrong))
     ListItem(
         leadingContent = { AppIconImage(app.icon) },
         headlineContent = { Text(app.label) },
         trailingContent = {
             Icon(
-                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.rotate(turn),
             )
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -365,8 +412,8 @@ private fun AppHeaderRow(app: LaunchableApp, expanded: Boolean, tag: String, onT
 private fun OpenAppGroup(
     apps: List<LaunchableApp>?,
     query: String,
-    current: CornerShortcut,
-    pick: (CornerShortcut) -> Unit,
+    current: SwipeAction,
+    pick: (SwipeAction) -> Unit,
 ) {
     SettingsGroup(title = stringResource(R.string.corner_open_app)) {
         if (apps == null) {
@@ -376,15 +423,15 @@ private fun OpenAppGroup(
         apps.filter { query.isEmpty() || it.label.contains(query, ignoreCase = true) }.forEach { app ->
             PickRow(
                 title = app.label,
-                selected = current == CornerShortcut.OpenApp(app.packageName),
+                selected = current == SwipeAction.OpenApp(app.packageName),
                 leading = { AppIconImage(app.icon) },
-            ) { pick(CornerShortcut.OpenApp(app.packageName)) }
+            ) { pick(SwipeAction.OpenApp(app.packageName)) }
         }
     }
 }
 
-// material-icons-core has no screenshot, power or split-screen glyph, so these three are drawn
-// here on the same 24-unit grid. Icon() tints them like any other glyph.
+// material-icons-core has no screenshot, power, split-screen or recents glyph, so these four are
+// drawn here on the same 24-unit grid. Icon() tints them like any other glyph.
 
 private val ScreenshotGlyph: ImageVector = ImageVector.Builder(
     name = "Screenshot",
@@ -433,5 +480,35 @@ private val SplitScreenGlyph: ImageVector = ImageVector.Builder(
     path(fill = SolidColor(Color.Black)) {
         moveTo(5f, 3f); horizontalLineTo(19f); verticalLineTo(11f); horizontalLineTo(5f); close()
         moveTo(5f, 13f); horizontalLineTo(19f); verticalLineTo(21f); horizontalLineTo(5f); close()
+    }
+}.build()
+
+private val TorchGlyph: ImageVector = ImageVector.Builder(
+    name = "Torch",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // A hand torch: a wide head over a narrow handle.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(6f, 2f); horizontalLineTo(18f); verticalLineTo(5f); horizontalLineTo(6f); close()
+        moveTo(6f, 6.5f); horizontalLineTo(18f); lineTo(15f, 10.5f); verticalLineTo(22f)
+        horizontalLineTo(9f); verticalLineTo(10.5f); close()
+    }
+}.build()
+
+private val RecentsGlyph: ImageVector = ImageVector.Builder(
+    name = "Recents",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f,
+).apply {
+    // Two cards, one behind the other, as the phone's Recents button draws them.
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(8f, 7f); horizontalLineTo(20f); verticalLineTo(21f); horizontalLineTo(8f); close()
+        moveTo(4f, 3f); horizontalLineTo(16f); verticalLineTo(5f); horizontalLineTo(6f)
+        verticalLineTo(17f); horizontalLineTo(4f); close()
     }
 }.build()

@@ -104,12 +104,12 @@ class EdgeSwitcherGestureTest {
         t.onDown(sample())
         // A left-right wobble while rising. The last move passes 40 dp sideways but the
         // rise is far bigger, so it is a swipe up, not a sideways drag.
-        assertEquals(TrackerAction.Armed(scheduleHoldMs = 16L), t.onMove(sample(x = 600f, y = 2245f, t = 50L)))
+        assertEquals(TrackerAction.Armed(scheduleHoldMs = 16L, pending = SwipeAction.Home), t.onMove(sample(x = 600f, y = 2245f, t = 50L)))
         assertEquals(TrackerAction.None, t.onMove(sample(x = 470f, y = 2145f, t = 100L)))
         assertEquals(TrackerAction.None, t.onMove(sample(x = 670f, y = 2095f, t = 150L)))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(500L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(500L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(x = 670f, y = 2095f, t = 600L)),
         )
     }
@@ -129,9 +129,9 @@ class EdgeSwitcherGestureTest {
         t.onDown(sample())
         t.onMove(sample(y = 2295f, t = 50L))
         t.onMove(sample(y = 2095f, t = 100L))
-        assertEquals(TrackerAction.RecentsPrimed, t.onHoldElapsed(400L))
+        assertEquals(RECENTS_PENDING, t.onHoldElapsed(400L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Recents, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(RECENTS_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(y = 2095f, t = 500L)),
         )
     }
@@ -165,7 +165,7 @@ class EdgeSwitcherGestureTest {
         t.onDown(TouchSample(1078f, 1200f, 0L))
         t.onMove(TouchSample(978f, 1200f, 80L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Back, ScreenEdge.RIGHT),
+            TrackerAction.Fire(backRun(ScreenEdge.RIGHT), ScreenEdge.RIGHT),
             t.onUp(TouchSample(978f, 1200f, 120L)),
         )
     }
@@ -175,7 +175,7 @@ class EdgeSwitcherGestureTest {
         t.onDown(sample())
         t.onMove(sample(y = 2295f, t = 50L))
         assertEquals(
-            TrackerAction.Fire(GestureAction.Home, ScreenEdge.BOTTOM),
+            TrackerAction.Fire(HOME_RUN, ScreenEdge.BOTTOM),
             t.onUp(sample(y = 2295f, t = 70L)),
         )
     }

@@ -38,8 +38,12 @@ import com.vijayyaso.navgesture.gesture.RecentApps
  */
 class AppSwitcher(internal val context: Context) {
 
-    /** Launches a selected app and reports failures to the diagnostics panel. */
+    /**
+     * Launches a selected app and reports failures to the diagnostics panel. This is the only way
+     * an app is started, so the practice backstop sits here.
+     */
     fun launch(packageName: String): Boolean {
+        if (PracticeSession.blocks("launch", packageName)) return false
         return runCatching {
             val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (intent == null) {
@@ -57,6 +61,7 @@ class AppSwitcher(internal val context: Context) {
             Log.w(TAG, "startActivity($packageName) threw", throwable)
         }.onSuccess {
             lastFailure = null
+            Log.i(TAG, "ACTION_PERFORMED launch $packageName")
         }.isSuccess
     }
 

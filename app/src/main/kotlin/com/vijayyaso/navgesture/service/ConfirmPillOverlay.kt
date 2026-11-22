@@ -50,6 +50,9 @@ internal class ConfirmPillOverlay(
 
     private var fade: ValueAnimator? = null
 
+    // Whether the pill was asked to be up, which its first frame's drawing does not show yet.
+    private var shown = false
+
     fun install() {
         val outlinePx = OUTLINE_DP * geometry.density
         val params = WindowManager.LayoutParams(
@@ -79,15 +82,24 @@ internal class ConfirmPillOverlay(
         attached = false
     }
 
-    fun show() {
-        fade?.cancel()
+    /** [fade] is off for a pill put back after its window was rebuilt: it was already up. */
+    fun show(fade: Boolean = true) {
+        this.fade?.cancel()
         view.dark = isNightMode()
         setWindowVisible(true)
-        animateTo(1f, FADE_IN_MS)
+        shown = true
+        if (fade) {
+            animateTo(1f, FADE_IN_MS)
+        } else {
+            this.fade = null
+            view.fraction = 1f
+        }
     }
 
     fun fadeOut() {
-        if (!attached || view.fraction == 0f) return
+        // By what was asked, not by what is drawn: a pill still at zero in its first frame goes too.
+        if (!attached || !shown) return
+        shown = false
         animateTo(0f, FADE_OUT_MS)
     }
 
@@ -95,6 +107,7 @@ internal class ConfirmPillOverlay(
     fun hide() {
         fade?.cancel()
         fade = null
+        shown = false
         view.fraction = 0f
         setWindowVisible(false)
     }

@@ -19,6 +19,7 @@
 package com.vijayyaso.navgesture.gesture
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,5 +123,85 @@ class FluidBubbleTest {
         spring.target = 100f
         spring.step(5_000L)
         assertTrue(spring.value in 0f..100.5f)
+    }
+
+    @Test
+    fun `the icon fade is not called settled until it has all but arrived`() {
+        val alpha = BubbleSpring(BubbleSpring.ICON_TENSION, BubbleSpring.ICON_FRICTION, BubbleSpring.SETTLED_ALPHA)
+        alpha.snap(0f)
+        alpha.target = 1f
+        var steps = 0
+        while (!alpha.settled && steps < 1000) {
+            alpha.step(4)
+            steps++
+        }
+        assertTrue("the fade ended at ${alpha.value}", alpha.value > 0.98f)
+    }
+
+    @Test
+    fun `a step in nanoseconds moves as far as the same step in milliseconds`() {
+        val byMs = BubbleSpring().apply { target = 100f }
+        val byNanos = BubbleSpring().apply { target = 100f }
+        repeat(30) {
+            byMs.step(8)
+            byNanos.stepNanos(8_000_000L)
+        }
+        assertEquals(byMs.value, byNanos.value, 0.0001f)
+    }
+
+    @Test
+    fun `a frame time before the start counts as no time passed`() {
+        val spring = BubbleSpring().apply { target = 100f }
+        spring.stepNanos(-5_000_000L)
+        assertEquals(0f, spring.value, 0f)
+    }
+
+    @Test
+    fun `an animated drop rises on its springs and is waited for on release`() {
+        val motion = BubbleMotion()
+        motion.start(200f, animate = true)
+        motion.moveTo(260f, 80f)
+        assertEquals(0f, motion.rise.value, 0f)
+        repeat(200) { motion.stepNanos(8_333_333L) }
+        assertEquals(80f, motion.rise.value, 0.5f)
+        assertEquals(260f, motion.along.value, 0.5f)
+        assertTrue(motion.release())
+        assertFalse(motion.settled)
+        repeat(200) { motion.stepNanos(8_333_333L) }
+        assertTrue(motion.settled)
+        assertEquals(0f, motion.rise.value, 0.5f)
+    }
+
+    @Test
+    fun `with animations removed the drop sits under the finger with nothing left to settle`() {
+        val motion = BubbleMotion()
+        motion.start(200f, animate = false)
+        assertEquals(1f, motion.iconAlpha.value, 0f)
+        motion.moveTo(260f, 80f)
+        assertEquals(80f, motion.rise.value, 0f)
+        assertEquals(260f, motion.along.value, 0f)
+        assertEquals(260f, motion.baseAlong.value, 0f)
+        assertTrue(motion.settled)
+    }
+
+    @Test
+    fun `with animations removed a release is gone at once and nothing is waited for`() {
+        val motion = BubbleMotion()
+        motion.start(200f, animate = false)
+        motion.moveTo(260f, 80f)
+        assertFalse(motion.release())
+        assertEquals(0f, motion.rise.value, 0f)
+        assertEquals(0f, motion.iconAlpha.value, 0f)
+        assertTrue(motion.settled)
+    }
+
+    @Test
+    fun `the setting is read again for the next touch`() {
+        val motion = BubbleMotion()
+        motion.start(200f, animate = false)
+        motion.start(200f, animate = true)
+        motion.moveTo(200f, 80f)
+        assertEquals(0f, motion.rise.value, 0f)
+        assertFalse(motion.settled)
     }
 }

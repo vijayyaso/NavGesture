@@ -30,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.vijayyaso.navgesture.demo.DemoStep
 import com.vijayyaso.navgesture.diagnostics.Diagnostics
 import com.vijayyaso.navgesture.diagnostics.DiagnosticsCollector
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
@@ -42,6 +43,7 @@ import com.vijayyaso.navgesture.navigation.NavigationIntegrationFactory
 import com.vijayyaso.navgesture.navigation.NavigationMode
 import com.vijayyaso.navgesture.service.NavGestureAccessibilityService
 import com.vijayyaso.navgesture.settings.GestureSettingsRepository
+import com.vijayyaso.navgesture.settings.debugOverride
 import com.vijayyaso.navgesture.setup.ServiceKeeper
 import com.vijayyaso.navgesture.setup.SetupChecklist
 import com.vijayyaso.navgesture.setup.SetupFacts
@@ -52,6 +54,7 @@ import com.vijayyaso.navgesture.setup.TileTap
 import com.vijayyaso.navgesture.setup.setupState
 import com.vijayyaso.navgesture.setup.tileTap
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -74,6 +77,10 @@ internal class AppModel(
         private set
     var record by mutableStateOf(SetupRecord())
         private set
+
+    /** False until the saved record is read; before that, steps confirmed by hand look undone. */
+    var recordLoaded by mutableStateOf(false)
+        private set
     var diagnostics: Diagnostics by mutableStateOf(DiagnosticsCollector.collect(context))
         private set
     var usageAccess by mutableStateOf(hasUsageAccess(context))
@@ -86,6 +93,22 @@ internal class AppModel(
 
     /** Set by a Turn on tap without consent; the screen stack shows the disclosure and clears it. */
     var disclosureRequested by mutableStateOf(false)
+
+    /**
+     * Set by the own-Back snackbar's "Try again". The screen stack opens practice from whatever
+     * is on top, as it does for [disclosureRequested], and clears it.
+     */
+    var practiceRequested by mutableStateOf(false)
+
+    /**
+     * One-shot: the step the live practice page hands to the drawn demo when it hands off. The
+     * drawn demo reads it once to start there, then clears it.
+     */
+    var demoStartStep by mutableStateOf<DemoStep?>(null)
+
+    /** Where a Home switch tap put the switch while its request is in flight; null otherwise. */
+    var pendingSwitch by mutableStateOf<Boolean?>(null)
+        private set
 
     val status: ServiceStatus get() = diagnostics.serviceStatus
 
@@ -120,6 +143,7 @@ internal class AppModel(
         collecting?.cancel()
         collecting = scope.launch {
             diagnostics = withContext(Dispatchers.IO) { DiagnosticsCollector.collect(context) }
+            pendingSwitch = pendingAfterRefresh(pendingSwitch, working = status == ServiceStatus.WORKING)
             if (status != ServiceStatus.OFF && !record.serviceEverEnabled) {
                 setFlag(SetupFlag.SERVICE_EVER_ENABLED, true)
             }
@@ -147,25 +171,65 @@ internal class AppModel(
      * On follows the tile's rules: one tap with the adb grant, else the Accessibility screen.
      */
     fun switchService(context: Context, on: Boolean) {
-        if (!on) {
-            scope.launch {
-                withContext(Dispatchers.IO) { ServiceKeeper.turnOff(this@AppModel.context, "Home switch") }
-                delay(SWITCH_SETTLE_MS)
-                refresh()
-            }
+        // The switch is disabled while a request is in flight; this also stops a tap already queued.
+        if (pendingSwitch != null) return
+        val inFlight = switchSendsRequest(on) {
+            val canTurnOn = ServiceKeeper.canTurnOn(context) &&
+                !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)
+            val tap = tileTap(serviceEnabled = false, record.disclosureAccepted, canTurnOn)
+            tap == TileTap.TURN_ON && ServiceKeeper.turnOn(context)
+        }
+        if (!inFlight) {
+            requestAccessibility(context)
             return
         }
-        val canTurnOn = ServiceKeeper.canTurnOn(context) &&
-            !DiagnosticsCollector.isAccessibilityServiceSwitchedOn(context)
-        val tap = tileTap(serviceEnabled = false, record.disclosureAccepted, canTurnOn)
-        if (tap == TileTap.TURN_ON && ServiceKeeper.turnOn(context)) {
-            scope.launch(Dispatchers.IO) { ServiceLog.add(this@AppModel.context, "Home switch: turned on") }
-        } else {
-            requestAccessibility(context)
+        // Undispatched, so the thumb holds the tap from this very frame.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            runSwitchRequest(
+                target = on,
+                setPending = { pendingSwitch = it },
+                request = {
+                    withContext(Dispatchers.IO) {
+                        if (on) {
+                            ServiceLog.add(this@AppModel.context, "Home switch: turned on")
+                        } else {
+                            ServiceKeeper.turnOff(this@AppModel.context, "Home switch")
+                        }
+                    }
+                },
+                settle = {
+                    delay(SWITCH_SETTLE_MS)
+                    refreshAndWait()
+                },
+            )
+        }
+    }
+
+    /** A newer refresh cancels an older one, so this waits for whichever one is the latest. */
+    private suspend fun refreshAndWait() {
+        refresh()
+        while (true) {
+            val job = collecting ?: return
+            job.join()
+            if (job === collecting) return
         }
     }
 
     fun acceptDisclosure() = setFlag(SetupFlag.DISCLOSURE_ACCEPTED, true)
+
+    /** A snackbar with one action, which [onAction] runs if the user taps it. */
+    fun showMessage(text: String, actionLabel: String, onAction: () -> Unit) {
+        scope.launch {
+            val result = snackbar.showSnackbar(text, actionLabel = actionLabel, withDismissAction = true)
+            if (result == SnackbarResult.ActionPerformed) onAction()
+        }
+    }
+
+    /**
+     * Debug builds only: `navgesture_force_drawn_demo` = 1 makes "Try the gestures" open the drawn
+     * demo even with the service working. Read on each call, so a change needs no rebind.
+     */
+    fun forcesDrawnDemo(): Boolean = debugOverride(context, FORCE_DRAWN_DEMO_OVERRIDE) == "1"
 
     fun setFlag(flag: SetupFlag, value: Boolean) {
         scope.launch { setupState.set(flag, value) }
@@ -183,7 +247,12 @@ internal class AppModel(
 
     internal suspend fun observe() {
         scope.launch { settings.configuration.collect { configuration = it } }
-        scope.launch { setupState.record.collect { record = it } }
+        scope.launch {
+            setupState.record.collect {
+                record = it
+                recordLoaded = true
+            }
+        }
         // UiAutomation, which uiautomator and screen readers use, unbinds the service for a moment.
         // So a stop shows only once it outlasts that, and a return shows at once.
         NavGestureAccessibilityService.running.collectLatest { running ->
@@ -197,6 +266,9 @@ private const val STOP_GRACE_MS = 3_000L
 
 /** The service takes itself down about half a second after a switch-off. */
 private const val SWITCH_SETTLE_MS = 800L
+
+/** The debug override that keeps the drawn demo with the service on; the `demo` suite sets it. */
+private const val FORCE_DRAWN_DEMO_OVERRIDE = "navgesture_force_drawn_demo"
 
 @Composable
 internal fun rememberAppModel(): AppModel {

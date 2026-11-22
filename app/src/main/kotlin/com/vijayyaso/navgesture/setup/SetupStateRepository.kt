@@ -33,6 +33,8 @@ data class SetupRecord(
     val autostartConfirmed: Boolean = false,
     /** The user tapped Agree on the Accessibility disclosure, which Google Play requires. */
     val disclosureAccepted: Boolean = false,
+    /** The practice demo opened by itself once, so it never does again. */
+    val demoSeen: Boolean = false,
 )
 
 enum class SetupFlag(internal val key: Preferences.Key<Boolean>) {
@@ -42,6 +44,7 @@ enum class SetupFlag(internal val key: Preferences.Key<Boolean>) {
     BATTERY_CONFIRMED(booleanPreferencesKey("battery_confirmed")),
     AUTOSTART_CONFIRMED(booleanPreferencesKey("autostart_confirmed")),
     DISCLOSURE_ACCEPTED(booleanPreferencesKey("disclosure_accepted")),
+    DEMO_SEEN(booleanPreferencesKey("demo_seen")),
 }
 
 class SetupStateRepository(private val store: DataStore<Preferences>) {
@@ -55,6 +58,7 @@ class SetupStateRepository(private val store: DataStore<Preferences>) {
             batteryConfirmed = flag(SetupFlag.BATTERY_CONFIRMED),
             autostartConfirmed = flag(SetupFlag.AUTOSTART_CONFIRMED),
             disclosureAccepted = flag(SetupFlag.DISCLOSURE_ACCEPTED),
+            demoSeen = flag(SetupFlag.DEMO_SEEN),
         )
     }
 

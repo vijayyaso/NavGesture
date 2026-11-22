@@ -109,7 +109,7 @@ class LandscapeConfirmTest {
 
         fun sideBack() {
             confirm.onDown(ScreenEdge.LEFT, time)
-            feed(TrackerAction.Fire(GestureAction.Back, ScreenEdge.LEFT))
+            feed(TrackerAction.Fire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT))
             confirm.onStreamEnd(ScreenEdge.LEFT, time)
         }
     }
@@ -120,12 +120,12 @@ class LandscapeConfirmTest {
         screen.swipeUp()
         screen.pause(300L)
         screen.sideBack()
-        assertEquals(listOf(GestureAction.Back), screen.performed)
+        assertEquals(listOf(backRun(ScreenEdge.LEFT)), screen.performed)
         assertFalse(screen.confirm.pillShown)
         screen.pause(300L)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Back), screen.performed)
-        assertEquals(listOf(GestureAction.Home, GestureAction.Home), screen.pills)
+        assertEquals(listOf(backRun(ScreenEdge.LEFT)), screen.performed)
+        assertEquals(listOf(HOME_RUN, HOME_RUN), screen.pills)
     }
 
     @Test
@@ -139,14 +139,14 @@ class LandscapeConfirmTest {
         screen.pause(300L)
         screen.swipeUp()
         assertEquals(listOf(GestureAction.CircleToSearch), screen.performed)
-        assertEquals(listOf(GestureAction.Home, GestureAction.Home), screen.pills)
+        assertEquals(listOf(HOME_RUN, HOME_RUN), screen.pills)
     }
 
     @Test
     fun `a first swipe up in landscape shows the pill and goes nowhere`() {
         val screen = Screen()
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.pills)
+        assertEquals(listOf(HOME_RUN), screen.pills)
         assertTrue(screen.performed.isEmpty())
         assertTrue(screen.confirm.pillShown)
     }
@@ -157,7 +157,7 @@ class LandscapeConfirmTest {
         screen.swipeUp()
         screen.pause(1_000L)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
         assertFalse(screen.confirm.pillShown)
     }
 
@@ -178,7 +178,7 @@ class LandscapeConfirmTest {
         screen.swipeUp()
         screen.time += ConfirmPill.WINDOW_MS - 10L
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
     }
 
     @Test
@@ -187,14 +187,14 @@ class LandscapeConfirmTest {
         screen.swipeUp()
         screen.pause(500L)
         screen.swipeUpAndHold()
-        assertEquals(listOf(GestureAction.Recents), screen.performed)
+        assertEquals(listOf(RECENTS_RUN), screen.performed)
     }
 
     @Test
     fun `a first swipe and hold is held back like a swipe`() {
         val screen = Screen()
         screen.swipeUpAndHold()
-        assertEquals(listOf(GestureAction.Recents), screen.pills)
+        assertEquals(listOf(RECENTS_RUN), screen.pills)
         assertTrue(screen.performed.isEmpty())
     }
 
@@ -202,7 +202,7 @@ class LandscapeConfirmTest {
     fun `portrait goes Home on the first swipe`() {
         val screen = Screen(landscape = false)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
         assertTrue(screen.pills.isEmpty())
     }
 
@@ -210,7 +210,7 @@ class LandscapeConfirmTest {
     fun `with the setting off landscape goes Home on the first swipe`() {
         val screen = Screen(GestureConfiguration(landscapeConfirmEnabled = false))
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
         assertTrue(screen.pills.isEmpty())
     }
 
@@ -229,7 +229,7 @@ class LandscapeConfirmTest {
         screen.confirm.configure(enabled = true, landscape = false)
         assertFalse(screen.confirm.pillShown)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
     }
 
     @Test
@@ -238,8 +238,8 @@ class LandscapeConfirmTest {
         screen.swipeUp()
         screen.confirm.configure(enabled = true, landscape = true)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
-        assertEquals(listOf(GestureAction.Home), screen.pills)
+        assertEquals(listOf(HOME_RUN), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.pills)
     }
 
     @Test
@@ -249,7 +249,7 @@ class LandscapeConfirmTest {
         screen.confirm.configure(enabled = true, landscape = true)
         assertTrue(screen.confirm.pillShown)
         screen.swipeUp()
-        assertEquals(listOf(GestureAction.Home), screen.performed)
+        assertEquals(listOf(HOME_RUN), screen.performed)
     }
 
     @Test
@@ -271,21 +271,21 @@ class LandscapeConfirmTest {
     @Test
     fun `a confirming touch still down keeps the pill past its expiry`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         confirm.expire(ConfirmPill.WINDOW_MS + 500L)
         assertTrue(confirm.pillShown)
         assertEquals(
             ConfirmVerdict.Perform,
-            confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, ConfirmPill.WINDOW_MS + 600L),
+            confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, ConfirmPill.WINDOW_MS + 600L),
         )
     }
 
     @Test
     fun `Back and Circle to Search are never held back`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        assertEquals(ConfirmVerdict.Perform, confirm.onFire(GestureAction.Back, ScreenEdge.LEFT, 0L))
-        assertEquals(ConfirmVerdict.Perform, confirm.onFire(GestureAction.Back, ScreenEdge.RIGHT, 0L))
+        assertEquals(ConfirmVerdict.Perform, confirm.onFire(backRun(ScreenEdge.LEFT), ScreenEdge.LEFT, 0L))
+        assertEquals(ConfirmVerdict.Perform, confirm.onFire(backRun(ScreenEdge.RIGHT), ScreenEdge.RIGHT, 0L))
         assertEquals(
             ConfirmVerdict.Perform,
             confirm.onFire(GestureAction.CircleToSearch, ScreenEdge.BOTTOM, 0L),
@@ -296,12 +296,12 @@ class LandscapeConfirmTest {
     @Test
     fun `a touch on a side edge does not confirm a bottom swipe`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.LEFT, 100L)
         confirm.onStreamEnd(ScreenEdge.LEFT, 200L)
         assertTrue(confirm.pillShown)
         confirm.onDown(ScreenEdge.BOTTOM, 300L)
-        assertEquals(ConfirmVerdict.Perform, confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 400L))
+        assertEquals(ConfirmVerdict.Perform, confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 400L))
     }
 
     @Test
@@ -309,7 +309,7 @@ class LandscapeConfirmTest {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
         assertEquals(
             ConfirmVerdict.ShowPill(1_000L + ConfirmPill.WINDOW_MS),
-            confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 1_000L),
+            confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 1_000L),
         )
         confirm.expire(1_000L + ConfirmPill.WINDOW_MS - 1L)
         assertTrue(confirm.pillShown)
@@ -327,7 +327,7 @@ class LandscapeConfirmTest {
     fun `a corner shortcut in landscape waits for a second swipe like Home`() {
         val confirm = LandscapeConfirm()
         confirm.configure(enabled = true, landscape = true)
-        val corner = GestureAction.Corner(BottomCorner.LEFT)
+        val corner = cornerRun(BottomCorner.LEFT, SwipeAction.Notifications)
         confirm.onDown(ScreenEdge.BOTTOM, 0L)
         assertTrue(confirm.onFire(corner, ScreenEdge.BOTTOM, 10L) is ConfirmVerdict.ShowPill)
         confirm.onStreamEnd(ScreenEdge.BOTTOM, 20L)
@@ -339,14 +339,14 @@ class LandscapeConfirmTest {
     fun `a pill with no touch down asks to wake at its expiry`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
         assertEquals(null, confirm.wakeAtMs)
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 1_000L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 1_000L)
         assertEquals(1_000L + ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
     }
 
     @Test
     fun `a confirming touch held past the expiry asks for no wake-up`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         assertEquals(null, confirm.wakeAtMs)
         confirm.expire(ConfirmPill.WINDOW_MS + 500L)
@@ -357,7 +357,7 @@ class LandscapeConfirmTest {
     @Test
     fun `ending a confirming touch after the expiry drops the pill`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         confirm.onStreamEnd(ScreenEdge.BOTTOM, ConfirmPill.WINDOW_MS + 800L)
         assertFalse(confirm.pillShown)
@@ -367,30 +367,30 @@ class LandscapeConfirmTest {
     @Test
     fun `a lost confirming touch hands the pill back to its timer`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         confirm.onTouchLost()
         assertEquals(ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
         confirm.expire(ConfirmPill.WINDOW_MS + 500L)
         assertFalse(confirm.pillShown)
         confirm.onDown(ScreenEdge.BOTTOM, 10_000L)
-        assertTrue(confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 10_100L) is ConfirmVerdict.ShowPill)
+        assertTrue(confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 10_100L) is ConfirmVerdict.ShowPill)
     }
 
     @Test
     fun `a bottom touch whose end never came does not confirm a much later swipe`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         confirm.onDown(ScreenEdge.BOTTOM, 60_000L)
         assertFalse(confirm.pillShown)
-        assertTrue(confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 60_100L) is ConfirmVerdict.ShowPill)
+        assertTrue(confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 60_100L) is ConfirmVerdict.ShowPill)
     }
 
     @Test
     fun `a side touch starting ends the confirmation of the bottom touch`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         confirm.onDown(ScreenEdge.LEFT, 200L)
         assertEquals(ConfirmPill.WINDOW_MS, confirm.wakeAtMs)
@@ -432,7 +432,7 @@ class LandscapeConfirmTest {
     @Test
     fun `an open app list held past the window asks for no wake-up`() {
         val confirm = LandscapeConfirm().apply { configure(enabled = true, landscape = true) }
-        confirm.onFire(GestureAction.Home, ScreenEdge.BOTTOM, 0L)
+        confirm.onFire(HOME_RUN, ScreenEdge.BOTTOM, 0L)
         confirm.onDown(ScreenEdge.BOTTOM, 100L)
         assertEquals(ConfirmVerdict.Perform, confirm.onOpenList(ScreenEdge.BOTTOM, 200L))
         confirm.expire(ConfirmPill.WINDOW_MS + 5_000L)

@@ -133,6 +133,7 @@ internal fun SearchField(query: String, placeholder: String, tag: String? = null
  * Rows grouped in one white rounded card, with an optional grey title above it and an optional
  * grey footer under it. A thin line separates each child from the next, so a block made of
  * several composables that belong together must be passed as one child (wrap it in a Column).
+ * An AnimatedVisibility is one child; a group that can vanish whole is wrapped from outside.
  */
 @Composable
 internal fun SettingsGroup(
@@ -182,16 +183,32 @@ private fun DividedCard(content: @Composable () -> Unit) {
         val height = placeables.sumOf { it.height }
         layout(constraints.maxWidth, height) {
             var y = 0
-            val found = ArrayList<Int>(placeables.size)
-            placeables.forEachIndexed { index, placeable ->
+            placeables.forEach { placeable ->
                 placeable.placeRelative(0, y)
                 y += placeable.height
-                if (index < placeables.lastIndex && placeable.height > 0) found += y
             }
-            val updated = found.toIntArray()
+            val updated = dividerEdges(placeables.map { it.height })
             if (!updated.contentEquals(edges)) edges = updated
         }
     }
+}
+
+/**
+ * Where the card's lines go: above each child with height, when one with height sits above it.
+ * So a block folded to nothing draws no line, even while it is still a child.
+ */
+internal fun dividerEdges(heights: List<Int>): IntArray {
+    val found = ArrayList<Int>(heights.size)
+    var y = 0
+    var anyAbove = false
+    heights.forEach { height ->
+        if (height > 0) {
+            if (anyAbove) found += y
+            anyAbove = true
+        }
+        y += height
+    }
+    return found.toIntArray()
 }
 
 /** A glyph and the colour of the square it sits on. */
@@ -220,6 +237,8 @@ internal data class HomeTile(
     val icon: GroupIcon,
     val tag: String,
     val toggle: TileToggle? = null,
+    // True for a tile that came in while this screen was open, so it grows in instead of popping.
+    val arriving: Boolean = false,
     val onOpen: () -> Unit,
 )
 
@@ -449,6 +468,7 @@ internal fun ThresholdSlider(
     range: ClosedFloatingPointRange<Float>,
     formatter: @Composable (Int) -> String,
     supporting: String? = null,
+    tag: String? = null,
     onCommit: (Float) -> Unit,
 ) {
     var dragging by remember { mutableStateOf(false) }
@@ -479,7 +499,9 @@ internal fun ThresholdSlider(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        // On the Slider itself: a layout-only node never reaches uiautomator.
         Slider(
+            modifier = Modifier.tagged(tag),
             value = local,
             valueRange = range,
             onValueChange = {
@@ -494,10 +516,11 @@ internal fun ThresholdSlider(
     }
 }
 
+/** A feature's last failure, in its own card. Draws nothing while there is none. */
 @Composable
 internal fun LastProblem(failure: String?) {
-    ValueRow(
-        label = stringResource(R.string.label_last_problem),
-        value = failure ?: stringResource(R.string.diag_none),
-    )
+    if (failure == null) return
+    SettingsGroup {
+        ValueRow(label = stringResource(R.string.label_last_problem), value = failure)
+    }
 }

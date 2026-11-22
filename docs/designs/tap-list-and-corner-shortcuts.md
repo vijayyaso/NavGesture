@@ -66,7 +66,9 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     inside a 45° cone. Then, while still rising, a MOVE whose sideways
     travel from DOWN is ≥ 40 dp and larger than the rise opens the list: a
     drag to the right opens recent apps, a drag to the left opens
-    favourites. When "Bottom app switcher" is on, arming gives one light
+    favourites. The "Swap the two lists" switch on App switching
+    (`swapAppLists`, off by default) trades the two sides; the corner
+    shortcuts name their list and are not affected. When "Bottom app switcher" is on, arming gives one light
     tick to say that a sideways drag can now open the list; when it is off
     there is no arm tick. Before arming, a stream older than 1000 ms is
     given up (`maximumArmDurationMs`).
@@ -110,7 +112,19 @@ Three changes to the bottom edge, from the owner's request of 2026-11-09:
     "No recent apps".
 *   **Smooth row.** The panel animates a float position toward the step count
     (`ValueAnimator`, 160 ms, `DecelerateInterpolator`, a new target restarts
-    from the current value). Slot pitch stays 56 dp, at most 6 slots.
+    from the current value). Slot pitch stays 56 dp, at most 6 slots. A move
+    of the finger that changes neither the step nor the selection draws
+    nothing.
+*   **The drop on open.** When the list opens, the drop under the finger
+    sinks back into its edge on its springs (about 0.2 s) and its window
+    hides when it has settled. No touch is replayed after a list open, so
+    the window does not need to vanish at once.
+*   **Remove animations.** The row slide and the pill fades are
+    `ValueAnimator`s, so they follow the phone's animator duration scale
+    without extra code. The drop is stepped by hand, so it reads
+    `ValueAnimator.areAnimatorsEnabled()` at each touch-down
+    (`BubbleMotion.start`): with animations removed it sits exactly under
+    the finger, shows its icon at once, and is gone the moment it is let go.
     *   **Fits** (apps ≤ slots): the row stands still and the highlight slides.
     *   **Ring** (more apps): the apps form a ring, the highlight is fixed in the centre slot, and the
         ring position is the unbounded step count, so a loop keeps moving the
@@ -204,12 +218,12 @@ of the screen, minus 4 dp, kept between 12 and 32 dp
     `CornerReady(corner)`: one haptic tick, the bubble released. A diagonal
     that arms Home before it reaches the corner trigger also gives the arm
     tick when "Bottom app switcher" is on (see App-list trigger), so two
-    light ticks are possible. The release returns `Fire(GestureAction.Corner(side))`, id
+    light ticks are possible. The release returns `Fire(GestureAction.Run(side))`, id
     `CornerLEFT` or `CornerRIGHT`. The overlay posts the shortcut **80 ms**
     later, after the strips' return to visible has settled (the launch rule
     needs a visible overlay) and the bubble is gone (screenshot). CANCEL or a
     second finger drops it.
-*   **Choices** (`CornerShortcut`, stored as its id string):
+*   **Choices** (`SwipeAction`, stored as its id string):
 
     | Id | Does |
     | --- | --- |
@@ -226,10 +240,10 @@ of the screen, minus 4 dp, kept between 12 and 32 dp
 
     `decode()` maps null, empty, unknown and `app:` with no package to
     `none`. All constants are at or below `minSdk` 30; lint `NewApi` passes.
-*   **One runner.** `EdgeTouchOverlay.runCorner()` reads the corner's current
+*   **One runner.** `EdgeTouchOverlay` reads the corner's current
     shortcut: the two list choices go to `EdgeSwitcherController.openForTouch`
     (which runs its own list lookup, the same code as the drag list), every
-    other choice to `GestureActionPerformer.performShortcut`, which reuses
+    other choice to `GestureActionPerformer.perform`, which reuses
     the existing failure recording (`lastFailure`, diagnostics panel).
 *   The list shortcuts work even when "Bottom app switcher" is off; the panel
     is then built for them alone.
@@ -265,7 +279,8 @@ the screen that asks for a second swipe.
     ends without doing either (a cancel, a second finger, a swipe pulled
     back before it fired) drops it only if the 2 s have passed. Inside the
     2 s the pill stays and the original window runs on; no new 2 s start.
-    A rotation drops the pill.
+    A rotation drops the pill. A pill put back after the overlays were
+    rebuilt in the same orientation shows at once, with no second fade-in.
 
 ### Settings
 
@@ -329,7 +344,7 @@ action and works with the app list off.
     grid), `CornerGestureTest` (16 cases: both corners, slow past 1000 ms,
     batched DOWN/UP, steep, flat, 30–75° bounds, short, zone edge, centre,
     `none`, no width, cancel, beats the app list, haptics),
-    `CornerShortcutTest`, `LandscapeConfirmTest` (corner guarded; the app
+    `SwipeActionTest`, `LandscapeConfirmTest` (corner guarded; the app
     list held back, confirmed, and confirmed by a pill a Home swipe raised;
     the pill shown again after the window; portrait and setting-off open at
     once; no timer under a held confirming touch; a confirming touch whose
@@ -351,3 +366,6 @@ action and works with the app list off.
     screenshot without the bubble, the cancel distance near the bottom edge
     (the 4 dp margin), the arm tick and the "held back" buzz, the landscape
     app list.
+
+See `swipe-actions.md` for the full `SwipeAction` list and the single
+`perform(SwipeAction)` runner.

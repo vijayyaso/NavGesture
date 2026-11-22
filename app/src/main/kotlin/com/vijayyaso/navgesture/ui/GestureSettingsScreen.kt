@@ -17,6 +17,8 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,20 +41,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vijayyaso.navgesture.BuildConfig
 import com.vijayyaso.navgesture.R
-import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
+import com.vijayyaso.navgesture.gesture.SwipeKind
+import com.vijayyaso.navgesture.gesture.SwipeWarning
+import com.vijayyaso.navgesture.gesture.swipeWarnings
 import com.vijayyaso.navgesture.navigation.GestureBarHider
 import com.vijayyaso.navgesture.navigation.GestureBarHider.BarState
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 @Composable
-internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner) -> Unit) {
+internal fun GestureSettingsScreen(model: AppModel, onOpen: (Screen) -> Unit) {
     val configuration = model.configuration
     var adjustOpen by rememberSaveable { mutableStateOf(false) }
-    SettingsGroup(title = stringResource(R.string.gestures_title)) {
-        CheatSheet(configuration)
-    }
-
     SettingsGroup(title = stringResource(R.string.section_edges)) {
         // One child, so no line cuts through the touch-area block.
         Column(modifier = Modifier.padding(vertical = 12.dp)) {
@@ -97,14 +98,6 @@ internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner)
             )
         }
         ToggleRow(
-            label = stringResource(R.string.label_left_edge_back),
-            checked = configuration.leftEdgeBackEnabled,
-        ) { updated -> model.update { it.copy(leftEdgeBackEnabled = updated) } }
-        ToggleRow(
-            label = stringResource(R.string.label_right_edge_back),
-            checked = configuration.rightEdgeBackEnabled,
-        ) { updated -> model.update { it.copy(rightEdgeBackEnabled = updated) } }
-        ToggleRow(
             label = stringResource(R.string.label_landscape_confirm),
             checked = configuration.landscapeConfirmEnabled,
             supporting = stringResource(R.string.label_landscape_confirm_body),
@@ -120,21 +113,33 @@ internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner)
         )
     }
 
+    // A side set to Nothing has no touch area, so the app underneath gets those touches.
+    SettingsGroup(title = stringResource(R.string.section_swipes)) {
+        EDGE_ROWS.forEach { row ->
+            NavigationRow(
+                title = stringResource(row.title),
+                supporting = edgeSummary(row.edge, configuration.slots),
+                tag = row.tag,
+            ) { onOpen(row.page) }
+        }
+    }
+    SwipeWarnings(configuration)
+
     // Here, not on App switching: a corner runs any action, even with the app list off.
     SettingsGroup(
         title = stringResource(R.string.section_corner_shortcuts),
         footer = stringResource(R.string.corner_shortcuts_body),
     ) {
-        CornerShortcutRow(
+        SwipeActionRow(
             title = stringResource(R.string.label_left_corner),
-            shortcut = configuration.leftCornerShortcut,
+            action = configuration.leftCornerShortcut,
             tag = TestTags.ROW_LEFT_CORNER,
-        ) { onOpenCorner(BottomCorner.LEFT) }
-        CornerShortcutRow(
+        ) { onOpen(Screen.LEFT_CORNER) }
+        SwipeActionRow(
             title = stringResource(R.string.label_right_corner),
-            shortcut = configuration.rightCornerShortcut,
+            action = configuration.rightCornerShortcut,
             tag = TestTags.ROW_RIGHT_CORNER,
-        ) { onOpenCorner(BottomCorner.RIGHT) }
+        ) { onOpen(Screen.RIGHT_CORNER) }
     }
 
     SettingsGroup(title = stringResource(R.string.section_distance_and_timing)) {
@@ -145,6 +150,36 @@ internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner)
             formatter = { stringResource(R.string.value_dp, it) },
             supporting = stringResource(R.string.label_side_distance_body),
         ) { updated -> model.update { it.copy(sideMinimumSwipeDistanceDp = updated) } }
+        // Only while a long swipe a touch can reach has an action, so the default page stays as it was.
+        AnimatedVisibility(
+            visible = configuration.slots.anySet(SwipeKind.LONG),
+            enter = BlockEnter,
+            exit = BlockExit,
+        ) {
+            ThresholdSlider(
+                label = stringResource(R.string.label_long_distance),
+                value = configuration.longSwipeDp,
+                range = LONG_SWIPE_RANGE,
+                formatter = { stringResource(R.string.value_dp, it) },
+                supporting = stringResource(R.string.label_long_distance_body),
+                tag = TestTags.SLIDER_LONG_SWIPE,
+            ) { updated -> model.update { it.copy(longSwipeDp = updated) } }
+        }
+        // The same rule for the wait: shown only while a reachable wait swipe has an action.
+        AnimatedVisibility(
+            visible = configuration.slots.anySet(SwipeKind.WAIT),
+            enter = BlockEnter,
+            exit = BlockExit,
+        ) {
+            ThresholdSlider(
+                label = stringResource(R.string.label_wait_time),
+                value = configuration.waitMs.toFloat(),
+                range = WAIT_RANGE,
+                formatter = { stringResource(R.string.value_ms, it) },
+                supporting = stringResource(R.string.label_wait_time_body),
+                tag = TestTags.SLIDER_WAIT,
+            ) { updated -> model.update { it.copy(waitMs = updated.roundToLong()) } }
+        }
         ThresholdSlider(
             label = stringResource(R.string.label_bottom_distance),
             value = configuration.bottomMinimumSwipeDistanceDp,
@@ -191,40 +226,61 @@ internal fun GestureSettingsScreen(model: AppModel, onOpenCorner: (BottomCorner)
     }
 }
 
-/** Only the gestures this configuration has, so a turned-off one is not advertised. */
+/** Home's tile line: a warning while one applies, else the three distances. */
 @Composable
-private fun CheatSheet(configuration: GestureConfiguration) {
-    val back = when {
-        configuration.leftEdgeBackEnabled && configuration.rightEdgeBackEnabled -> R.string.gesture_back_how
-        configuration.leftEdgeBackEnabled -> R.string.gesture_back_left_how
-        configuration.rightEdgeBackEnabled -> R.string.gesture_back_right_how
-        else -> null
-    }
-    buildList {
-        back?.let { add(R.string.gesture_back_name to it) }
-        add(R.string.gesture_home_recents_name to R.string.gesture_home_recents_how)
-        if (configuration.edgeAppListEnabled) {
-            add(R.string.gesture_switch_apps_name to R.string.gesture_switch_apps_how)
-        }
-        if (configuration.circleToSearchEnabled) {
-            add(R.string.gesture_circle_to_search_name to R.string.gesture_circle_to_search_how)
-        }
-        if (configuration.anyCornerShortcut) {
-            add(R.string.gesture_corner_name to R.string.gesture_corner_how)
-        }
-    }.forEach { (name, how) -> InfoRow(title = stringResource(name), supporting = stringResource(how)) }
+internal fun gestureSettingsSummary(configuration: GestureConfiguration): String {
+    val warning = configuration.swipeWarnings().firstOrNull()
+    if (warning != null) return stringResource(warningTitle(warning))
+    return distancesSummary(configuration)
 }
 
 @Composable
-internal fun gestureSettingsSummary(configuration: GestureConfiguration): String = stringResource(
+private fun distancesSummary(configuration: GestureConfiguration): String = stringResource(
     R.string.gesture_settings_summary,
     configuration.edgeWidthDp.roundToInt(),
     configuration.sideMinimumSwipeDistanceDp.roundToInt(),
     configuration.bottomMinimumSwipeDistanceDp.roundToInt(),
 )
 
+/**
+ * Shown only while no swipe or corner goes Home, or none goes Back. It never blocks a choice;
+ * it names the tile that turns gestures off and brings the phone's own bar back.
+ */
+@Composable
+private fun SwipeWarnings(configuration: GestureConfiguration) {
+    val warnings = configuration.swipeWarnings()
+    // A block folding away keeps its last rows rather than shrinking to nothing first.
+    val shown = rememberLastShown(warnings, warnings.isNotEmpty())
+    AnimatedVisibility(visible = warnings.isNotEmpty(), enter = BlockEnter, exit = BlockExit) {
+        SettingsGroup {
+            shown.forEach { warning ->
+                InfoRow(
+                    title = stringResource(warningTitle(warning)),
+                    supporting = stringResource(R.string.swipe_warning_way_out),
+                    supportingTag = when (warning) {
+                        SwipeWarning.NO_HOME -> TestTags.WARNING_NO_HOME
+                        SwipeWarning.NO_BACK -> TestTags.WARNING_NO_BACK
+                    },
+                )
+            }
+        }
+    }
+}
+
+@StringRes
+internal fun warningTitle(warning: SwipeWarning): Int = when (warning) {
+    SwipeWarning.NO_HOME -> R.string.swipe_warning_no_home
+    SwipeWarning.NO_BACK -> R.string.swipe_warning_no_back
+}
+
 /** The same 8 to 64 dp the touch strips have always offered. */
 private val EDGE_WIDTH_RANGE = 8f..64f
+
+/** Far swipe distance, around its 120 dp default; it stays well past most back swipe distances. */
+private val LONG_SWIPE_RANGE = 80f..240f
+
+/** Wait time in ms, around its 350 ms default: long enough that a hesitating Back stays Back. */
+private val WAIT_RANGE = 200f..800f
 
 @Composable
 private fun GestureBarSection(configuration: GestureConfiguration, bar: BarState, model: AppModel) {

@@ -17,6 +17,10 @@
 
 package com.vijayyaso.navgesture.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import android.text.format.DateFormat
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +35,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -64,13 +69,21 @@ internal fun UpdateStatusRow(
                     text = updateMessage(state) ?: stringResource(R.string.update_not_checked),
                     modifier = Modifier.testTag(TestTags.UPDATE_STATUS),
                 )
-                if (phase is UpdatePhase.Downloading) {
-                    val percent = phase.percent
+                val downloading = phase as? UpdatePhase.Downloading
+                // The last percent is kept while the bar folds away, so it does not fall back to empty.
+                val percent = rememberLastShown(downloading?.percent, downloading != null)
+                AnimatedVisibility(visible = downloading != null, enter = BlockEnter, exit = BlockExit) {
                     if (percent == null) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     } else {
+                        // Linear, as the download moves at a steady rate between two reports.
+                        val shownProgress by animateFloatAsState(
+                            percent / 100f,
+                            tween(EXPAND_MS, easing = LinearEasing),
+                            label = "download",
+                        )
                         LinearProgressIndicator(
-                            progress = { percent / 100f },
+                            progress = { shownProgress },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

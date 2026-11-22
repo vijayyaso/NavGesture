@@ -28,7 +28,6 @@ set -e
 
 require_adb
 
-usage_granted="$(string_res label_usage_access_granted)"
 usage_missing="$(string_res label_usage_access_missing)"
 service_working="$(string_res status_working)"
 service_off="$(string_res status_off)"
@@ -62,8 +61,8 @@ open_screen row_app_switching usage_access
 assert_shows "the row starts out missing" usage_access "${usage_missing}"
 leave_app
 "${ADB_BIN}" shell appops set "${PKG}" GET_USAGE_STATS allow >/dev/null
-open_screen row_app_switching usage_access
-assert_shows "the row reads granted without a tap" usage_access "${usage_granted}"
+open_screen row_app_switching switch_edge_app_list
+assert_shows "the row is gone once granted, without a tap" usage_access ""
 
 echo >&2
 echo "== usage access revoked in the background shows on return ==" >&2

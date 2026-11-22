@@ -218,6 +218,18 @@ swipe_and_hold() {
   "${ADB_BIN}" shell input motionevent UP "$3" "$4" >/dev/null
 }
 
+# swipe_up_drag <x> <dx> - the app-list trigger: a short swipe up from the bottom, then a longer
+# drag sideways, then lift. The rise only arms the gesture; the sideways travel must beat it.
+swipe_up_drag() {
+  x="$1" dx="$2" top=$((BOTTOM_Y - 120))
+  "${ADB_BIN}" shell input motionevent DOWN "${x}" "${BOTTOM_Y}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE "${x}" "${top}" >/dev/null
+  "${ADB_BIN}" shell input motionevent MOVE $((x + dx)) "${top}" >/dev/null
+  sleep 0.4
+  "${ADB_BIN}" shell input motionevent UP $((x + dx)) "${top}" >/dev/null
+  sleep 2
+}
+
 # corner_swipe <x0> <dx-sign> - a 45-degree diagonal from a bottom corner, in three events.
 corner_swipe() {
   x0="$1" sign="$2"
@@ -343,6 +355,13 @@ ui_nodes() {
   printf '%s\n' "${nodes}"
 }
 
+# bounds_of_id <tag> - the left, top, right and bottom of that node, from one dump and without
+# scrolling: on the practice demo a scroll swipe would land on the drawn phone and count as a try.
+bounds_of_id() {
+  ui_nodes | grep -m1 "resource-id=\"$1\"" |
+    sed -n 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]".*/\1 \2 \3 \4/p'
+}
+
 # string_res <name> [source set] - the default-locale text of an app string (default: main).
 string_res() {
   sed -n "s/.*name=\"$1\">\(.*\)<\/string>.*/\1/p" "app/src/${2:-main}/res/values/strings.xml"
@@ -365,6 +384,10 @@ scroll_app() {
 # find_id <tag> - scrolls the app from the top until that node's centre clears the bottom
 # strip, which takes a tap there for itself, and prints the node.
 find_id() {
+  # Four, not two: a long Home page restored part-way down (as after the disclosure's Not now)
+  # needs more than two to reach the status block at the top.
+  scroll_app up
+  scroll_app up
   scroll_app up
   scroll_app up
   size="$("${ADB_BIN}" shell wm size | tr -d '\r' | awk -F': *' '{print $2}' | tail -1)"
@@ -396,6 +419,29 @@ tap_id() {
   tap_node "${node}"
 }
 
+# find_text <text> - like find_id, but finds the node by the exact text it shows.
+find_text() {
+  scroll_app up
+  size="$("${ADB_BIN}" shell wm size | tr -d '\r' | awk -F': *' '{print $2}' | tail -1)"
+  clear_y=$((${size#*x} - 260))
+  text_try=1
+  while [ "${text_try}" -le 6 ]; do
+    # shellcheck disable=SC2310 # an empty dump is the retry signal, not an error
+    hit="$(ui_nodes | grep -m1 "text=\"$1\"" || true)"
+    middle="$(printf '%s\n' "${hit}" |
+      sed -n 's/.*bounds="\[[0-9]*,\([0-9]*\)\]\[[0-9]*,\([0-9]*\)\]".*/\1 \2/p' |
+      awk '{print int(($1 + $2) / 2)}')"
+    if [ -n "${middle}" ] && [ "${middle}" -lt "${clear_y}" ]; then
+      printf '%s\n' "${hit}"
+      return 0
+    fi
+    scroll_app down
+    sleep 1
+    text_try=$((text_try + 1))
+  done
+  return 1
+}
+
 # text_of_id <tag> - prints the text the node with that tag shows.
 text_of_id() {
   # shellcheck disable=SC2310 # a missing node is reported by the caller
@@ -406,8 +452,9 @@ text_of_id() {
 # set_toggle_id <tag> <true|false> - sets the switch with that tag on the current screen.
 set_toggle_id() {
   tapped=''
+  seen_at=''
   tries=1
-  while [ "${tries}" -le 6 ]; do
+  while [ "${tries}" -le 8 ]; do
     # shellcheck disable=SC2310 # a missing node is retried and then reported below
     node="$(find_id "$1" || true)"
     case "${node}" in
@@ -415,12 +462,15 @@ set_toggle_id() {
         echo "   '$1' is $2" >&2
         return 0
         ;;
-      # Tapped once, since a loaded emulator redraws late and a second tap would undo it.
+      # Tapped once, since a loaded emulator redraws late and a second tap would undo it. And
+      # only where two reads in a row found it: a screen still loading moves it under the tap.
       *'checked="'*)
-        if [ -z "${tapped}" ]; then
+        at="$(printf '%s\n' "${node}" | sed -n 's/.*bounds="\([^"]*\)".*/\1/p')"
+        if [ -z "${tapped}" ] && [ "${at}" = "${seen_at}" ]; then
           tap_node "${node}"
           tapped='1'
         fi
+        seen_at="${at}"
         ;;
       *) ;;
     esac
@@ -435,11 +485,19 @@ set_toggle_id() {
 # open_test_app lands on whichever screen was open last, where Back only returns home.
 # So a suite that touches the UI or needs Back to leave the app goes through these.
 
-# to_home - taps the app bar's back arrow until home, which has none, is showing.
+# to_home - taps the app bar's back arrow until home, which has none, is showing. The live
+# practice page has no bar, so its Close is tapped instead, or Done on its finish card.
 to_home() {
   back_try=1
   while [ "${back_try}" -le 6 ]; do
-    back_node="$(ui_nodes | grep -m1 'resource-id="nav_back"' || true)"
+    screen="$(ui_nodes)"
+    back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="nav_back"' || true)"
+    if [ -z "${back_node}" ]; then
+      back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="practice_close"' || true)"
+    fi
+    if [ -z "${back_node}" ] && printf '%s\n' "${screen}" | grep -q 'resource-id="practice_page"'; then
+      back_node="$(printf '%s\n' "${screen}" | grep -m1 'resource-id="demo_done"' || true)"
+    fi
     if [ -z "${back_node}" ]; then
       return 0
     fi

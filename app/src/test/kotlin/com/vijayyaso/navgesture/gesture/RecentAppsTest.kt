@@ -103,4 +103,12 @@ class RecentAppsTest {
         assertEquals(true, RecentApps.currentIsFirst(wide, ordered))
         assertEquals(false, RecentApps.tooFew(ordered, currentFirst = true))
     }
+
+    @Test
+    fun `the previous app skips the app in front, and is the first one when the front app is not listed`() {
+        assertEquals("b", RecentApps.previous(listOf("a", "b", "c"), currentFirst = true))
+        assertEquals("a", RecentApps.previous(listOf("a", "b", "c"), currentFirst = false))
+        assertEquals(null, RecentApps.previous(listOf("a"), currentFirst = true))
+        assertEquals(null, RecentApps.previous(emptyList(), currentFirst = false))
+    }
 }

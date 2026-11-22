@@ -18,6 +18,7 @@
 package com.vijayyaso.navgesture.service
 
 import com.vijayyaso.navgesture.gesture.TouchSample
+import kotlin.math.hypot
 
 /**
  * Re-injects a touch that an edge strip consumed but did not turn into a gesture. Strips
@@ -28,4 +29,19 @@ internal fun interface TouchReplayer {
 
     /** [samples] are display coordinates, oldest first. */
     fun replay(samples: List<TouchSample>, onDone: () -> Unit): Boolean
+}
+
+/** How far a touch may move, first sample to last, and still be a tap. */
+internal const val TAP_SLOP_PX = 12f
+
+/**
+ * Whether [samples] are a tap: the touch moved less than [TAP_SLOP_PX] from its first sample to
+ * its last. A still hold is a tap too. The replay and the practice report layer both use this
+ * one rule, so a touch is never a tap to one and a swipe to the other. No samples is no tap.
+ */
+internal fun isTap(samples: List<TouchSample>): Boolean {
+    if (samples.isEmpty()) return false
+    val first = samples.first()
+    val last = samples.last()
+    return hypot(last.xPx - first.xPx, last.yPx - first.yPx) < TAP_SLOP_PX
 }

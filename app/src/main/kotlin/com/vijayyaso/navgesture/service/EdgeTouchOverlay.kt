@@ -32,16 +32,20 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import com.vijayyaso.navgesture.demo.DemoMiss
+import com.vijayyaso.navgesture.demo.DemoResult
 import com.vijayyaso.navgesture.diagnostics.ServiceLog
-import com.vijayyaso.navgesture.gesture.BottomCorner
 import com.vijayyaso.navgesture.gesture.ConfirmVerdict
-import com.vijayyaso.navgesture.gesture.CornerShortcut
 import com.vijayyaso.navgesture.gesture.GestureAction
 import com.vijayyaso.navgesture.gesture.GestureConfiguration
 import com.vijayyaso.navgesture.gesture.GestureTracker
 import com.vijayyaso.navgesture.gesture.HapticGate
 import com.vijayyaso.navgesture.gesture.LandscapeConfirm
+import com.vijayyaso.navgesture.gesture.RejectionReason
 import com.vijayyaso.navgesture.gesture.ScreenEdge
+import com.vijayyaso.navgesture.gesture.SlotId
+import com.vijayyaso.navgesture.gesture.SwipeAction
+import com.vijayyaso.navgesture.gesture.SwipeKind
 import com.vijayyaso.navgesture.gesture.TouchRecording
 import com.vijayyaso.navgesture.gesture.TouchSample
 import com.vijayyaso.navgesture.gesture.TrackerAction
@@ -69,8 +73,8 @@ internal class EdgeTouchOverlay(
     private val onGestureAction: (GestureAction, ScreenEdge) -> Unit,
     private val switcher: AppSwitcher,
     private val favourites: () -> List<String>,
-    /** Runs a corner shortcut that is not an app list: a system action or an app. */
-    private val onShortcut: (CornerShortcut) -> Unit,
+    /** Runs an action that waited for the settle delay and is not an app list. */
+    private val onAction: (SwipeAction) -> Unit,
     private val layout: OverlayLayout = OverlayLayout(),
 ) {
 
@@ -100,18 +104,26 @@ internal class EdgeTouchOverlay(
 
     private val stuckCheck = Runnable(::onStuckCheck)
 
+    // The stream that started while live practice held the gate: the first reading of the gate.
+    private var practiceStream = 0L
+
+    // The stream that already reported its one result to the practice page.
+    private var reportedStream = 0L
+
     fun install(configuration: GestureConfiguration, geometry: ScreenGeometry) {
         remove()
         this.configuration = configuration
+        val installed = InstalledStrips(configuration, geometry.landscape)
         confirmation.configure(configuration.landscapeConfirmEnabled, geometry.landscape)
         if (configuration.landscapeConfirmEnabled && geometry.landscape) {
             pill = ConfirmPillOverlay(context, windowManager, geometry).also { it.install() }
         }
-        syncPill()
+        syncPill(restored = true)
 
-        val listShortcut = listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut)
-            .any { it == CornerShortcut.RecentsList || it == CornerShortcut.FavouritesList }
-        if (configuration.edgeAppListEnabled || listShortcut) {
+        // Built only when something can open it: the bottom drag, or a swipe or corner set to a list.
+        val listAction = configuration.slots.holds { it.needsListPanel } ||
+            listOf(configuration.leftCornerShortcut, configuration.rightCornerShortcut).any { it.needsListPanel }
+        if (configuration.edgeAppListEnabled || listAction) {
             val stripPx = (configuration.edgeWidthDp * geometry.density).toInt() + geometry.navBottomPx
             val panel = SwitcherPanelOverlay(context, windowManager, geometry, stripPx).also { it.install() }
             switcherPanel = panel
@@ -123,6 +135,7 @@ internal class EdgeTouchOverlay(
                 style = configuration.appListStyle,
                 stepDp = configuration.switcherStepDp,
                 adaptiveSpeed = configuration.switcherAdaptiveSpeed,
+                practiceReport = ::sendToPractice,
             ) { feedback ->
                 if (configuration.hapticFeedbackEnabled) {
                     strips.values.firstOrNull()?.performHapticFeedback(feedback)
@@ -130,9 +143,10 @@ internal class EdgeTouchOverlay(
             }
         }
 
+        // A side with nothing to run has no strip, so the app underneath gets its touches.
         val edges = buildList {
-            if (configuration.leftEdgeBackEnabled) add(ScreenEdge.LEFT)
-            if (configuration.rightEdgeBackEnabled) add(ScreenEdge.RIGHT)
+            if (configuration.slots.edgeInUse(ScreenEdge.LEFT)) add(ScreenEdge.LEFT)
+            if (configuration.slots.edgeInUse(ScreenEdge.RIGHT)) add(ScreenEdge.RIGHT)
             add(ScreenEdge.BOTTOM)
         }
 
@@ -142,10 +156,15 @@ internal class EdgeTouchOverlay(
             }
             addStrip(edge, configuration, geometry)
         }
+        StripPause.listen(::applyInteractivity)
         applyInteractivity()
+        // The exact settings these strips were built with, for the live practice page's steps.
+        PracticeSession.setStrips(installed)
     }
 
     fun remove() {
+        PracticeSession.setStrips(null)
+        StripPause.listen(null)
         switcherController?.cancel()
         switcherController = null
         switcherPanel?.remove()
@@ -166,6 +185,7 @@ internal class EdgeTouchOverlay(
         // still in flight from freeing the next install's strips mid-touch.
         hold.reset()
         heldEdge = null
+        practiceStream = 0L
         // That stream's end never comes, so a pill it kept up returns to its timer.
         confirmation.onTouchLost()
     }
@@ -195,8 +215,12 @@ internal class EdgeTouchOverlay(
             onActivity = ::onActivity,
             admit = { stream, action -> hold.isCurrent(stream) && admit(action, edge) },
             admitList = { stream -> hold.isCurrent(stream) && admitList(edge) },
-            onFire = { stream, action -> if (hold.isCurrent(stream)) onFire(action, edge) },
-            onUnused = { stream, samples -> onUnused(edge, stream, samples) },
+            onFire = { stream, action -> if (hold.isCurrent(stream)) onFire(action, edge, stream) },
+            onUnused = { stream, samples, reason -> onUnused(edge, stream, samples, reason) },
+            onMiss = { stream, reason ->
+                if (hold.isCurrent(stream) && inPractice(stream)) report(stream, PracticeEvent.Missed(reason))
+            },
+            practiceNow = ::inPractice,
             onStreamEnd = { stream -> endStream(edge, stream) },
         )
         val params = paramsFor(edge, configuration, geometry)
@@ -256,8 +280,8 @@ internal class EdgeTouchOverlay(
      */
     private fun bottomSpan(configuration: GestureConfiguration, geometry: ScreenGeometry): Pair<Int, Int> {
         val margin = geometry.widthPx * (100 - layout.bottomLengthPercent) / 200
-        val left = if (configuration.leftCornerShortcut != CornerShortcut.None) 0 else margin
-        val right = if (configuration.rightCornerShortcut != CornerShortcut.None) {
+        val left = if (configuration.leftCornerShortcut != SwipeAction.None) 0 else margin
+        val right = if (configuration.rightCornerShortcut != SwipeAction.None) {
             geometry.widthPx
         } else {
             geometry.widthPx - margin
@@ -272,6 +296,7 @@ internal class EdgeTouchOverlay(
         confirmation.onDown(edge, now)
         syncPill()
         val stream = hold.start(now)
+        if (PracticeSession.isActive()) practiceStream = stream
         heldEdge = edge
         applyInteractivity()
         scheduleStuckCheck()
@@ -302,27 +327,46 @@ internal class EdgeTouchOverlay(
         return verdict is ConfirmVerdict.Perform
     }
 
-    private fun onFire(action: GestureAction, edge: ScreenEdge) {
-        if (action is GestureAction.Corner) {
-            // After the stream ends and the window update settles: the strips are visible again,
-            // which HyperOS needs to allow an app launch, and a screenshot misses the bubble.
-            handler.postDelayed({ runCorner(action.side) }, CORNER_SETTLE_MS)
+    private fun onFire(action: GestureAction, edge: ScreenEdge, stream: Long) {
+        // Live practice: the page gets the gesture, and nothing runs, not even later.
+        if (inPractice(stream)) {
+            catch(action, edge, stream)
+            return
+        }
+        // Every corner action waits, as does any action that settles: the strips must be visible
+        // again (HyperOS allows an app launch only then) and a screenshot must miss the bubble.
+        if (action is GestureAction.Run && (action.slot is SlotId.Corner || action.action.settles)) {
+            handler.postDelayed({ run(action.action) }, SETTLE_MS)
+            return
+        }
+        // A list opens the panel, which only the overlay has.
+        if (action is GestureAction.Run && action.action.needsListPanel) {
+            run(action.action)
             return
         }
         onGestureAction(action, edge)
     }
 
-    private fun runCorner(side: BottomCorner) {
-        when (val shortcut = configuration.shortcutFor(side)) {
-            CornerShortcut.None -> Unit
-            CornerShortcut.RecentsList -> switcherController?.openForTouch(recents = true)
-            CornerShortcut.FavouritesList -> switcherController?.openForTouch(recents = false)
-            else -> onShortcut(shortcut)
+    private fun run(action: SwipeAction) {
+        when (action) {
+            SwipeAction.None -> Unit
+            SwipeAction.RecentsList -> switcherController?.openForTouch(recents = true)
+            SwipeAction.FavouritesList -> switcherController?.openForTouch(recents = false)
+            else -> onAction(action)
         }
     }
 
-    private fun onUnused(edge: ScreenEdge, stream: Long, samples: List<TouchSample>) {
+    private fun onUnused(edge: ScreenEdge, stream: Long, samples: List<TouchSample>, reason: RejectionReason) {
         if (!hold.isCurrent(stream)) return
+        if (inPractice(stream)) {
+            report(stream, PracticeEvent.Missed(DemoMiss.Rejected(reason)))
+            // Only a tap is replayed in practice, into the page. Any other touch ends here, as a
+            // skipped replay does, or the strips would stay given back.
+            if (!isTap(samples)) {
+                endStream(edge, stream)
+                return
+            }
+        }
         if (!hold.mayReplay(stream)) {
             Log.d(TAG, "replay skipped, the strips were given back during this touch")
             endStream(edge, stream)
@@ -332,6 +376,40 @@ internal class EdgeTouchOverlay(
         syncPill(immediate = true)
         val dispatched = replayer.replay(samples) { releaseStream(stream, "replay done") }
         if (!dispatched) releaseStream(stream, "replay refused")
+    }
+
+    /** The gate's two readings: at this touch's DOWN, and now. Either one makes it practice. */
+    private fun inPractice(stream: Long): Boolean =
+        (stream != 0L && stream == practiceStream) || PracticeSession.isActive()
+
+    /** A whole gesture in practice: the page shows it and nothing runs. */
+    private fun catch(action: GestureAction, edge: ScreenEdge, stream: Long) {
+        val result = when (action) {
+            is GestureAction.Run -> DemoResult.Ran(action)
+            GestureAction.CircleToSearch -> DemoResult.CircleToSearch
+        }
+        Log.i(TAG, "PRACTICE_CAUGHT $edge ${action.id}")
+        report(stream, PracticeEvent.Caught(result, null))
+    }
+
+    /** One result per touch: the tracker can report a slow swipe as unused twice. */
+    private fun report(stream: Long, event: PracticeEvent) {
+        if (stream == reportedStream) return
+        reportedStream = stream
+        sendToPractice(event)
+    }
+
+    private fun sendToPractice(event: PracticeEvent) {
+        if (event is PracticeEvent.Missed) Log.i(TAG, "PRACTICE_MISSED ${missName(event.reason)}")
+        PracticeSession.emit(event)
+    }
+
+    // Enum names and fixed words, which R8 keeps; a class name would read as "a" in a release build.
+    private fun missName(reason: DemoMiss): String = when (reason) {
+        is DemoMiss.Rejected -> reason.reason.name
+        DemoMiss.PulledBack -> "PULLED_BACK"
+        DemoMiss.Cancelled -> "CANCELLED"
+        DemoMiss.NotOnEdge -> "NOT_ON_EDGE"
     }
 
     private fun endStream(edge: ScreenEdge, stream: Long) {
@@ -348,11 +426,12 @@ internal class EdgeTouchOverlay(
     }
 
     // Brings the pill window and its expiry timer in line with the model.
-    private fun syncPill(immediate: Boolean = false) {
+    // [restored] marks a pill put back after a reinstall: it was already up, so it does not fade in.
+    private fun syncPill(immediate: Boolean = false, restored: Boolean = false) {
         val expiresAt = confirmation.expiresAtMs
         val overlay = pill
         if (expiresAt != null && overlay != null) {
-            if (!pillVisible) overlay.show()
+            if (!pillVisible) overlay.show(fade = !restored)
             pillVisible = true
             handler.removeCallbacks(pillExpiry)
             // No timer under a confirming touch: one already due would run again at once.
@@ -404,7 +483,8 @@ internal class EdgeTouchOverlay(
 
     /** See the class comment for why this is alpha 0 as well as non-touchable. */
     private fun applyInteractivity() {
-        val interactive = !hold.held
+        // The practice demo is in front: its swipes belong to the drawn phone.
+        val interactive = !hold.held && !StripPause.paused
         strips.values.forEach { view ->
             val params = view.layoutParams as? WindowManager.LayoutParams ?: return@forEach
             val flags = if (interactive) {
@@ -435,7 +515,11 @@ internal class EdgeTouchOverlay(
         private val admit: (Long, GestureAction) -> Boolean,
         private val admitList: (Long) -> Boolean,
         private val onFire: (Long, GestureAction) -> Unit,
-        private val onUnused: (Long, List<TouchSample>) -> Unit,
+        private val onUnused: (Long, List<TouchSample>, RejectionReason) -> Unit,
+        /** A touch in live practice that ended with no gesture and no replay. */
+        private val onMiss: (Long, DemoMiss) -> Unit,
+        /** Whether the gate held for this stream, for an app list that opens in it. */
+        private val practiceNow: (Long) -> Boolean,
         private val onStreamEnd: (Long) -> Unit,
     ) : View(context) {
 
@@ -445,12 +529,12 @@ internal class EdgeTouchOverlay(
         private val samples = TouchRecording(MAX_SAMPLES)
         private var abandoned = false
         private var switching = false
-        private val haptics = HapticGate()
+        private val haptics = HapticGate(edge)
 
-        // MotionEvent times are uptime, so the pause poll reads the same clock.
+        // MotionEvent times are uptime, so the pause and wait polls read the same clock.
         private val holdRunnable = Runnable {
             val action = tracker.onHoldElapsed(SystemClock.uptimeMillis())
-            // The bottom bubble swaps to the Recents icon on the poll that primes it.
+            // The bubble swaps to the pause or wait action's icon on the poll that reaches it.
             samples.last?.let { bubble?.follow(action, it.xPx, it.yPx) }
             handle(action, replayable = false)
         }
@@ -498,6 +582,8 @@ internal class EdgeTouchOverlay(
                     // Never a navigation gesture, and replaying a partial pinch would be
                     // worse than dropping it.
                     Log.d(TAG, "$edge ABANDONED second pointer went down")
+                    // An open list reports its own cancel when the controller closes it.
+                    if (!abandoned && !switching) onMiss(stream, DemoMiss.Cancelled)
                     abandoned = true
                     switching = false
                     controller?.cancel()
@@ -535,6 +621,7 @@ internal class EdgeTouchOverlay(
                     // Commonly SystemUI when the touch began on the navigation bar, which
                     // sits above us in Z order.
                     Log.d(TAG, "$edge CANCELLED stream taken over by another window")
+                    if (!abandoned && !switching) onMiss(stream, DemoMiss.Cancelled)
                     switching = false
                     controller?.cancel()
                     bubble?.release()
@@ -566,6 +653,8 @@ internal class EdgeTouchOverlay(
                 !admitted && buzz -> confirmTick()
                 !admitted || !buzz -> Unit
                 action is TrackerAction.Fire && action.action == GestureAction.CircleToSearch -> longPressTick()
+                // A reached wait is a hold that landed, so it gets the same stronger buzz.
+                action is TrackerAction.Pending && action.kind == SwipeKind.WAIT -> longPressTick()
                 else -> tick()
             }
             when (action) {
@@ -573,9 +662,10 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.OpenSwitcher -> {
                     cancelHold()
                     if (admitted) {
-                        bubble?.hide()
+                        // No replay follows a list open, so the drop may sink back into its edge.
+                        bubble?.release()
                         switching = true
-                        controller?.open(action)
+                        controller?.open(action, practice = practiceNow(stream))
                         samples.last?.let { controller?.move(it) }
                     } else {
                         // Behind the pill: the tracker owns the rest of the touch and returns
@@ -597,18 +687,28 @@ internal class EdgeTouchOverlay(
                 is TrackerAction.Armed -> {
                     // A swipe is under way, so this touch can no longer be a long press.
                     removeCallbacks(longPressRunnable)
-                    Log.d(TAG, "$edge armed (pause poll=${action.scheduleHoldMs})")
-                    // The rise is live: from here a sideways drag opens the app list, so say so.
-                    // With the list off nothing can open, and the gesture's own buzz is enough.
-                    if (edge == ScreenEdge.BOTTOM && dragListEnabled) confirmTick()
-                    action.scheduleHoldMs?.let { postDelayed(holdRunnable, it) }
+                    Log.d(TAG, "$edge armed (hold poll=${action.scheduleHoldMs})")
+                    // The rise is live and a sideways drag opens the app list, so say so: once, and
+                    // only when the list is on and the arm did not already buzz (no pause action).
+                    if (edge == ScreenEdge.BOTTOM && dragListEnabled && !buzz) confirmTick()
+                    action.scheduleHoldMs?.let {
+                        removeCallbacks(holdRunnable)
+                        postDelayed(holdRunnable, it)
+                    }
                 }
                 is TrackerAction.RearmHold -> {
                     removeCallbacks(holdRunnable)
                     postDelayed(holdRunnable, action.delayMs)
                 }
-                // The release now means Recents; the haptic gate ticks for it.
-                is TrackerAction.RecentsPrimed -> Log.d(TAG, "$edge RECENTS_PRIMED")
+                // The release now means another action (pause, long, wait or back to short); the gate
+                // decides the tick. Moving on from a wait starts the still poll again.
+                is TrackerAction.Pending -> {
+                    Log.d(TAG, "$edge PENDING ${action.kind} ${action.action.id}")
+                    action.scheduleHoldMs?.let {
+                        removeCallbacks(holdRunnable)
+                        postDelayed(holdRunnable, it)
+                    }
+                }
                 is TrackerAction.Fire -> {
                     cancelHold()
                     if (admitted) {
@@ -617,16 +717,23 @@ internal class EdgeTouchOverlay(
                         onFire(stream, action.action)
                     }
                 }
-                is TrackerAction.Disarmed -> Log.d(TAG, "$edge disarmed, pulled back inside the trigger")
+                is TrackerAction.Disarmed -> {
+                    removeCallbacks(holdRunnable)
+                    Log.d(TAG, "$edge disarmed, pulled back inside the trigger")
+                }
                 // Consumed rather than replayed: the app never asked for this swipe.
-                is TrackerAction.Reverted -> Log.i(TAG, "GESTURE_REVERTED $edge")
+                is TrackerAction.Reverted -> {
+                    Log.i(TAG, "GESTURE_REVERTED $edge")
+                    onMiss(stream, DemoMiss.PulledBack)
+                }
                 is TrackerAction.Unused -> {
                     cancelHold()
                     Log.d(TAG, "$edge unused (${action.reason})")
                     if (replayable && !samples.isEmpty()) {
-                        onUnused(stream, samples.snapshot())
+                        onUnused(stream, samples.snapshot(), action.reason)
                         return true
                     }
+                    onMiss(stream, DemoMiss.Rejected(action.reason))
                 }
             }
             return false
@@ -689,9 +796,9 @@ internal class EdgeTouchOverlay(
         const val TAG = "NavGesture"
 
         /**
-         * Wait before a corner shortcut runs: the strips' return to visible is an async
+         * Wait before a settling action runs: the strips' return to visible is an async
          * window update, and an app launch is allowed only once a visible overlay is back.
          */
-        const val CORNER_SETTLE_MS = 80L
+        const val SETTLE_MS = 80L
     }
 }

@@ -37,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -116,8 +118,9 @@ internal fun TouchAreaAdjuster(
             val band = local.dp
             val sideLength = maxHeight * SIDE_LENGTH_FRACTION
             val bottomLength = maxWidth * BOTTOM_LENGTH_FRACTION
-            val leftLabel = sideLabel(configuration.leftEdgeBackEnabled)
-            val rightLabel = sideLabel(configuration.rightEdgeBackEnabled)
+            // A side with no strip has no band.
+            val leftLabel = sideName(configuration.slots, ScreenEdge.LEFT)
+            val rightLabel = sideName(configuration.slots, ScreenEdge.RIGHT)
             val description = stringResource(R.string.edge_area_preview_desc, local.roundToInt())
 
             Box(
@@ -144,7 +147,7 @@ internal fun TouchAreaAdjuster(
                         modifier = Modifier.align(Alignment.CenterStart),
                     )
                     OverlayLabel(
-                        text = stringResource(leftLabel),
+                        text = leftLabel,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .padding(start = band + HIT_EXPAND + 10.dp),
@@ -162,7 +165,7 @@ internal fun TouchAreaAdjuster(
                         modifier = Modifier.align(Alignment.CenterEnd),
                     )
                     OverlayLabel(
-                        text = stringResource(rightLabel),
+                        text = rightLabel,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .padding(end = band + HIT_EXPAND + 10.dp),
@@ -255,10 +258,6 @@ internal fun TouchAreaAdjuster(
     }
 }
 
-/** Null when no swipe listens on that side. */
-private fun sideLabel(backEnabled: Boolean): Int? =
-    if (backEnabled) R.string.gesture_back_name else null
-
 @Composable
 private fun OverlayLabel(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -289,8 +288,12 @@ private fun EdgeBand(
         topEnd = if (edge == ScreenEdge.RIGHT) 12.dp else 4.dp,
         bottomEnd = if (edge == ScreenEdge.RIGHT) 12.dp else 4.dp,
     )
-    val fill = BAND_FILL.copy(alpha = if (dragging) 0.38f else 0.22f)
-    val stroke = BAND_STROKE.copy(alpha = if (dragging) 1f else 0.7f)
+    // Lights up fast under the finger and lets go slower.
+    val held = tween<Float>(if (dragging) PRESS_IN_MS else PRESS_OUT_MS, easing = EaseOutStrong)
+    val fillAlpha by animateFloatAsState(if (dragging) 0.38f else 0.22f, held, label = "band fill")
+    val strokeAlpha by animateFloatAsState(if (dragging) 1f else 0.7f, held, label = "band stroke")
+    val fill = BAND_FILL.copy(alpha = fillAlpha)
+    val stroke = BAND_STROKE.copy(alpha = strokeAlpha)
 
     Box(
         modifier = modifier

@@ -59,17 +59,6 @@ configure notifications recents_list TAP
 geometry
 warm_input
 
-# swipe_up_drag <x> <dx> - the app-list trigger: a short rise, then a sideways drag, then lift.
-swipe_up_drag() {
-  x="$1" dx="$2" top=$((BOTTOM_Y - 120))
-  "${ADB_BIN}" shell input motionevent DOWN "${x}" "${BOTTOM_Y}" >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE "${x}" "${top}" >/dev/null
-  "${ADB_BIN}" shell input motionevent MOVE $((x + dx)) "${top}" >/dev/null
-  sleep 0.4
-  "${ADB_BIN}" shell input motionevent UP $((x + dx)) "${top}" >/dev/null
-  sleep 2
-}
-
 tap_outside() {
   "${ADB_BIN}" shell input tap $((WIDTH / 2)) $((HEIGHT / 3)) >/dev/null
   sleep 1
@@ -82,7 +71,7 @@ reset_log
 corner_swipe 30 1
 assert_log "the diagonal is a corner" "CORNER_READY LEFT"
 assert_log "the release fires the corner" "GESTURE_FIRED BOTTOM CornerLEFT"
-assert_log "the shortcut runs" "CORNER_SHORTCUT notifications"
+assert_log "the shortcut runs" "SWIPE_ACTION notifications"
 assert_no_log "the diagonal is not Home" "GESTURE_FIRED BOTTOM Home"
 assert_no_log "the diagonal is not replayed" "REPLAY_DISPATCHED"
 "${ADB_BIN}" shell cmd statusbar collapse >/dev/null 2>&1 || true

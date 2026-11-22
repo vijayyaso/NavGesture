@@ -18,6 +18,8 @@
 package com.vijayyaso.navgesture.ui
 
 import android.view.ViewConfiguration
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +29,6 @@ import com.vijayyaso.navgesture.R
 
 @Composable
 internal fun CircleToSearchScreen(model: AppModel) {
-    val context = LocalContext.current
     val configuration = model.configuration
     SettingsGroup(footer = stringResource(R.string.section_circle_to_search_body)) {
         ToggleRow(
@@ -36,8 +37,16 @@ internal fun CircleToSearchScreen(model: AppModel) {
             tag = TestTags.SWITCH_CIRCLE_TO_SEARCH,
         ) { updated -> model.update { it.copy(circleToSearchEnabled = updated) } }
     }
-    if (!configuration.circleToSearchEnabled) return
+    // The groups below open and close with the switch, whole, so no title is left behind.
+    AnimatedVisibility(visible = configuration.circleToSearchEnabled, enter = BlockEnter, exit = BlockExit) {
+        Column { CircleToSearchDetails(model) }
+    }
+}
 
+@Composable
+private fun CircleToSearchDetails(model: AppModel) {
+    val context = LocalContext.current
+    val configuration = model.configuration
     SettingsGroup(title = stringResource(R.string.section_timing)) {
         ToggleRow(
             label = stringResource(R.string.label_circle_to_search_system_timing),
@@ -47,7 +56,11 @@ internal fun CircleToSearchScreen(model: AppModel) {
             ),
             checked = configuration.circleToSearchFollowsSystemTiming,
         ) { updated -> model.update { it.copy(circleToSearchFollowsSystemTiming = updated) } }
-        if (!configuration.circleToSearchFollowsSystemTiming) {
+        AnimatedVisibility(
+            visible = !configuration.circleToSearchFollowsSystemTiming,
+            enter = BlockEnter,
+            exit = BlockExit,
+        ) {
             ThresholdSlider(
                 label = stringResource(R.string.label_circle_to_search_hold),
                 value = configuration.circleToSearchHoldMs.toFloat(),
@@ -57,28 +70,27 @@ internal fun CircleToSearchScreen(model: AppModel) {
         }
     }
 
-    SettingsGroup(title = stringResource(R.string.section_needs)) {
-        InfoRow(
-            title = stringResource(R.string.label_assistant),
-            supporting = stringResource(
-                when (model.assistant) {
-                    Assistant.GOOGLE -> R.string.assistant_google
-                    Assistant.OTHER -> R.string.assistant_other
-                    Assistant.UNKNOWN -> R.string.label_circle_to_search_assistant
-                },
-            ),
-            actions = if (model.assistant == Assistant.GOOGLE) {
-                null
-            } else {
-                {
+    // Shown only until Google is the assistant: after that there is nothing to do here.
+    if (model.assistant != Assistant.GOOGLE) {
+        SettingsGroup(title = stringResource(R.string.section_needs)) {
+            InfoRow(
+                title = stringResource(R.string.label_assistant),
+                supporting = stringResource(
+                    if (model.assistant == Assistant.OTHER) {
+                        R.string.assistant_other
+                    } else {
+                        R.string.label_circle_to_search_assistant
+                    },
+                ),
+                actions = {
                     FilledTonalButton(onClick = { openAssistantSettings(context) }) {
                         Text(stringResource(R.string.action_open_assistant_settings))
                     }
-                }
-            },
-        )
-        LastProblem(model.diagnostics.lastCircleToSearchFailure)
+                },
+            )
+        }
     }
+    LastProblem(model.diagnostics.lastCircleToSearchFailure)
 }
 
 @Composable
